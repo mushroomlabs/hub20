@@ -1,0 +1,21 @@
+syntax: glob
+*.pyc
+*.pyo
+*.mo
+*.db
+*.egg
+*.egg-info
+.idea
+.mypy_cache
+/config
+/log
+/data
+/docker
+docker.secrets
+dist
+build
+.vagrant
+.vagrant.d/
+.DS_Store
+ubuntu*.log
+*.local

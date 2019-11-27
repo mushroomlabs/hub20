@@ -1,0 +1,5 @@
+HUB20_DATABASE_HOST=localhost
+HUB20_BROKER_URL=amqp://localhost
+HUB20_CACHE_LOCATION=redis://localhost:6379/0
+HUB20_SITE_DOMAIN=localhost
+

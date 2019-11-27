@@ -1,0 +1,8 @@
+flake8
+rope
+jedi
+black
+autopep8
+yapf
+remote-pdb
+ipython
