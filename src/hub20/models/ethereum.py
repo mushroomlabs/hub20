@@ -2,6 +2,7 @@ from typing import TypeVar, Type, Any
 
 from django.db import models
 from gnosis.eth.django.models import EthereumAddressField, HexField
+from model_utils.managers import QueryManager
 from web3.auto import w3
 
 from ..choices import ETHEREUM_NETWORKS
@@ -29,6 +30,19 @@ class EthereumToken(models.Model):
 class Wallet(models.Model):
     address = EthereumAddressField(unique=True, db_index=True)
     private_key = HexField(max_length=64, unique=True)
+    is_locked = models.BooleanField(default=False)
+
+    objects = models.Manager()
+    unlocked = QueryManager(is_locked=False)
+    locked = QueryManager(is_locked=True)
+
+    def lock(self):
+        self.is_locked = True
+        self.save()
+
+    def unlock(self):
+        self.is_locked = False
+        self.save()
 
     def __str__(self) -> str:
         return self.address

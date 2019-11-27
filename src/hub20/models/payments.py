@@ -2,35 +2,27 @@ from typing import Optional
 import datetime
 
 from django.db import models
+from django.db.models import Sum
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
+from django.utils import timezone
 from gnosis.eth.django.models import EthereumAddressField, Sha3HashField
-from model_utils import Choices
-from model_utils.managers import QueryManager
-from model_utils.models import StatusModel, TimeStampedModel
-
+from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 
 from .accounts import Account
 from .ethereum import Wallet, EthereumTokenValueModel, EthereumToken
 from .raiden import Raiden
 
 
-INVOICE_LIFETIME = 15 * 60
-
-
-class Invoice(StatusModel, TimeStampedModel, EthereumTokenValueModel):
-    STATUS = Choices("requested", "ongoing", "completed", "canceled", "expired")
+class Invoice(TimeStampedModel, EthereumTokenValueModel):
+    EXPIRATION_TIME = 15 * 60
 
     identifier = models.CharField(max_length=48, unique=True, db_index=True)
+    expiration_time = models.DateTimeField()
     wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT)
     raiden = models.ForeignKey(Raiden, null=True, on_delete=models.PROTECT)
     account = models.ForeignKey(Account, on_delete=models.PROTECT)
-
-    objects = models.Manager()
-    closed = QueryManager(status__in=[STATUS.completed, STATUS.canceled, STATUS.expired])
-    pending = QueryManager(status__in=[STATUS.requested, STATUS.ongoing])
-
-    @property
-    def expiration_time(self) -> datetime.datetime:
-        return self.created + datetime.timedelta(seconds=INVOICE_LIFETIME)
 
     @property
     def chain_payment_address(self) -> str:
@@ -40,14 +32,26 @@ class Invoice(StatusModel, TimeStampedModel, EthereumTokenValueModel):
     def raiden_payment_address(self) -> Optional[str]:
         return self.raiden and self.raiden.address
 
+    @property
+    def payments(self):
+        return self.payment_set.filter(currency=self.currency).select_subclasses()
+
+    @property
+    def expired(self):
+        return timezone.now() > self.expiration_time
+
+    @property
+    def paid(self):
+        total_paid = self.payments.aggregate(total=Sum("amount")).get("total")
+        return total_paid is not None and total_paid >= self.amount
+
     @staticmethod
     def get_wallet() -> Wallet:
-        unlocked_wallets = Wallet.objects.exclude(
-            invoice__status__in=[Invoice.STATUS.requested, Invoice.STATUS.ongoing]
-        )
-        wallet = unlocked_wallets.order_by("?").first()
+        unlocked_wallets = Wallet.unlocked.all()
+        wallet = unlocked_wallets.order_by("?").first() or Wallet.generate()
+        wallet.lock()
 
-        return wallet or Wallet.generate()
+        return wallet
 
     @staticmethod
     def get_raiden(token: EthereumToken) -> Optional[Raiden]:
@@ -56,9 +60,7 @@ class Invoice(StatusModel, TimeStampedModel, EthereumTokenValueModel):
 
 class Payment(TimeStampedModel, EthereumTokenValueModel):
     invoice = models.ForeignKey(Invoice, on_delete=models.PROTECT)
-
-    class Meta:
-        abstract = True
+    objects = InheritanceManager()
 
 
 class InternalPayment(Payment):
@@ -73,6 +75,16 @@ class BlockchainPayment(Payment):
 class RaidenPayment(Payment):
     raiden = models.ForeignKey(Raiden, on_delete=models.PROTECT)
     identifier = models.PositiveIntegerField()
+
+
+@receiver(pre_save, sender=Invoice)
+def on_invoice_created(sender, **kw):
+    instance = kw["instance"]
+    created_time = instance.created or timezone.now()
+    if instance.expiration_time is None:
+        instance.expiration_time = created_time + datetime.timedelta(
+            seconds=Invoice.EXPIRATION_TIME
+        )
 
 
 __all__ = ["Invoice", "InternalPayment", "BlockchainPayment", "RaidenPayment"]

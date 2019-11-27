@@ -40,13 +40,17 @@ class InvoiceSerializer(serializers.ModelSerializer):
             "expiration_time",
             "chain_payment_address",
             "raiden_payment_address",
-            "status",
+            "created",
+            "expired",
+            "paid",
         ]
         read_only_fields = [
             "chain_payment_address",
             "raiden_payment_address",
             "expiration_time",
-            "status",
+            "created",
+            "expired",
+            "paid",
         ]
 
 
