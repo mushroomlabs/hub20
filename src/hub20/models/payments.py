@@ -6,9 +6,11 @@ from django.db.models import Sum
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
 from django.utils import timezone
-from gnosis.eth.django.models import EthereumAddressField, Sha3HashField
+from gnosis.eth.django.models import EthereumAddressField
 from model_utils.managers import InheritanceManager
 from model_utils.models import TimeStampedModel
+
+from blockchain.models import Transaction
 
 from .accounts import Account
 from .ethereum import Wallet, EthereumTokenValueModel, EthereumToken
@@ -69,7 +71,7 @@ class InternalPayment(Payment):
 
 class BlockchainPayment(Payment):
     address = EthereumAddressField(db_index=True)
-    tx_hash = Sha3HashField()
+    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE)
 
 
 class RaidenPayment(Payment):

@@ -10,7 +10,6 @@ DEBUG = "HUB20_DEBUG" in os.environ
 
 ALLOWED_HOSTS = os.getenv("HUB20_ALLOWED_HOSTS", ["*"])
 
-
 # Application definition
 
 DJANGO_APPS = [
@@ -36,11 +35,9 @@ THIRD_PARTY_APPS = [
     "qr_code",
 ]
 
-PROJECT_APPS = ["hub20"]
-
+PROJECT_APPS = ["blockchain", "hub20"]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS
-
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -160,9 +157,8 @@ STATICFILES_FINDERS = (
 STATIC_URL = "/static/"
 
 ADMIN_USERNAME = os.getenv("HUB20_ADMIN_USERNAME", "admin")
-
-
 AUTH_USER_MODEL = "hub20.Account"
+
 
 # Configuration of authentication/signup/registration via django-allauth/invitations
 LOGIN_URL = "login"
@@ -486,6 +482,11 @@ ACCOUNT_USERNAME_BLACKLIST = [
     "yoursite",
     "yourdomain",
 ]
+
+
+# Web3 and Hub20 configuration
+WEB3_PROVIDER_URI = os.getenv("WEB3_PROVIDER_URI", "http://localhost:8545")
+
 
 # Logging Configuration
 LOG_FILE = os.getenv("HUB20_SITE_LOG_FILE")

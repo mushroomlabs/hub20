@@ -2,19 +2,18 @@ from typing import TypeVar, Type, Any
 
 from django.db import models
 from gnosis.eth.django.models import EthereumAddressField, HexField
+from model_utils.models import TimeStampedModel
 from model_utils.managers import QueryManager
-from web3.auto import w3
 
-from ..choices import ETHEREUM_NETWORKS
+from blockchain.models import make_web3
+from blockchain.choices import ETHEREUM_CHAINS
 
 
 Wallet_T = TypeVar("Wallet_T", bound="Wallet")
 
 
 class EthereumToken(models.Model):
-    chain = models.PositiveIntegerField(
-        choices=ETHEREUM_NETWORKS, default=ETHEREUM_NETWORKS.mainnet
-    )
+    chain = models.PositiveIntegerField(choices=ETHEREUM_CHAINS, default=ETHEREUM_CHAINS.mainnet)
     ticker = models.CharField(max_length=5)
     name = models.CharField(max_length=60)
     decimals = models.PositiveIntegerField(default=18)
@@ -27,7 +26,7 @@ class EthereumToken(models.Model):
         unique_together = ("chain", "address")
 
 
-class Wallet(models.Model):
+class Wallet(TimeStampedModel):
     address = EthereumAddressField(unique=True, db_index=True)
     private_key = HexField(max_length=64, unique=True)
     is_locked = models.BooleanField(default=False)
@@ -49,7 +48,9 @@ class Wallet(models.Model):
 
     @classmethod
     def generate(cls: Type[Wallet_T]) -> Wallet_T:
+        w3 = make_web3()
         account = w3.eth.account.create()
+
         return cls.objects.create(address=account.address, private_key=account.privateKey.hex())
 
 
