@@ -59,7 +59,7 @@ class InvoiceView(BaseInvoiceView, generics.RetrieveDestroyAPIView):
 
     def get_object(self) -> models.Invoice:
         return get_object_or_404(
-            models.Invoice, id=self.kwargs.get("id"), account=self.request.user
+            models.Invoice, pk=self.kwargs.get("pk"), account=self.request.user
         )
 
 

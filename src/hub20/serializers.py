@@ -3,6 +3,7 @@ from typing import Dict
 from django.db import transaction
 from rest_framework import serializers
 
+from blockchain.models import CURRENT_CHAIN_ID
 from . import models
 
 
@@ -19,6 +20,9 @@ class EthereumTokenSerializer(serializers.ModelSerializer):
 
 class InvoiceSerializer(serializers.ModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="hub20:invoice-detail")
+    currency = serializers.PrimaryKeyRelatedField(
+        queryset=models.EthereumToken.objects.filter(chain=CURRENT_CHAIN_ID)
+    )
 
     def create(self, validated_data: Dict) -> models.Invoice:
         request = self.context["request"]

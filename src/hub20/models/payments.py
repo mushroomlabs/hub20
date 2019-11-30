@@ -1,24 +1,21 @@
 from typing import Optional
-import datetime
 
 from django.db import models
 from django.db.models import Sum
-from django.db.models.signals import pre_save
-from django.dispatch import receiver
 from django.utils import timezone
-from gnosis.eth.django.models import EthereumAddressField
+from gnosis.eth.django.models import EthereumAddressField, HexField
 from model_utils.managers import InheritanceManager
 from model_utils.models import TimeStampedModel
 
 from blockchain.models import Transaction
-
+from .. import app_settings
 from .accounts import Account
 from .ethereum import Wallet, EthereumTokenValueModel, EthereumToken
 from .raiden import Raiden
 
 
 class Invoice(TimeStampedModel, EthereumTokenValueModel):
-    EXPIRATION_TIME = 15 * 60
+    EXPIRATION_TIME = app_settings.PAYMENTS.invoice_lifetime
 
     identifier = models.CharField(max_length=48, unique=True, db_index=True)
     expiration_time = models.DateTimeField()
@@ -71,22 +68,16 @@ class InternalPayment(Payment):
 
 class BlockchainPayment(Payment):
     address = EthereumAddressField(db_index=True)
-    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE)
+    transaction_hash = HexField(max_length=64, db_index=True, unique=True)
+
+    @property
+    def transaction(self):
+        return Transaction.objects.filter(hash=self.transaction_hash).first()
 
 
 class RaidenPayment(Payment):
     raiden = models.ForeignKey(Raiden, on_delete=models.PROTECT)
     identifier = models.PositiveIntegerField()
-
-
-@receiver(pre_save, sender=Invoice)
-def on_invoice_created(sender, **kw):
-    instance = kw["instance"]
-    created_time = instance.created or timezone.now()
-    if instance.expiration_time is None:
-        instance.expiration_time = created_time + datetime.timedelta(
-            seconds=Invoice.EXPIRATION_TIME
-        )
 
 
 __all__ = ["Invoice", "InternalPayment", "BlockchainPayment", "RaidenPayment"]
