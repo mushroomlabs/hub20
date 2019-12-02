@@ -30,9 +30,9 @@ class TransferTestCase(BaseTestCase):
         self.assertEquals(self.transfer.payment.status, PAYMENT_STATUS.received)
 
     def test_user_balance_is_updated_on_completed_payment(self):
-        for _ in range(PAYMENT_SETTINGS.minimum_confirmations):
-            BlockFactory()
+        BlockFactory.create_batch(PAYMENT_SETTINGS.minimum_confirmations)
 
         user_account = UserAccount(self.transfer.payment.user)
         currency = self.transfer.currency
-        self.assertEquals(user_account.get_balance(currency), self.transfer.amount)
+        balance = user_account.get_balance(currency)
+        self.assertEquals(balance.amount, self.transfer.amount)

@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, List
 
 from django.shortcuts import get_object_or_404
 from django.db.models.query import QuerySet
@@ -6,6 +6,7 @@ from rest_framework import generics
 from rest_framework import permissions
 from rest_framework.serializers import Serializer
 
+from blockchain.models import CURRENT_CHAIN_ID
 from . import models
 from . import serializers
 
@@ -58,9 +59,27 @@ class PaymentView(BasePaymentView, generics.RetrieveDestroyAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_object(self) -> models.Payment:
-        return get_object_or_404(
-            models.Payment, pk=self.kwargs.get("pk"), user=self.request.user
+        return get_object_or_404(models.Payment, pk=self.kwargs.get("pk"), user=self.request.user)
+
+
+class TokenBalanceListView(generics.ListAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = serializers.TokenBalanceSerializer
+
+    def get_queryset(self) -> List[models.EthereumTokenAmount]:
+        return models.UserAccount(self.request.user).get_balances()
+
+
+class TokenBalanceView(generics.RetrieveAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = serializers.TokenBalanceSerializer
+
+    def get_object(self) -> models.EthereumTokenAmount:
+        user_account = models.UserAccount(self.request.user)
+        token = get_object_or_404(
+            models.EthereumToken, ticker=self.kwargs["code"], chain=CURRENT_CHAIN_ID
         )
+        return user_account.get_balance(token)
 
 
 class TokenListView(generics.ListAPIView):

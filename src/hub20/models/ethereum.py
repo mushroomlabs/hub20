@@ -1,4 +1,7 @@
-from typing import TypeVar, Type, Any, Optional
+from __future__ import annotations
+
+from typing import TypeVar, Type, Any, Optional, Union
+from decimal import Decimal
 
 from django.db import models
 from ethtoken.abi import EIP20_ABI
@@ -86,14 +89,58 @@ class EthereumTokenValueModel(models.Model):
 
     @property
     def formatted_amount(self):
-        return self.__class__.format_value(self.amount, self.currency)
-
-    @classmethod
-    def format_value(cls, amount, currency):
-        return f"{amount} {currency.ticker}"
+        token_amount = EthereumTokenAmount(amount=self.amount, token=self.currency)
+        return token_amount.formatted
 
     class Meta:
         abstract = True
 
 
-__all__ = ["EthereumToken", "Wallet"]
+class EthereumTokenAmount:
+    def __init__(self, amount: Decimal, currency: EthereumToken):
+        self.amount = amount
+        self.currency = currency
+
+    @property
+    def formatted(self):
+        return f"{self.amount} {self.currency.ticker}"
+
+    @property
+    def as_wei(self) -> int:
+        return int(self.amount * (10 ** self.currency.decimals))
+
+    def _check_currency_type(self, other):
+        if not self.currency == other.currency:
+            raise ValueError(f"Can not operate {self.currency} and {other.currency}")
+
+    def __add__(self, other: EthereumTokenAmount) -> EthereumTokenAmount:
+        self._check_currency_type(self)
+        return self.__class__(self.amount + other.amount, self.currency)
+
+    def __mul__(self, other: Union[int, float, Decimal]) -> EthereumTokenAmount:
+        return EthereumTokenAmount(amount=other * self.amount, currency=self.currency)
+
+    def __eq__(self, other: EthereumTokenAmount):
+        return self.currency == other.currency and self.amount == other.amount
+
+    def __lt__(self, other: EthereumTokenAmount):
+        self._check_currency_type(self)
+        return self.amount < other.amount
+
+    def __le__(self, other: EthereumTokenAmount):
+        self._check_currency_type(self)
+        return self.amount <= other.amount
+
+    def __gt__(self, other: EthereumTokenAmount):
+        self._check_currency_type(self)
+        return self.amount > other.amount
+
+    def __ge__(self, other: EthereumTokenAmount):
+        self._check_currency_type(self)
+        return self.amount >= other.amount
+
+    def __str__(self):
+        return self.formatted
+
+
+__all__ = ["EthereumToken", "Wallet", "EthereumTokenAmount"]
