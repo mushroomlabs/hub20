@@ -9,15 +9,17 @@ from gnosis.eth.django.models import EthereumAddressField, HexField
 from model_utils.managers import QueryManager
 from web3.contract import Contract
 
-from blockchain.models import make_web3, CURRENT_CHAIN_ID
+from blockchain.models import make_web3
 from blockchain.choices import ETHEREUM_CHAINS
+
+from hub20.app_settings import WEB3_SETTINGS
 
 
 Wallet_T = TypeVar("Wallet_T", bound="Wallet")
 
 
 class EthereumToken(models.Model):
-    chain = models.PositiveIntegerField(choices=ETHEREUM_CHAINS, default=CURRENT_CHAIN_ID)
+    chain = models.PositiveIntegerField(choices=ETHEREUM_CHAINS, default=WEB3_SETTINGS.chain_id)
     ticker = models.CharField(max_length=5)
     name = models.CharField(max_length=60)
     decimals = models.PositiveIntegerField(default=18)
@@ -38,7 +40,7 @@ class EthereumToken(models.Model):
         return w3.eth.contract(address=self.address, abi=EIP20_ABI)
 
     @staticmethod
-    def ETH(chain_id=CURRENT_CHAIN_ID):
+    def ETH(chain_id=WEB3_SETTINGS.chain_id):
         eth, _ = EthereumToken.objects.get_or_create(
             chain=chain_id, ticker="ETH", defaults={"name": "Ethereum"}
         )

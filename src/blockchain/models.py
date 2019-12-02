@@ -117,8 +117,4 @@ class Transaction(models.Model):
         return f"Tx {hash_hex}"
 
 
-_w3 = make_web3()
-CURRENT_CHAIN_ID = int(_w3.net.version)
-
-
-__all__ = ["Block", "Transaction", "CURRENT_CHAIN_ID"]
+__all__ = ["Block", "Transaction"]

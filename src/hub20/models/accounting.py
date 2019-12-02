@@ -8,7 +8,7 @@ from model_utils.models import TimeStampedModel
 
 logger = logging.getLogger(__name__)
 
-from blockchain.models import CURRENT_CHAIN_ID
+from hub20.app_settings import WEB3_SETTINGS
 from .ethereum import EthereumTokenValueModel, EthereumTokenAmount, EthereumToken
 
 
@@ -28,7 +28,7 @@ class UserAccount:
     def get_balances(self) -> List[EthereumTokenAmount]:
         return [
             self.get_balance(token)
-            for token in EthereumToken.objects.filter(chain=CURRENT_CHAIN_ID)
+            for token in EthereumToken.objects.filter(chain=WEB3_SETTINGS.chain_id)
         ]
 
 

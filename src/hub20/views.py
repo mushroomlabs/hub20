@@ -6,9 +6,9 @@ from rest_framework import generics
 from rest_framework import permissions
 from rest_framework.serializers import Serializer
 
-from blockchain.models import CURRENT_CHAIN_ID
 from . import models
 from . import serializers
+from .app_settings import WEB3_SETTINGS
 
 
 class ReadWriteSerializerMixin(generics.GenericAPIView):
@@ -77,7 +77,7 @@ class TokenBalanceView(generics.RetrieveAPIView):
     def get_object(self) -> models.EthereumTokenAmount:
         user_account = models.UserAccount(self.request.user)
         token = get_object_or_404(
-            models.EthereumToken, ticker=self.kwargs["code"], chain=CURRENT_CHAIN_ID
+            models.EthereumToken, ticker=self.kwargs["code"], chain=WEB3_SETTINGS.chain_id
         )
         return user_account.get_balance(token)
 

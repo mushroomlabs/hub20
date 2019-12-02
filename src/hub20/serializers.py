@@ -4,7 +4,7 @@ from django.db import transaction
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from blockchain.models import CURRENT_CHAIN_ID
+from .app_settings import WEB3_SETTINGS
 from . import models
 
 
@@ -43,7 +43,7 @@ class TokenBalanceSerializer(serializers.Serializer):
 class PaymentSerializer(serializers.ModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="hub20:payment-detail")
     currency = serializers.PrimaryKeyRelatedField(
-        queryset=models.EthereumToken.objects.filter(chain=CURRENT_CHAIN_ID)
+        queryset=models.EthereumToken.objects.filter(chain=WEB3_SETTINGS.chain_id)
     )
     transfer_methods = serializers.SerializerMethodField()
 
