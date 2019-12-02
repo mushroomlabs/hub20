@@ -1,9 +1,10 @@
 attributedict
 celery
-django>=2.0
+django<3
 django-allauth
 django-invitations
 django-model-utils
+django-pdb
 django-qr-code
 django-redis
 djangorestframework
@@ -15,4 +16,5 @@ ethtoken
 factory_boy
 gnosis-py
 psycopg2-binary
+raiden_contracts
 web3>=4,<5

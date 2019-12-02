@@ -1,29 +1,28 @@
 from typing import Dict
+import copy
 
+from django.contrib.auth import get_user_model
 from django.db import transaction
+from gnosis.eth.django.serializers import EthereumAddressField, HexadecimalField
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
-from .app_settings import WEB3_SETTINGS
+from ethereum_money.serializers import (
+    EthereumTokenSerializer,
+    TokenValueField,
+    CurrencyRelatedField,
+)
 from . import models
 
+User = get_user_model()
 
-class TokenValueField(serializers.DecimalField):
+
+class UserRelatedField(serializers.SlugRelatedField):
+    queryset = User.objects.filter(is_active=True)
+
     def __init__(self, *args, **kw):
-        kw.setdefault("max_digits", 32)
-        kw.setdefault("decimal_places", 18)
+        kw.setdefault("slug_field", "username")
         super().__init__(*args, **kw)
-
-
-class EthereumTokenSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(
-        view_name="hub20:token-detail", lookup_field="ticker", lookup_url_kwarg="code"
-    )
-    code = serializers.CharField(source="ticker")
-
-    class Meta:
-        model = models.EthereumToken
-        fields = ["url", "code", "name", "address"]
 
 
 class TokenBalanceSerializer(serializers.Serializer):
@@ -40,37 +39,160 @@ class TokenBalanceSerializer(serializers.Serializer):
         )
 
 
-class PaymentSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="hub20:payment-detail")
-    currency = serializers.PrimaryKeyRelatedField(
-        queryset=models.EthereumToken.objects.filter(chain=WEB3_SETTINGS.chain_id)
-    )
-    transfer_methods = serializers.SerializerMethodField()
+class TransferSerializer(serializers.ModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name="hub20:transfer-detail")
+    address = EthereumAddressField(write_only=True, required=False)
+    recipient = UserRelatedField(write_only=True, required=False, allow_null=True)
+    currency = CurrencyRelatedField()
+    target = serializers.CharField(read_only=True)
+    status = serializers.CharField(read_only=True)
 
-    def create(self, validated_data: Dict) -> models.Payment:
+    def validate_recipient(self, value):
         request = self.context["request"]
-        with transaction.atomic():
-            return models.Payment.objects.create(
-                wallet=models.Payment.get_wallet(),
-                raiden=models.Payment.get_raiden(validated_data["currency"]),
-                account=request.user,
-                **validated_data,
+        if value == request.user:
+            raise serializers.ValidationError("You can not make a transfer to yourself")
+        return value
+
+    def validate(self, data):
+        address = data.get("address")
+        recipient = data.get("recipient")
+        request = self.context["request"]
+
+        if not address and not recipient:
+            raise serializers.ValidationError(
+                "Either one of recipient or address must be provided"
+            )
+        if address and recipient:
+            raise serializers.ValidationError(
+                "Choose recipient by address or username, but not both at the same time"
             )
 
-    def get_transfer_methods(self, obj: models.Payment) -> Dict:
-        return {
-            "blockchain": obj.chain_transfer_details,
-            "raiden": obj.raiden_transfer_details,
-        }
+        transfer_data = copy.copy(data)
+        del transfer_data["address"]
+        del transfer_data["recipient"]
+
+        if recipient is not None:
+            transfer_class = models.InternalTransfer
+            transfer_data["receiver"] = recipient
+        else:
+            transfer_class = models.ExternalTransfer
+            transfer_data["recipient_address"] = address
+
+        transfer = transfer_class(sender=request.user, **transfer_data)
+
+        try:
+            transfer.verify_conditions()
+        except models.TransferError as exc:
+            raise serializers.ValidationError(str(exc))
+
+        return transfer_data
+
+    def create(self, validated_data):
+        transfer_class = (
+            models.InternalTransfer if "recipient" in validated_data else models.ExternalTransfer
+        )
+        request = self.context["request"]
+
+        return transfer_class.objects.create(sender=request.user, **validated_data)
+
+    class Meta:
+        model = models.Transfer
+        fields = (
+            "url",
+            "address",
+            "recipient",
+            "amount",
+            "currency",
+            "memo",
+            "identifier",
+            "status",
+            "target",
+        )
+        read_only_fields = ("recipient", "status", "target")
+
+
+class PaymentOrderMethodSerializer(serializers.ModelSerializer):
+    blockchain = EthereumAddressField(source="wallet.address", read_only=True)
+    raiden = EthereumAddressField(source="raiden.address", read_only=True)
+    identifier = serializers.IntegerField(read_only=True)
+    expiration_time = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        model = models.PaymentOrderMethod
+        fields = ("blockchain", "raiden", "identifier", "expiration_time")
+        read_only_fields = ("blockchain", "raiden", "identifier", "expiration_time")
+
+
+class PaymentSerializer(serializers.ModelSerializer):
+    currency = EthereumTokenSerializer()
 
     class Meta:
         model = models.Payment
-        fields = ["url", "amount", "currency", "expiration_time", "created", "transfer_methods"]
+        fields = ("id", "created", "currency", "amount")
+        read_only_fields = ("id", "created", "currency", "amount")
+
+
+class InternalPaymentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.InternalPayment
+        fields = PaymentSerializer.Meta.fields + ("user", "memo")
+        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("user", "memo")
+
+
+class BlockchainPaymentSerializer(PaymentSerializer):
+    transaction = HexadecimalField(read_only=True, source="transaction.hash")
+
+    class Meta:
+        model = models.BlockchainPayment
+        fields = PaymentSerializer.Meta.fields + ("transaction",)
+        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("transaction",)
+
+
+class RaidenPaymentSerializer(PaymentSerializer):
+    class Meta:
+        model = models.RaidenPayment
+        fields = PaymentSerializer.Meta.fields + ("raiden", "identifier")
+        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("raiden", "identifier")
+
+
+class PaymentOrderSerializer(serializers.ModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name="hub20:payment-order-detail")
+    currency = CurrencyRelatedField()
+    payment_method = PaymentOrderMethodSerializer(read_only=True)
+    payments = serializers.SerializerMethodField()
+
+    def create(self, validated_data: Dict) -> models.PaymentOrder:
+        request = self.context["request"]
+        with transaction.atomic():
+            return models.PaymentOrder.objects.create(user=request.user, **validated_data)
+
+    def get_payments(self, obj):
+        def get_payment_serializer(payment):
+            return {
+                models.InternalPayment: InternalPaymentSerializer,
+                models.BlockchainPayment: BlockchainPaymentSerializer,
+                models.RaidenPayment: RaidenPaymentSerializer,
+            }.get(type(payment), PaymentSerializer)(payment, context=self.context)
+
+        return [get_payment_serializer(payment).data for payment in obj.payments]
+
+    class Meta:
+        model = models.PaymentOrder
+        fields = [
+            "url",
+            "amount",
+            "currency",
+            "created",
+            "payment_method",
+            "payments",
+            "status",
+        ]
         read_only_fields = [
-            "expiration_time",
+            "payment_method",
+            "status",
             "created",
         ]
 
 
-class PaymentReadSerializer(PaymentSerializer):
+class PaymentOrderReadSerializer(PaymentOrderSerializer):
     currency = EthereumTokenSerializer(read_only=True)

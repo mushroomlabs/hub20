@@ -6,11 +6,6 @@ from django.http import HttpRequest
 from . import models
 
 
-@admin.register(models.EthereumToken)
-class TokenAdmin(admin.ModelAdmin):
-    pass
-
-
 @admin.register(models.Wallet)
 class WalletAdmin(admin.ModelAdmin):
     exclude = ["private_key"]

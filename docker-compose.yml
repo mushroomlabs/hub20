@@ -23,7 +23,8 @@ services:
   # RabbitMQ for celery and interprocess pub-sub
   rabbitmq:
     image: rabbitmq:latest
-
+    ports:
+      - "5672:5672"
   # Django web application
   web:
     command: >
@@ -33,7 +34,6 @@ services:
         while ! nc -w 1 -z rabbitmq 5672; do sleep 0.5; done;
         django-admin runserver 0.0.0.0:8000
       "
-
     image: hub20
     build: .
     volumes:
@@ -57,9 +57,8 @@ services:
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
         while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
         while ! nc -w 1 -z rabbitmq 5672; do sleep 0.5; done;
-        celery worker -A hub20 -l info
+        celery worker -A hub20server -l info
       "
-
     image: hub20
     build: .
     volumes:

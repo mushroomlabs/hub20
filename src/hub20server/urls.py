@@ -28,6 +28,7 @@ urlpatterns = [
     make_auth_view("api/accounts/user", UserDetailsView, "rest_user_details"),
     make_auth_view("api/session/login", LoginView, "rest_login"),
     make_auth_view("api/session/logout", LogoutView, "rest_logout"),
+    path("api/tokens/", include("ethereum_money.api", namespace="ethereum_money")),
     path("api/", include("hub20.api", namespace="hub20")),
     path("admin/", admin.site.urls),
 ]

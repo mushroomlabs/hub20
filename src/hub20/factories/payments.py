@@ -2,55 +2,54 @@ import factory
 from factory import fuzzy
 
 from blockchain.factories.providers import EthereumProvider
+from ethereum_money.factories import ETHFactory, Erc20TokenFactory, EthereumAccountFactory
 from hub20 import models
-from .base import UserAccountFactory
-from .ethereum import ETHFactory, Erc20TokenFactory
+from .base import UserFactory
 
 
 factory.Faker.add_provider(EthereumProvider)
 
 
-class PaymentFactory(factory.django.DjangoModelFactory):
-    user = factory.SubFactory(UserAccountFactory)
+class PaymentOrderFactory(factory.django.DjangoModelFactory):
+    user = factory.SubFactory(UserFactory)
     amount = fuzzy.FuzzyDecimal(0, 10, precision=6)
-    wallet = factory.LazyAttribute(lambda obj: models.Payment.get_wallet())
 
     class Meta:
         abstract = False
-        model = models.Payment
+        model = models.PaymentOrder
 
 
-class ETHPaymentFactory(PaymentFactory):
+class ETHPaymentOrderFactory(PaymentOrderFactory):
     currency = factory.SubFactory(ETHFactory)
 
     class Meta:
-        model = models.Payment
+        model = models.PaymentOrder
 
 
-class Erc20TokenPaymentFactory(PaymentFactory):
+class Erc20TokenPaymentOrderFactory(PaymentOrderFactory):
     currency = factory.SubFactory(Erc20TokenFactory)
 
     class Meta:
-        model = models.Payment
+        model = models.PaymentOrder
 
 
-class BlockchainTransferFactory(factory.django.DjangoModelFactory):
-    payment = factory.SubFactory(ETHPaymentFactory)
-    address = factory.Faker("ethereum_address")
-    amount = factory.LazyAttribute(lambda obj: obj.payment.amount)
-    currency = factory.LazyAttribute(lambda obj: obj.payment.currency)
+class BlockchainPaymentFactory(factory.django.DjangoModelFactory):
+    order = factory.SubFactory(ETHPaymentOrderFactory)
+    account = factory.SubFactory(EthereumAccountFactory)
+    amount = factory.LazyAttribute(lambda obj: obj.order.amount)
+    currency = factory.LazyAttribute(lambda obj: obj.order.currency)
 
     class Meta:
-        model = models.BlockchainTransfer
+        model = models.BlockchainPayment
 
 
-class PendingBlockchainTransferFactory(BlockchainTransferFactory):
+class PendingBlockchainPaymentFactory(BlockchainPaymentFactory):
     transaction_hash = factory.Faker("hex64")
 
 
 __all__ = [
-    "ETHPaymentFactory",
-    "Erc20TokenPaymentFactory",
-    "BlockchainTransferFactory",
-    "PendingBlockchainTransferFactory",
+    "ETHPaymentOrderFactory",
+    "Erc20TokenPaymentOrderFactory",
+    "BlockchainPaymentFactory",
+    "PendingBlockchainPaymentFactory",
 ]

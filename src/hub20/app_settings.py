@@ -10,7 +10,14 @@ def _get_setting(setting_name: str, default: Any) -> Optional[Dict]:
 
 
 WEB3_SETTINGS = AttributeDict(
-    {"chain_id": _get_setting("WEB3_CHAIN_ID", 5 if settings.DEBUG else 1)}
+    {
+        "chain_id": _get_setting("WEB3_CHAIN_ID", 5 if settings.DEBUG else 1),
+        "max_gas": _get_setting("WEB3_MAX_GAS", 200_000),
+    }
+)
+
+TRANSFER_SETTINGS = AttributeDict(
+    {"minimum_confirmations": _get_setting("TRANSFER_MININUM_CONFIRMATIONS", 10)}
 )
 
 PAYMENT_SETTINGS = AttributeDict(

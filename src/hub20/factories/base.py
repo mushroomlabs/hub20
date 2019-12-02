@@ -6,11 +6,11 @@ import factory
 User = get_user_model()
 
 
-class UserAccountFactory(factory.django.DjangoModelFactory):
+class UserFactory(factory.django.DjangoModelFactory):
     username = factory.Sequence(lambda n: f"test-user-{n:03}")
 
     class Meta:
         model = User
 
 
-__all__ = ["UserAccountFactory"]
+__all__ = ["UserFactory"]

@@ -10,4 +10,4 @@ HUB20_SITE_LOG_FILE=/tmp/app.log
 HUB20_EMAIL_MAILER_ADDRESS=noreply@hub20.example.com
 HUB20_EMAIL_BACKEND=django.core.mail.backends.console.EmailBackend
 HUB20_SECRET_KEY=base-hub20-development-secret-key
-DJANGO_SETTINGS_MODULE=api.settings
+DJANGO_SETTINGS_MODULE=hub20server.settings

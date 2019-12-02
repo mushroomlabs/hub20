@@ -6,10 +6,10 @@ app_name = "hub20"
 
 
 urlpatterns = [
-    path("payments", views.PaymentListView.as_view(), name="payment-list"),
-    path("payments/payment/<int:pk>", views.PaymentView.as_view(), name="payment-detail"),
-    path("balance", views.TokenBalanceListView.as_view(), name="balance-list"),
+    path("balances", views.TokenBalanceListView.as_view(), name="balance-list"),
     path("balance/<str:code>", views.TokenBalanceView.as_view(), name="balance-detail"),
-    path("tokens", views.TokenListView.as_view(), name="token-list"),
-    path("tokens/token/<str:code>", views.TokenView.as_view(), name="token-detail"),
+    path("payment/orders", views.PaymentOrderListView.as_view(), name="payment-order-list"),
+    path("payment/order/<int:pk>", views.PaymentOrderView.as_view(), name="payment-order-detail"),
+    path("transfers", views.TransferListView.as_view(), name="transfer-list"),
+    path("transfers/transfer/<int:pk>", views.TransferView.as_view(), name="transfer-detail"),
 ]

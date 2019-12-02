@@ -1,14 +1,16 @@
 from typing import Optional, List
 
-from django.shortcuts import get_object_or_404
 from django.db.models.query import QuerySet
+from django.http import Http404
+from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework import permissions
 from rest_framework.serializers import Serializer
 
+from blockchain.app_settings import CHAIN_ID
+from ethereum_money.models import EthereumToken, EthereumTokenAmount
 from . import models
 from . import serializers
-from .app_settings import WEB3_SETTINGS
 
 
 class ReadWriteSerializerMixin(generics.GenericAPIView):
@@ -43,54 +45,61 @@ class ReadWriteSerializerMixin(generics.GenericAPIView):
         return self.write_serializer_class
 
 
-class BasePaymentView(ReadWriteSerializerMixin):
-    read_serializer_class = serializers.PaymentReadSerializer
-    write_serializer_class = serializers.PaymentSerializer
+class BasePaymentOrderView(ReadWriteSerializerMixin):
+    read_serializer_class = serializers.PaymentOrderReadSerializer
+    write_serializer_class = serializers.PaymentOrderSerializer
 
 
-class PaymentListView(BasePaymentView, generics.ListCreateAPIView):
+class PaymentOrderListView(BasePaymentOrderView, generics.ListCreateAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self) -> QuerySet:
-        return self.request.user.payment_set.all()
+        return self.request.user.paymentorder_set.all()
 
 
-class PaymentView(BasePaymentView, generics.RetrieveDestroyAPIView):
+class PaymentOrderView(BasePaymentOrderView, generics.RetrieveDestroyAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
-    def get_object(self) -> models.Payment:
-        return get_object_or_404(models.Payment, pk=self.kwargs.get("pk"), user=self.request.user)
+    def get_object(self) -> models.PaymentOrder:
+        return get_object_or_404(
+            models.PaymentOrder, pk=self.kwargs.get("pk"), user=self.request.user
+        )
+
+
+class TransferListView(generics.ListCreateAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = serializers.TransferSerializer
+
+    def get_queryset(self) -> QuerySet:
+        return self.request.user.transfers_sent.all()
+
+
+class TransferView(generics.RetrieveAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = serializers.TransferSerializer
+
+    def get_object(self):
+        try:
+            return models.Transfer.objects.get_subclass(
+                pk=self.kwargs.get("pk"), sender=self.request.user
+            )
+        except models.Transfer.DoesNotExist:
+            raise Http404
 
 
 class TokenBalanceListView(generics.ListAPIView):
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = serializers.TokenBalanceSerializer
 
-    def get_queryset(self) -> List[models.EthereumTokenAmount]:
-        return models.UserAccount(self.request.user).get_balances()
+    def get_queryset(self) -> List[EthereumTokenAmount]:
+        return models.UserAccount(self.request.user).get_balances(chain_id=CHAIN_ID)
 
 
 class TokenBalanceView(generics.RetrieveAPIView):
     permission_classes = (permissions.IsAuthenticated,)
     serializer_class = serializers.TokenBalanceSerializer
 
-    def get_object(self) -> models.EthereumTokenAmount:
+    def get_object(self) -> EthereumTokenAmount:
         user_account = models.UserAccount(self.request.user)
-        token = get_object_or_404(
-            models.EthereumToken, ticker=self.kwargs["code"], chain=WEB3_SETTINGS.chain_id
-        )
+        token = get_object_or_404(EthereumToken, ticker=self.kwargs["code"], chain=CHAIN_ID)
         return user_account.get_balance(token)
-
-
-class TokenListView(generics.ListAPIView):
-    serializer_class = serializers.EthereumTokenSerializer
-
-    def get_queryset(self) -> QuerySet:
-        return models.EthereumToken.objects.filter(address__isnull=False)
-
-
-class TokenView(generics.RetrieveAPIView):
-    serializer_class = serializers.EthereumTokenSerializer
-
-    def get_object(self) -> models.EthereumToken:
-        return get_object_or_404(models.EthereumToken, ticker=self.kwargs.get("code"))

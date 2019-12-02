@@ -1,4 +1,3 @@
-from typing import Dict
 import os
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
@@ -27,6 +26,7 @@ THIRD_PARTY_APPS = [
     "allauth",
     "allauth.account",
     "djmoney",
+    "django_pdb",
     "rest_framework",
     "rest_framework.authtoken",
     "rest_auth",
@@ -35,7 +35,7 @@ THIRD_PARTY_APPS = [
     "qr_code",
 ]
 
-PROJECT_APPS = ["blockchain", "hub20"]
+PROJECT_APPS = ["blockchain", "ethereum_money", "raiden", "hub20"]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS
 
@@ -50,7 +50,7 @@ MIDDLEWARE = [
 ]
 
 APPEND_SLASH = False
-ROOT_URLCONF = "api.urls"
+ROOT_URLCONF = "hub20server.urls"
 
 TEMPLATES = [
     {
@@ -128,10 +128,8 @@ EMAIL_HOST_PASSWORD = os.getenv("HUB20_EMAIL_SMTP_PASSWORD")
 EMAIL_TIMEOUT = os.getenv("HUB20_EMAIL_TIMEOUT", 5)
 
 
-MESSAGE_BROKER = {
-    "URL": os.environ.get("HUB20_BROKER_URL"),
-    "USE_SSL": bool(int(os.environ.get("HUB20_BROKER_USE_SSL", 0))),
-}
+CELERY_BROKER_URL = os.environ.get("HUB20_BROKER_URL")
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.9/topics/i18n/
@@ -485,15 +483,19 @@ ACCOUNT_USERNAME_BLACKLIST = [
 
 # Web3 and Hub20 configuration
 WEB3_PROVIDER_URI = os.getenv("WEB3_PROVIDER_URI", "http://localhost:8545")
+ETHEREUM_ACCOUNT_MODEL = os.getenv(
+    "HUB20_ETHEREUM_ACCOUNT_MODEL", "ethereum_money.EthereumAccount"
+)
 
 
 # Logging Configuration
 LOG_FILE = os.getenv("HUB20_SITE_LOG_FILE")
+LOG_LEVEL = os.getenv("HUB20_LOG_LEVEL", "DEBUG" if DEBUG else "INFO")
 LOGGING = {
     "version": 1,
     "formatters": {
         "verbose": {
-            "format": "%(asctime)s %(levelname)s:%(module)s %(process)d %(lineno)d %(message)s"
+            "format": "%(asctime)s %(levelname)s:%(pathname)s %(process)d %(lineno)d %(message)s"
         },
         "simple": {"format": "%(levelname)s:%(module)s %(lineno)d %(message)s"},
     },
@@ -501,9 +503,9 @@ LOGGING = {
         "null": {"level": "DEBUG", "class": "logging.NullHandler"},
         "console": {"level": "DEBUG", "class": "logging.StreamHandler", "formatter": "verbose"},
         "file": {
-            "level": "DEBUG" if DEBUG else "INFO",
+            "level": "DEBUG",
             "class": "logging.handlers.RotatingFileHandler",
-            "formatter": "simple",
+            "formatter": "verbose",
             "filename": LOG_FILE,
             "maxBytes": 16 * 1024 * 1024,
             "backupCount": 3,

@@ -1,12 +1,16 @@
 from django.utils import timezone
 
 import factory
+import factory.fuzzy
 
 from blockchain.models import Block, Transaction
 from .providers import EthereumProvider
 
 
 factory.Faker.add_provider(EthereumProvider)
+
+
+TEST_CHAIN_ID = 2
 
 
 def find_parent_by_block_number(block):
@@ -19,7 +23,7 @@ def make_parent_hash(block):
 
 
 class BlockFactory(factory.django.DjangoModelFactory):
-    chain = 1000
+    chain = TEST_CHAIN_ID
     hash = factory.Faker("hex64")
     number = factory.Sequence(lambda n: n)
     timestamp = factory.LazyAttribute(lambda obj: timezone.now())

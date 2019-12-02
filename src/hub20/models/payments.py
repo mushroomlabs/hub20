@@ -1,60 +1,43 @@
-from typing import Optional, Dict
 import random
 
 from django.conf import settings
 from django.db import models
 from django.db.models import Sum
-from django.utils import timezone
-from gnosis.eth.django.models import EthereumAddressField, HexField
 from model_utils.managers import InheritanceManager
 from model_utils.models import TimeStampedModel, StatusModel
 
 from blockchain.models import Transaction
+from ethereum_money import get_ethereum_account_model
+from ethereum_money.models import EthereumTokenValueModel
+from raiden.models import Raiden
 from hub20.app_settings import PAYMENT_SETTINGS
-from hub20.choices import PAYMENT_STATUS
-from .ethereum import Wallet, EthereumTokenValueModel, EthereumToken
-from .raiden import Raiden
+from hub20.choices import PAYMENT_EVENT_TYPES
+from .accounting import Wallet
 
 
-def generate_raiden_payment_identifier():
+EthereumAccount = get_ethereum_account_model()
+
+
+def generate_payment_order_id():
     return random.randint(1, 2 ** 63 - 1)
 
 
-class Payment(TimeStampedModel, EthereumTokenValueModel):
-    EXPIRATION_TIME = PAYMENT_SETTINGS.payment_lifetime
-    STATUS = PAYMENT_STATUS
+class PaymentOrder(TimeStampedModel, EthereumTokenValueModel):
 
-    expiration_time = models.DateTimeField()
-    wallet = models.ForeignKey(Wallet, on_delete=models.PROTECT)
-    raiden = models.ForeignKey(Raiden, null=True, on_delete=models.PROTECT)
-    raiden_payment_identifier = models.BigIntegerField(default=generate_raiden_payment_identifier)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    STATUS = PAYMENT_EVENT_TYPES
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
 
     @property
-    def chain_transfer_details(self) -> Dict:
-        return {"address": self.wallet.address}
-
-    @property
-    def raiden_transfer_details(self) -> Dict:
-        if not self.raiden:
-            return {}
-
-        return {
-            "address": self.raiden.address,
-            "identifier": self.raiden_payment_identifier,
-        }
-
-    @property
-    def transfers(self):
-        return self.transfer_set.filter(currency=self.currency).select_subclasses()
+    def payments(self):
+        return self.payment_set.filter(currency=self.currency).select_subclasses()
 
     @property
     def total_transferred(self):
-        return self.transfers.aggregate(total=Sum("amount")).get("total") or 0
+        return self.payments.aggregate(total=Sum("amount")).get("total") or 0
 
     @property
     def total_confirmed(self):
-        return sum([transfer.amount for transfer in self.transfers if transfer.is_confirmed])
+        return sum([payment.amount for payment in self.payments if payment.is_confirmed])
 
     @property
     def due_amount(self):
@@ -63,8 +46,8 @@ class Payment(TimeStampedModel, EthereumTokenValueModel):
     @property
     def status(self):
         try:
-            return self.logs.latest().status
-        except PaymentLog.DoesNotExist:
+            return self.events.latest().status
+        except PaymentOrderEvent.DoesNotExist:
             return None
 
     @property
@@ -83,77 +66,72 @@ class Payment(TimeStampedModel, EthereumTokenValueModel):
         total_transferred = self.total_transferred
 
         if total_transferred > 0 and due_amount > 0 and self.status != self.STATUS.partial:
-            self.logs.create(status=self.STATUS.partial)
+            self.events.create(status=self.STATUS.partial)
         elif total_transferred > 0 and due_amount == 0 and self.status != self.STATUS.received:
-            self.logs.create(status=self.STATUS.received)
+            self.events.create(status=self.STATUS.received)
         elif self.total_transferred == 0 and self.status != self.STATUS.requested:
-            self.logs.create(status=self.STATUS.requested)
+            self.events.create(status=self.STATUS.requested)
 
     def maybe_finalize(self):
         if self.is_finalized:
             return
 
-        should_expire = timezone.now() > self.expiration_time
-
         if self.total_confirmed >= self.amount:
-            self.logs.create(status=self.STATUS.confirmed)
-        elif should_expire:
-            self.logs.create(status=self.STATUS.expired)
-
-    @staticmethod
-    def get_wallet() -> Wallet:
-        unlocked_wallets = Wallet.unlocked.all()
-        wallet = unlocked_wallets.order_by("?").first() or Wallet.generate()
-        wallet.lock()
-
-        return wallet
-
-    @staticmethod
-    def get_raiden(token: EthereumToken) -> Optional[Raiden]:
-        return Raiden.objects.filter(token_networks__token=token).first()
+            self.events.create(status=self.STATUS.confirmed)
 
 
-class PaymentLog(TimeStampedModel, StatusModel):
-    STATUS = PAYMENT_STATUS
-    payment = models.ForeignKey(Payment, on_delete=models.PROTECT, related_name="logs")
+class PaymentOrderMethod(TimeStampedModel):
+    EXPIRATION_TIME = PAYMENT_SETTINGS.payment_lifetime
+
+    order = models.OneToOneField(
+        PaymentOrder, on_delete=models.CASCADE, related_name="payment_method"
+    )
+    expiration_time = models.DateTimeField()
+    wallet = models.OneToOneField(Wallet, on_delete=models.CASCADE)
+    raiden = models.ForeignKey(Raiden, null=True, on_delete=models.SET_NULL)
+    identifier = models.BigIntegerField(default=generate_payment_order_id, unique=True)
+
+
+class PaymentOrderEvent(TimeStampedModel, StatusModel):
+    STATUS = PAYMENT_EVENT_TYPES
+    order = models.ForeignKey(PaymentOrder, on_delete=models.PROTECT, related_name="events")
 
     class Meta:
         get_latest_by = "created"
-        unique_together = ("payment", "status")
+        unique_together = ("order", "status")
 
 
-class Transfer(TimeStampedModel, EthereumTokenValueModel):
-    payment = models.ForeignKey(Payment, on_delete=models.PROTECT)
+class Payment(TimeStampedModel, EthereumTokenValueModel):
+    order = models.ForeignKey(PaymentOrder, on_delete=models.PROTECT)
     objects = InheritanceManager()
 
     def is_confirmed(self):
         return True
 
 
-class InternalTransfer(Transfer):
+class InternalPayment(Payment):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    memo = models.TextField(null=True, blank=True)
 
 
-class BlockchainTransfer(Transfer):
-    address = EthereumAddressField(db_index=True)
-    transaction_hash = HexField(max_length=64, db_index=True, unique=True)
-
-    @property
-    def transaction(self):
-        tx = Transaction.objects.filter(hash=self.transaction_hash)
-        return tx.select_related("block").first()
+class BlockchainPayment(Payment):
+    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE)
 
     @property
     def is_confirmed(self):
-        if self.transaction is None:
-            return False
-
-        block = self.transaction and self.transaction.block
-        return block.confirmations >= PAYMENT_SETTINGS.minimum_confirmations
+        return self.transaction.block.confirmations >= PAYMENT_SETTINGS.minimum_confirmations
 
 
-class RaidenTransfer(Transfer):
+class RaidenPayment(Payment):
     raiden = models.ForeignKey(Raiden, on_delete=models.PROTECT)
 
 
-__all__ = ["Payment", "InternalTransfer", "BlockchainTransfer", "RaidenTransfer"]
+__all__ = [
+    "PaymentOrder",
+    "PaymentOrderMethod",
+    "PaymentOrderEvent",
+    "Payment",
+    "InternalPayment",
+    "BlockchainPayment",
+    "RaidenPayment",
+]

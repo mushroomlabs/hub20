@@ -6,7 +6,7 @@ from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db import transaction as database_transaction
-from django.db.models import Max
+from django.db.models import Max, Avg
 from django.utils import timezone
 from gnosis.eth.django.models import EthereumAddressField, HexField
 from web3 import Web3
@@ -20,6 +20,18 @@ from .fields import Unsigned256IntegerField
 logger = logging.getLogger(__name__)
 
 
+def database_history_gas_price_strategy(w3: Web3, transaction_params=None) -> int:
+    BLOCK_HISTORY_SIZE = 100
+    chain_id = int(w3.net.version)
+    current_block_number = w3.eth.blockNumber
+    default_price = Web3.toWei(1.2, "gwei")
+
+    txs = Transaction.objects.filter(
+        block__chain=chain_id, block__number__gte=current_block_number - BLOCK_HISTORY_SIZE
+    )
+    return int(txs.aggregate(avg_price=Avg("gas_price")).get("avg_price")) or default_price
+
+
 def make_web3():
     web3_endpoint = settings.WEB3_PROVIDER_URI
     provider_class = {
@@ -31,6 +43,7 @@ def make_web3():
 
     w3 = Web3(provider_class(web3_endpoint))
     w3.middleware_stack.inject(geth_poa_middleware, layer=0)
+    w3.eth.setGasPriceStrategy(database_history_gas_price_strategy)
     return w3
 
 
