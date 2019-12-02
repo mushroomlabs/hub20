@@ -42,24 +42,24 @@ class ReadWriteSerializerMixin(generics.GenericAPIView):
         return self.write_serializer_class
 
 
-class BaseInvoiceView(ReadWriteSerializerMixin):
-    read_serializer_class = serializers.InvoiceReadSerializer
-    write_serializer_class = serializers.InvoiceSerializer
+class BasePaymentView(ReadWriteSerializerMixin):
+    read_serializer_class = serializers.PaymentReadSerializer
+    write_serializer_class = serializers.PaymentSerializer
 
 
-class InvoiceListView(BaseInvoiceView, generics.ListCreateAPIView):
+class PaymentListView(BasePaymentView, generics.ListCreateAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
     def get_queryset(self) -> QuerySet:
-        return self.request.user.invoice_set.all()
+        return self.request.user.payment_set.all()
 
 
-class InvoiceView(BaseInvoiceView, generics.RetrieveDestroyAPIView):
+class PaymentView(BasePaymentView, generics.RetrieveDestroyAPIView):
     permission_classes = (permissions.IsAuthenticated,)
 
-    def get_object(self) -> models.Invoice:
+    def get_object(self) -> models.Payment:
         return get_object_or_404(
-            models.Invoice, pk=self.kwargs.get("pk"), account=self.request.user
+            models.Payment, pk=self.kwargs.get("pk"), user=self.request.user
         )
 
 

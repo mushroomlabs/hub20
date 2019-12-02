@@ -3,7 +3,6 @@ from typing import TypeVar, Type, Any, Optional
 from django.db import models
 from ethtoken.abi import EIP20_ABI
 from gnosis.eth.django.models import EthereumAddressField, HexField
-from model_utils.models import TimeStampedModel
 from model_utils.managers import QueryManager
 from web3.contract import Contract
 
@@ -36,7 +35,7 @@ class EthereumToken(models.Model):
         return w3.eth.contract(address=self.address, abi=EIP20_ABI)
 
     @staticmethod
-    def ETH(chain_id):
+    def ETH(chain_id=CURRENT_CHAIN_ID):
         eth, _ = EthereumToken.objects.get_or_create(
             chain=chain_id, ticker="ETH", defaults={"name": "Ethereum"}
         )
@@ -46,7 +45,7 @@ class EthereumToken(models.Model):
         unique_together = ("chain", "address")
 
 
-class Wallet(TimeStampedModel):
+class Wallet(models.Model):
     address = EthereumAddressField(unique=True, db_index=True)
     private_key = HexField(max_length=64, unique=True)
     is_locked = models.BooleanField(default=False)
@@ -84,6 +83,14 @@ class EthereumTokenAmountField(models.DecimalField):
 class EthereumTokenValueModel(models.Model):
     amount = EthereumTokenAmountField()
     currency = models.ForeignKey(EthereumToken, on_delete=models.PROTECT)
+
+    @property
+    def formatted_amount(self):
+        return self.__class__.format_value(self.amount, self.currency)
+
+    @classmethod
+    def format_value(cls, amount, currency):
+        return f"{amount} {currency.ticker}"
 
     class Meta:
         abstract = True

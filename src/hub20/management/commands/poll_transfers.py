@@ -6,24 +6,27 @@ from django.core.management.base import BaseCommand
 from django.db import IntegrityError
 
 from blockchain.models import make_web3
-from hub20.models import BlockchainPayment, EthereumToken, Wallet, Invoice
+from hub20.models import BlockchainTransfer, EthereumToken, Wallet, Payment
 
 
 logger = logging.getLogger(__name__)
 
 
-def _make_payment(target_address, transaction_hash, value, currency: EthereumToken):
+def _make_transfer(target_address, transaction_hash, value, currency: EthereumToken):
     wallet = Wallet.locked.get(address=target_address)
-    invoice = Invoice.objects.get(wallet=wallet)
+    payment = Payment.objects.get(wallet=wallet)
     amount = Decimal(value) / (10 ** currency.decimals)
 
-    return BlockchainPayment.objects.create(
-        amount=amount, currency=currency, invoice=invoice, transaction_hash=transaction_hash
+    return BlockchainTransfer.objects.create(
+        amount=amount,
+        currency=currency,
+        payment=payment,
+        transaction_hash=transaction_hash,
     )
 
 
-def make_ethereum_payment(transaction_data, ethereum: EthereumToken) -> BlockchainPayment:
-    return _make_payment(
+def make_ethereum_transfer(transaction_data, ethereum: EthereumToken) -> BlockchainTransfer:
+    return _make_transfer(
         target_address=transaction_data.to,
         transaction_hash=transaction_data.hash,
         value=transaction_data.value,
@@ -31,8 +34,8 @@ def make_ethereum_payment(transaction_data, ethereum: EthereumToken) -> Blockcha
     )
 
 
-def make_token_payment(event_data, token: EthereumToken) -> BlockchainPayment:
-    return _make_payment(
+def make_token_transfer(event_data, token: EthereumToken) -> BlockchainTransfer:
+    return _make_transfer(
         target_address=event_data.args._to,
         transaction_hash=event_data.transactionHash,
         value=event_data.args._value,
@@ -52,12 +55,12 @@ async def listen_eth_transfers(w3):
 
         for transaction_data in ethereum_transactions:
             try:
-                make_ethereum_payment(transaction_data, ETH)
-            except (Wallet.DoesNotExist, Invoice.DoesNotExist):
-                logger.warning(f"Failed to register payment for {transaction_data}")
+                make_ethereum_transfer(transaction_data, ETH)
+            except (Wallet.DoesNotExist, Payment.DoesNotExist):
+                logger.warning(f"Failed to register transfer for {transaction_data}")
             except IntegrityError:
                 logger.info(
-                    f"Payment with transaction {transaction_data.hash.hex()} already registered"
+                    f"Transfer with transaction {transaction_data.hash.hex()} already registered"
                 )
         else:
             await asyncio.sleep(2)
@@ -82,15 +85,15 @@ async def listen_erc20_transfers(w3):
             for event in events:
                 target_address = event.args._to
                 if target_address in wallet_addresses:
-                    logger.info(f"ERC20 Payment to {target_address} in pending transaction")
+                    logger.info(f"ERC20 Transfer to {target_address} in pending transaction")
                     try:
-                        make_token_payment(event, token)
-                    except (Wallet.DoesNotExist, Invoice.DoesNotExist):
-                        logger.warning(f"Failed to register token payment for {event}")
+                        make_token_transfer(event, token)
+                    except (Wallet.DoesNotExist, Payment.DoesNotExist):
+                        logger.warning(f"Failed to register token transfer for {event}")
                     except IntegrityError:
                         transaction_hash = event.transactionHash.hex()
                         logger.info(
-                            f"Payment with transaction {transaction_hash} already registered"
+                            f"Transfer with transaction {transaction_hash} already registered"
                         )
             else:
                 await asyncio.sleep(0.5)

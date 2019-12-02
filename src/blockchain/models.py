@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db import transaction as database_transaction
+from django.db.models import Max
 from django.utils import timezone
 from gnosis.eth.django.models import EthereumAddressField, HexField
 from web3 import Web3
@@ -52,6 +53,12 @@ class Block(models.Model):
     @property
     def uncles(self):
         return self.__class__.objects.filter(hash__in=self.uncle_hashes)
+
+    @property
+    def confirmations(self) -> int:
+        chain_blocks = self.__class__.objects.filter(chain=self.chain)
+        height = chain_blocks.aggregate(height=Max("number")).get("height")
+        return height - self.number
 
     @classmethod
     def make(cls, block_data, chain_id):

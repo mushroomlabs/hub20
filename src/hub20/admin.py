@@ -1,15 +1,9 @@
 from typing import Optional
 
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
 from django.http import HttpRequest
 
 from . import models
-
-
-@admin.register(models.Account)
-class AccountAdmin(UserAdmin):
-    pass
 
 
 @admin.register(models.EthereumToken)

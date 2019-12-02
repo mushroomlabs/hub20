@@ -18,45 +18,37 @@ class EthereumTokenSerializer(serializers.ModelSerializer):
         fields = ["url", "code", "name", "address"]
 
 
-class InvoiceSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="hub20:invoice-detail")
+class PaymentSerializer(serializers.ModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name="hub20:payment-detail")
     currency = serializers.PrimaryKeyRelatedField(
         queryset=models.EthereumToken.objects.filter(chain=CURRENT_CHAIN_ID)
     )
+    transfer_methods = serializers.SerializerMethodField()
 
-    def create(self, validated_data: Dict) -> models.Invoice:
+    def create(self, validated_data: Dict) -> models.Payment:
         request = self.context["request"]
         with transaction.atomic():
-            return models.Invoice.objects.create(
-                wallet=models.Invoice.get_wallet(),
-                raiden=models.Invoice.get_raiden(validated_data["currency"]),
+            return models.Payment.objects.create(
+                wallet=models.Payment.get_wallet(),
+                raiden=models.Payment.get_raiden(validated_data["currency"]),
                 account=request.user,
                 **validated_data,
             )
 
+    def get_transfer_methods(self, obj: models.Payment) -> Dict:
+        return {
+            "blockchain": obj.chain_transfer_details,
+            "raiden": obj.raiden_transfer_details,
+        }
+
     class Meta:
-        model = models.Invoice
-        fields = [
-            "url",
-            "identifier",
-            "amount",
-            "currency",
-            "expiration_time",
-            "chain_payment_address",
-            "raiden_payment_address",
-            "created",
-            "expired",
-            "paid",
-        ]
+        model = models.Payment
+        fields = ["url", "amount", "currency", "expiration_time", "created", "transfer_methods"]
         read_only_fields = [
-            "chain_payment_address",
-            "raiden_payment_address",
             "expiration_time",
             "created",
-            "expired",
-            "paid",
         ]
 
 
-class InvoiceReadSerializer(InvoiceSerializer):
+class PaymentReadSerializer(PaymentSerializer):
     currency = EthereumTokenSerializer(read_only=True)

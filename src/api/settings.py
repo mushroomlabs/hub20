@@ -157,7 +157,6 @@ STATICFILES_FINDERS = (
 STATIC_URL = "/static/"
 
 ADMIN_USERNAME = os.getenv("HUB20_ADMIN_USERNAME", "admin")
-AUTH_USER_MODEL = "hub20.Account"
 
 
 # Configuration of authentication/signup/registration via django-allauth/invitations
