@@ -6,13 +6,15 @@ from django.dispatch import receiver
 
 from blockchain.models import Block, Transaction
 from ethereum_money.signals import account_deposit_received
-from raiden.models import Raiden
+from raiden.models import Raiden, Payment as RaidenPaymentEvent
+from raiden.signals import raiden_payment_received
 from hub20.app_settings import PAYMENT_SETTINGS, TRANSFER_SETTINGS
 from hub20.choices import PAYMENT_EVENT_TYPES, TRANSFER_EVENT_TYPES
 from hub20.models import (
     PaymentOrder,
     PaymentOrderMethod,
     BlockchainPayment,
+    RaidenPayment,
     InternalPayment,
     PaymentOrderEvent,
     InternalTransfer,
@@ -49,6 +51,26 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
         order=order, amount=amount.amount, currency=amount.currency, transaction=transaction,
     )
     payment_received.send(sender=BlockchainPayment, payment=payment)
+
+
+@receiver(raiden_payment_received, sender=RaidenPaymentEvent)
+def on_raiden_payment_received_check_raiden_payments(sender, **kw):
+    raiden_payment = kw["payment"]
+
+    order = PaymentOrder.objects.filter(
+        payment_method__identifier=raiden_payment.identifier,
+        payment_method__raiden=raiden_payment.channel.raiden,
+    ).first()
+
+    if order is not None:
+        amount = raiden_payment.as_token_amount
+        payment = RaidenPayment.objects.create(
+            order=order,
+            amount=amount.amount,
+            currency=raiden_payment.token,
+            payment=raiden_payment,
+        )
+        payment_confirmed.send(sender=RaidenPayment, payment=payment)
 
 
 @receiver(post_save, sender=PaymentOrder)
@@ -131,6 +153,7 @@ def on_payment_received_update_status(sender, **kw):
 
 
 @receiver(payment_confirmed, sender=BlockchainPayment)
+@receiver(payment_confirmed, sender=RaidenPayment)
 def on_payment_confirmed_finalize(sender, **kw):
     payment = kw["payment"]
     logger.info(f"Processing payment {payment} confirmed")

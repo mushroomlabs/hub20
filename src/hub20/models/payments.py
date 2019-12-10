@@ -9,7 +9,7 @@ from model_utils.models import TimeStampedModel, StatusModel
 from blockchain.models import Transaction
 from ethereum_money import get_ethereum_account_model
 from ethereum_money.models import EthereumTokenValueModel
-from raiden.models import Raiden
+from raiden.models import Raiden, Payment as RaidenPaymentEvent
 from hub20.app_settings import PAYMENT_SETTINGS
 from hub20.choices import PAYMENT_EVENT_TYPES
 from .accounting import Wallet
@@ -115,7 +115,7 @@ class InternalPayment(Payment):
 
 
 class BlockchainPayment(Payment):
-    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE)
+    transaction = models.OneToOneField(Transaction, on_delete=models.CASCADE)
 
     @property
     def is_confirmed(self):
@@ -123,7 +123,7 @@ class BlockchainPayment(Payment):
 
 
 class RaidenPayment(Payment):
-    raiden = models.ForeignKey(Raiden, on_delete=models.PROTECT)
+    payment = models.OneToOneField(RaidenPaymentEvent, on_delete=models.PROTECT)
 
 
 __all__ = [

@@ -10,8 +10,9 @@ from django.db.models import Sum
 import ethereum
 from ethereum.abi import ContractTranslator
 
+from ethtoken import token
 from ethtoken.abi import EIP20_ABI
-from eth_utils import from_wei, to_checksum_address
+from eth_utils import to_checksum_address
 from gnosis.eth.django.models import EthereumAddressField, HexField
 from model_utils.managers import QueryManager
 from web3 import Web3
@@ -26,8 +27,7 @@ def get_max_fee() -> EthereumTokenAmount:
     ETH = EthereumToken.ETH(chain_id=int(w3.net.version))
 
     gas_price = w3.eth.generateGasPrice()
-    gas_cost = from_wei(TRANSFER_GAS_LIMIT * gas_price, "ether")
-    return EthereumTokenAmount(amount=gas_cost, currency=ETH)
+    return ETH.from_wei(TRANSFER_GAS_LIMIT * gas_price)
 
 
 def encode_transfer_data(recipient_address, amount: EthereumTokenAmount):
@@ -75,7 +75,7 @@ class EthereumAccount(AbstractEthereumAccount):
 class EthereumToken(models.Model):
     chain = models.PositiveIntegerField(choices=ETHEREUM_CHAINS)
     ticker = models.CharField(max_length=8)
-    name = models.CharField(max_length=60)
+    name = models.CharField(max_length=500)
     decimals = models.PositiveIntegerField(default=18)
     address = EthereumAddressField(null=True, blank=True)
 
@@ -119,8 +119,7 @@ class EthereumToken(models.Model):
             # transaction input strings are '0x', so we they should be 138 chars long
             assert len(transaction.data) == 138, "Not a ERC20 transfer transaction"
             recipient_address = to_checksum_address(transaction.data[-104:-64])
-            value = from_wei(int(transaction.data[-64:], 16), "ether")
-            transfer_amount = EthereumTokenAmount(amount=value, currency=self)
+            transfer_amount = self.from_wei(int(transaction.data[-64:], 16))
             return recipient_address, transfer_amount
         except AssertionError:
             return None, None
@@ -133,9 +132,13 @@ class EthereumToken(models.Model):
 
     def get_transfer_amount(self, transaction: Transaction) -> Optional[EthereumTokenAmount]:
         if self.address is None:
-            return EthereumTokenAmount(amount=from_wei(transaction.value, "ether"), currency=self)
+            return self.from_wei(transaction.value)
         else:
             return self._decode_token_transfer_input(transaction)[0]
+
+    def from_wei(self, wei_amount: int) -> EthereumTokenAmount:
+        value = Decimal(wei_amount) / (10 ** self.decimals)
+        return EthereumTokenAmount(amount=value, currency=self)
 
     @staticmethod
     def ETH(chain_id: int):
@@ -143,6 +146,20 @@ class EthereumToken(models.Model):
             chain=chain_id, ticker="ETH", defaults={"name": "Ethereum"}
         )
         return eth
+
+    @classmethod
+    def make(cls, address: str, chain_id: int):
+        proxy = token(address)
+        obj, _ = cls.objects.update_or_create(
+            address=address,
+            chain=chain_id,
+            defaults={
+                "name": proxy.name(),
+                "ticker": proxy.symbol(),
+                "decimals": proxy.decimals(),
+            },
+        )
+        return obj
 
     class Meta:
         unique_together = (("chain", "ticker"), ("chain", "address"))
@@ -180,9 +197,9 @@ class AccountBalanceEntry(EthereumTokenValueModel):
 
 
 class EthereumTokenAmount:
-    def __init__(self, amount: Decimal, currency: EthereumToken):
-        self.amount = amount
-        self.currency = currency
+    def __init__(self, amount: Union[int, str, Decimal], currency: EthereumToken):
+        self.amount: Decimal = Decimal(amount)
+        self.currency: EthereumToken = currency
 
     @property
     def formatted(self):
@@ -196,7 +213,7 @@ class EthereumTokenAmount:
     def is_ETH(self) -> bool:
         return self.currency.address is None
 
-    def _check_currency_type(self, other):
+    def _check_currency_type(self, other: EthereumTokenAmount):
         if not self.currency == other.currency:
             raise ValueError(f"Can not operate {self.currency} and {other.currency}")
 
@@ -204,29 +221,32 @@ class EthereumTokenAmount:
         self._check_currency_type(self)
         return self.__class__(self.amount + other.amount, self.currency)
 
-    def __mul__(self, other: Union[int, float, Decimal]) -> EthereumTokenAmount:
-        return EthereumTokenAmount(amount=other * self.amount, currency=self.currency)
+    def __mul__(self, other: Union[int, Decimal]) -> EthereumTokenAmount:
+        return EthereumTokenAmount(amount=Decimal(other * self.amount), currency=self.currency)
 
-    def __rmul__(self, other: Union[int, float, Decimal]) -> EthereumTokenAmount:
+    def __rmul__(self, other: Union[int, Decimal]) -> EthereumTokenAmount:
         return self.__mul__(other)
 
-    def __eq__(self, other: EthereumTokenAmount):
+    def __eq__(self, other: object) -> bool:
+        message = f"Can not compare {self.currency} amount with {type(other)}"
+        assert isinstance(other, EthereumTokenAmount), message
+
         return self.currency == other.currency and self.amount == other.amount
 
     def __lt__(self, other: EthereumTokenAmount):
-        self._check_currency_type(self)
+        self._check_currency_type(other)
         return self.amount < other.amount
 
     def __le__(self, other: EthereumTokenAmount):
-        self._check_currency_type(self)
+        self._check_currency_type(other)
         return self.amount <= other.amount
 
     def __gt__(self, other: EthereumTokenAmount):
-        self._check_currency_type(self)
+        self._check_currency_type(other)
         return self.amount > other.amount
 
     def __ge__(self, other: EthereumTokenAmount):
-        self._check_currency_type(self)
+        self._check_currency_type(other)
         return self.amount >= other.amount
 
     def __str__(self):
@@ -238,7 +258,7 @@ class EthereumTokenAmount:
     @classmethod
     def aggregated(cls, queryset, currency: EthereumToken):
         entries = queryset.filter(currency=currency)
-        amount = entries.aggregate(total=Sum("amount")).get("total") or 0
+        amount = entries.aggregate(total=Sum("amount")).get("total") or Decimal(0)
         return cls(amount=amount, currency=currency)
 
 

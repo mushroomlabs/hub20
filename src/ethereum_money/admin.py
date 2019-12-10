@@ -5,4 +5,4 @@ from . import models
 
 @admin.register(models.EthereumToken)
 class TokenAdmin(admin.ModelAdmin):
-    list_display = ["ticker", "name", "address"]
+    list_display = ["ticker", "name", "address", "chain"]

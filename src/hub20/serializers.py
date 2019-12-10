@@ -128,8 +128,8 @@ class PaymentSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Payment
-        fields = ("id", "created", "currency", "amount")
-        read_only_fields = ("id", "created", "currency", "amount")
+        fields = ("created", "currency", "amount")
+        read_only_fields = ("created", "currency", "amount")
 
 
 class InternalPaymentSerializer(serializers.ModelSerializer):
@@ -149,6 +149,9 @@ class BlockchainPaymentSerializer(PaymentSerializer):
 
 
 class RaidenPaymentSerializer(PaymentSerializer):
+    raiden = serializers.CharField(source="payment.channel.raiden.address")
+    identifier = serializers.CharField(source="payment.identifier")
+
     class Meta:
         model = models.RaidenPayment
         fields = PaymentSerializer.Meta.fields + ("raiden", "identifier")

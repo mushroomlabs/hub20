@@ -10,6 +10,7 @@ from ethereum_money.factories import (
     Erc20TokenFactory,
 )
 from ethereum_money.models import EthereumTokenAmount, encode_transfer_data
+from raiden.factories import ChannelFactory, PaymentEventFactory, TokenNetworkFactory
 from hub20.choices import PAYMENT_EVENT_TYPES, TRANSFER_EVENT_TYPES
 from hub20.app_settings import PAYMENT_SETTINGS, TRANSFER_SETTINGS
 from hub20.factories import (
@@ -30,18 +31,13 @@ TEST_SETTINGS = {
 
 
 def add_eth_to_wallet(wallet: Wallet, amount: EthereumTokenAmount):
-    block = BlockFactory(chain=amount.currency.chain)
-    return TransactionFactory(
-        block=block, to_address=wallet.address, value=to_wei(amount.amount, "ether")
-    )
+
+    return TransactionFactory(to_address=wallet.address, value=to_wei(amount.amount, "ether"))
 
 
 def add_token_to_wallet(wallet: Wallet, amount: EthereumTokenAmount):
-    block = BlockFactory(chain=amount.currency.chain)
     transaction_data = encode_transfer_data(wallet.address, amount)
-    return TransactionFactory(
-        block=block, to_address=amount.currency.address, data=transaction_data, value=0
-    )
+    return TransactionFactory(to_address=amount.currency.address, data=transaction_data, value=0)
 
 
 @override_settings(**TEST_SETTINGS)
@@ -70,6 +66,34 @@ class BlockchainPaymentTestCase(BaseTestCase):
         user_account = UserAccount(self.order.user)
         balance = user_account.get_balance(self.order.currency)
         self.assertEquals(balance.amount, self.order.amount)
+
+
+class RaidenPaymentTestCase(BaseTestCase):
+    def setUp(self):
+        token_network = TokenNetworkFactory()
+
+        self.channel = ChannelFactory(token_network=token_network)
+        self.channel.raiden.token_networks.add(token_network)
+
+        self.order = Erc20TokenPaymentOrderFactory(currency=token_network.token)
+
+    def test_order_payment_method_includes_raiden(self):
+        self.assertIsNotNone(self.order.payment_method)
+        self.assertIsNotNone(self.order.payment_method.raiden)
+
+    def test_order_payment_method_includes_identifier(self):
+        self.assertIsNotNone(self.order.payment_method)
+        self.assertIsNotNone(self.order.payment_method.identifier)
+
+    def test_payment_via_raiden_sets_order_as_paid(self):
+        PaymentEventFactory(
+            channel=self.channel,
+            amount=self.order.amount,
+            identifier=self.order.payment_method.identifier,
+            receiver_address=self.channel.raiden.address,
+        )
+        self.assertTrue(self.order.is_finalized)
+        self.assertEquals(self.order.status, PAYMENT_EVENT_TYPES.confirmed)
 
 
 class WalletTestCase(BaseTestCase):
