@@ -55,6 +55,7 @@ class PaymentOrder(TimeStampedModel, EthereumTokenValueModel):
         return self.status not in [
             self.STATUS.requested,
             self.STATUS.partial,
+            self.STATUS.expired,
             self.STATUS.received,
         ]
 

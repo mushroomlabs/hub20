@@ -31,7 +31,7 @@ from hub20.signals import (
     transfer_failed,
     transfer_scheduled,
 )
-from hub20.tasks import execute_transfer
+from hub20 import tasks
 
 logger = logging.getLogger(__name__)
 
@@ -95,6 +95,16 @@ def on_payment_created_set_created_status(sender, **kw):
     payment = kw["instance"]
     if payment.created:
         payment.events.create(status=PAYMENT_EVENT_TYPES.requested)
+
+
+@receiver(post_save, sender=PaymentOrderMethod)
+def on_payment_order_method_created_schedule_expiration_task(sender, **kw):
+    payment_method = kw["instance"]
+    if kw["created"]:
+
+        tasks.expire_payment_method.apply_async(
+            args=(payment_method.id,), eta=payment_method.expiration_time
+        )
 
 
 @receiver(post_save, sender=PaymentOrderEvent)
@@ -181,7 +191,7 @@ def on_transfer_created_mark_transfer_scheduled(sender, **kw):
     transfer = kw["instance"]
     if kw["created"]:
         transfer.events.create(status=TRANSFER_EVENT_TYPES.scheduled)
-        execute_transfer.delay(transfer.id)
+        tasks.execute_transfer.delay(transfer.id)
         transfer_scheduled.send(sender=sender, transfer=transfer)
 
 
@@ -227,6 +237,7 @@ __all__ = [
     "on_block_added_check_confirmed_payments",
     "on_block_added_check_confirmed_transfers",
     "on_payment_created_set_created_status",
+    "on_payment_order_method_created_schedule_expiration_task",
     "on_payment_event_created_send_order_paid_signal",
     "on_payment_received_update_status",
     "on_payment_confirmed_finalize",
