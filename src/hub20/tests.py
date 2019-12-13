@@ -31,7 +31,6 @@ TEST_SETTINGS = {
 
 
 def add_eth_to_wallet(wallet: Wallet, amount: EthereumTokenAmount):
-
     return TransactionFactory(to_address=wallet.address, value=to_wei(amount.amount, "ether"))
 
 

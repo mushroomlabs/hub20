@@ -4,7 +4,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 
-from raiden.models import Payment
+from raiden.models import Payment, TokenNetworkChannelStatus, TokenNetworkChannelEvent
 from raiden.signals import raiden_payment_received
 
 
@@ -18,3 +18,10 @@ def on_payment_created_check_received(sender, **kw):
         if payment.receiver_address == payment.channel.raiden.address:
             logger.info(f"New payment received by {payment.channel}")
             raiden_payment_received.send(sender=Payment, payment=payment)
+
+
+@receiver(post_save, sender=TokenNetworkChannelEvent)
+def on_token_network_channel_event_set_status(sender, **kw):
+    event = kw["instance"]
+    if kw["created"]:
+        TokenNetworkChannelStatus.set_status(event.channel)

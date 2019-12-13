@@ -128,9 +128,6 @@ EMAIL_HOST_PASSWORD = os.getenv("HUB20_EMAIL_SMTP_PASSWORD")
 EMAIL_TIMEOUT = os.getenv("HUB20_EMAIL_TIMEOUT", 5)
 
 
-CELERY_BROKER_URL = os.environ.get("HUB20_BROKER_URL")
-
-
 # Internationalization
 # https://docs.djangoproject.com/en/1.9/topics/i18n/
 
@@ -486,6 +483,8 @@ WEB3_PROVIDER_URI = os.getenv("WEB3_PROVIDER_URI", "http://localhost:8545")
 ETHEREUM_ACCOUNT_MODEL = os.getenv(
     "HUB20_ETHEREUM_ACCOUNT_MODEL", "ethereum_money.EthereumAccount"
 )
+
+BLOCKCHAIN_START_BLOCK_NUMBER = os.getenv("HUB20_BLOCKCHAIN_STARTING_BLOCK")
 
 
 # Logging Configuration

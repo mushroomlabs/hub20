@@ -12,6 +12,7 @@ syntax: glob
 /data
 /docker
 docker.secrets
+celerybeat-schedule
 dist
 build
 .vagrant

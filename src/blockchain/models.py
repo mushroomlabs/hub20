@@ -13,6 +13,7 @@ from web3 import Web3
 from web3.providers import WebsocketProvider, HTTPProvider, IPCProvider
 from web3.middleware import geth_poa_middleware
 
+from .app_settings import START_BLOCK_NUMBER
 from .choices import ETHEREUM_CHAINS
 from .fields import Unsigned256IntegerField
 
@@ -94,6 +95,23 @@ class Block(models.Model):
 
             return block
 
+    @classmethod
+    def fetch_by_hash(cls, block_hash, w3: Web3 = None):
+        try:
+            return cls.objects.get(hash=block_hash)
+        except cls.DoesNotExist:
+            if w3 is None:
+                w3 = make_web3()
+
+            chain_id = int(w3.net.version)
+
+            block_data = w3.eth.getBlock(block_hash, full_transactions=True)
+            return cls.make(block_data, chain_id)
+
+    @classmethod
+    def get_latest_block_number(cls, qs):
+        return qs.aggregate(latest=Max("number")).get("latest") or START_BLOCK_NUMBER
+
     class Meta:
         unique_together = ("chain", "hash", "number")
 
@@ -112,18 +130,36 @@ class Transaction(models.Model):
 
     @classmethod
     def make(cls, transaction_data, block: Block):
-        return cls.objects.create(
-            block=block,
-            hash=transaction_data.hash,
-            from_address=transaction_data["from"],
-            to_address=transaction_data.to,
-            gas=transaction_data.gas,
-            gas_price=transaction_data.gasPrice,
-            nonce=transaction_data.nonce,
-            index=transaction_data.transactionIndex,
-            value=transaction_data.value,
-            data=transaction_data.input,
-        )
+        try:
+            return cls.objects.get(hash=transaction_data.hash, block=block)
+        except cls.DoesNotExist:
+            return cls.objects.create(
+                block=block,
+                hash=transaction_data.hash,
+                from_address=transaction_data["from"],
+                to_address=transaction_data.to,
+                gas=transaction_data.gas,
+                gas_price=transaction_data.gasPrice,
+                nonce=transaction_data.nonce,
+                index=transaction_data.transactionIndex,
+                value=transaction_data.value,
+                data=transaction_data.input,
+            )
+
+    @classmethod
+    def fetch_by_hash(cls, transaction_hash: str, w3: Web3 = None):
+        try:
+            return cls.objects.get(hash=transaction_hash)
+        except cls.DoesNotExist:
+            pass
+
+        if w3 is None:
+            w3 = make_web3()
+
+        tx_data = w3.eth.getTransaction(transaction_hash)
+        block = Block.fetch_by_hash(tx_data.blockHash, w3=w3)
+
+        return cls.objects.filter(block=block, hash=transaction_hash).first()
 
     def __str__(self) -> str:
         hash_hex = self.hash if type(self.hash) is str else self.hash.hex()
