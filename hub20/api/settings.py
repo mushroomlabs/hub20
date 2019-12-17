@@ -25,6 +25,7 @@ DJANGO_APPS = [
 THIRD_PARTY_APPS = [
     "allauth",
     "allauth.account",
+    "channels",
     "djmoney",
     "django_pdb",
     "rest_framework",
@@ -56,6 +57,8 @@ MIDDLEWARE = [
 
 APPEND_SLASH = False
 ROOT_URLCONF = "hub20.api.urls"
+ASGI_APPLICATION = "hub20.api.routing.application"
+
 
 TEMPLATES = [
     {
@@ -88,15 +91,26 @@ DATABASES = {
     }
 }
 
+
+# Channel Configurations
+CHANNEL_LAYER_BACKEND = os.getenv(
+    "HUB20_CHANNEL_LAYER_BACKEND", "channels_redis.core.RedisChannelLayer"
+)
+CHANNEL_LAYER_HOST = os.getenv("HUB20_CHANNEL_LAYER_HOST", "redis")
+CHANNEL_LAYER_PORT = int(os.getenv("HUB20_CHANNEL_LAYER_PORT", 6379))
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": CHANNEL_LAYER_BACKEND,
+        "CONFIG": {"hosts": [(CHANNEL_LAYER_HOST, CHANNEL_LAYER_PORT)],},
+    },
+}
+
 # Caches
 DEFAULT_CACHE_BACKEND = os.getenv(
     "HUB20_CACHE_BACKEND", "django.core.cache.backends.filebased.FileBasedCache"
 )
 
-DEFAULT_CACHE_LOCATION = {
-    "django.core.cache.backends.filebased.FileBasedCache": "/tmp/hub20_cache",
-    "django_redis.cache.RedisCache": "redis://127.0.0.1:6379/1",
-}.get(DEFAULT_CACHE_BACKEND, "")
+DEFAULT_CACHE_LOCATION = os.getenv("HUB20_CACHE_URL", "/tmp/hub20_cache")
 
 DEFAULT_CACHE_OPTIONS = {
     "django_redis.cache.RedisCache": {"CLIENT_CLASS": "django_redis.client.DefaultClient"}
@@ -481,7 +495,6 @@ ACCOUNT_USERNAME_BLACKLIST = [
     "yoursite",
     "yourdomain",
 ]
-
 
 # Web3 and Hub20 configuration
 WEB3_PROVIDER_URI = os.getenv("WEB3_PROVIDER_URI", "http://localhost:8545")

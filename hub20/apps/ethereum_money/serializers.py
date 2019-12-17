@@ -21,11 +21,8 @@ class CurrencyRelatedField(serializers.SlugRelatedField):
 
 
 class EthereumTokenSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(
-        view_name="ethereum_money:token-detail", lookup_field="ticker", lookup_url_kwarg="code"
-    )
     code = serializers.CharField(source="ticker")
 
     class Meta:
         model = models.EthereumToken
-        fields = ["url", "code", "name", "address"]
+        fields = ["code", "name", "address"]

@@ -1,6 +1,8 @@
 import datetime
 import logging
 
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -22,6 +24,7 @@ from hub20.apps.core.models import (
     ExternalTransfer,
     Wallet,
 )
+from hub20.apps.core.consumers import NotificationConsumer
 from hub20.apps.core.signals import (
     payment_received,
     payment_confirmed,
@@ -31,6 +34,7 @@ from hub20.apps.core.signals import (
     transfer_failed,
     transfer_scheduled,
 )
+from hub20.apps.core.serializers import BlockchainPaymentSerializer
 from hub20.apps.core import tasks
 
 logger = logging.getLogger(__name__)
@@ -50,7 +54,7 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
     payment = BlockchainPayment.objects.create(
         order=order, amount=amount.amount, currency=amount.currency, transaction=transaction,
     )
-    payment_received.send(sender=BlockchainPayment, payment=payment)
+    payment_received.send_robust(sender=BlockchainPayment, payment=payment)
 
 
 @receiver(raiden_payment_received, sender=RaidenPaymentEvent)
@@ -162,6 +166,19 @@ def on_payment_received_update_status(sender, **kw):
     payment.order.maybe_finalize()
 
 
+@receiver(payment_received, sender=BlockchainPayment)
+def on_payment_received_send_notification(sender, **kw):
+    payment = kw["payment"]
+    serializer = BlockchainPaymentSerializer(payment)
+
+    logger.info(f"Notifying requester of {payment} that it was received")
+    layer = get_channel_layer()
+    channel_group_name = NotificationConsumer.get_group_name(payment.order.user)
+    async_to_sync(layer.group_send)(
+        channel_group_name, {"type": "notify_payment_status_change", "message": serializer.data}
+    )
+
+
 @receiver(payment_confirmed, sender=BlockchainPayment)
 @receiver(payment_confirmed, sender=RaidenPayment)
 def on_payment_confirmed_finalize(sender, **kw):
@@ -240,6 +257,7 @@ __all__ = [
     "on_payment_order_method_created_schedule_expiration_task",
     "on_payment_event_created_send_order_paid_signal",
     "on_payment_received_update_status",
+    "on_payment_received_send_notification",
     "on_payment_confirmed_finalize",
     "on_order_paid_credit_user",
     "on_order_paid_free_payment_channels",

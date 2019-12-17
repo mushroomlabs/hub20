@@ -1,5 +1,7 @@
 attributedict
 celery
+channels
+channels_redis
 django<3
 django-allauth
 django-invitations

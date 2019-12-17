@@ -19,6 +19,8 @@ services:
   # Redis for cache and session
   redis:
     image: redis:latest
+    ports:
+      - "6379:6379"
 
   # RabbitMQ for celery and interprocess pub-sub
   rabbitmq:
@@ -37,7 +39,7 @@ services:
     image: hub20
     build: .
     volumes:
-      - ./src:/code
+      - ./:/code
     depends_on:
       - db
       - rabbitmq
@@ -62,7 +64,7 @@ services:
     image: hub20
     build: .
     volumes:
-      - ./src:/code
+      - ./:/code
     depends_on:
       - db
       - rabbitmq

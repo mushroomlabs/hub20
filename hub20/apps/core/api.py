@@ -1,6 +1,7 @@
 from django.urls import path
 
 from . import views
+from .consumers import NotificationConsumer
 
 app_name = "hub20"
 
@@ -13,3 +14,5 @@ urlpatterns = [
     path("transfers", views.TransferListView.as_view(), name="transfer-list"),
     path("transfers/transfer/<int:pk>", views.TransferView.as_view(), name="transfer-detail"),
 ]
+
+consumer_patterns = [path("events", NotificationConsumer)]
