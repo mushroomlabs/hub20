@@ -1,13 +1,45 @@
-import logging
 import asyncio
+import logging
 
-from django.db.models import Min
 from django.core.management.base import BaseCommand
 
-from hub20.apps.blockchain.models import make_web3, Block
-
+from hub20.apps.blockchain.app_settings import START_BLOCK_NUMBER
+from hub20.apps.blockchain.models import Block, make_web3
 
 logger = logging.getLogger(__name__)
+
+
+def split_block_lists(block_numbers, group_size=25):
+    for n in range(0, len(block_numbers), group_size):
+        yield block_numbers[n : n + group_size]
+
+
+async def make_blocks_in_range(w3, start, end, speed=25):
+    chain_id = int(w3.net.version)
+    chain_blocks = Block.objects.filter(chain=chain_id)
+
+    block_range = (start, end)
+    recorded_block_set = set(
+        chain_blocks.filter(number__range=block_range).values_list("number", flat=True)
+    )
+    range_set = set(range(*block_range))
+    missing_blocks = list(range_set.difference(recorded_block_set))[::-1]
+
+    counter = 0
+
+    logger.info(f"{len(missing_blocks)} missing blocks between {start} and {end}")
+
+    for block_list in split_block_lists(missing_blocks, group_size=speed):
+
+        for block_number in block_list:
+            counter += 1
+            if (counter % speed) == 0:
+                await asyncio.sleep(1)
+
+            block_data = w3.eth.getBlock(block_number, full_transactions=True)
+            Block.make(block_data, chain_id)
+    else:
+        await asyncio.sleep(1)
 
 
 async def save_new_blocks(w3):
@@ -18,61 +50,29 @@ async def save_new_blocks(w3):
         block_number = w3.eth.blockNumber
         if block_number > current_block_number:
             block_data = w3.eth.getBlock(block_number, full_transactions=True)
-            block = Block.make(block_data, chain_id)
-            logger.info(f"Saved block {block}")
+            Block.make(block_data, chain_id)
             current_block_number = block_number
         else:
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
 
 
-async def backfill(w3, fill_speed=10):
-    chain_id = int(w3.net.version)
-    chain_blocks = Block.objects.filter(chain=chain_id)
-    lowest_block = chain_blocks.aggregate(low=Min("number")).get("low") or w3.eth.blockNumber
-
-    while lowest_block > 0:
-        lowest_block -= 1
-        block_data = w3.eth.getBlock(lowest_block, full_transactions=True)
-        block = Block.make(block_data, chain_id)
-        logger.info(f"Saved block {block}")
-        if (lowest_block % fill_speed) == 0:
-            await asyncio.sleep(1)
-
-
-async def fill_gaps(w3, fill_speed=10):
-    chain_id = int(w3.net.version)
-    chain_blocks = Block.objects.filter(chain=chain_id)
-    lowest = chain_blocks.aggregate(low=Min("number")).get("low")
-
-    if not lowest:
-        return
-
-    current = w3.eth.blockNumber
-    block_range = (lowest, current)
-    recorded_block_set = set(
-        Block.objects.filter(number__range=block_range).values_list("number", flat=True)
-    )
-    range_set = set(range(*block_range))
-    missing_block_set = range_set.difference(recorded_block_set)
-
-    for idx, block_number in enumerate(missing_block_set):
-        block_data = w3.eth.getBlock(block_number, full_transactions=True)
-        block = Block.make(block_data, chain_id)
-        logger.info(f"Saved block {block}")
-        if (idx % fill_speed) == 0:
-            await asyncio.sleep(1)
+async def backfill(w3):
+    SCAN_SIZE = 5000
+    end = w3.eth.blockNumber
+    while end > START_BLOCK_NUMBER:
+        start = max(end - SCAN_SIZE, START_BLOCK_NUMBER)
+        await make_blocks_in_range(w3, start, end)
+        end = start
+    logger.info(f"Backfill complete. All blocks from {end} now recorded")
 
 
 class Command(BaseCommand):
     help = "Listens to new blocks and transactions on event loop and saves on DB"
 
     def handle(self, *args, **options):
-        logger.info("Subscribers set up and waiting for messages")
         w3 = make_web3()
         loop = asyncio.get_event_loop()
         try:
-            loop.run_until_complete(
-                asyncio.gather(save_new_blocks(w3), backfill(w3), fill_gaps(w3))
-            )
+            loop.run_until_complete(asyncio.gather(save_new_blocks(w3), backfill(w3)))
         finally:
             loop.close()

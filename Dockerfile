@@ -8,9 +8,10 @@ RUN apt-get update
 RUN apt-get install -y netcat
 
 # Copy all our files into the image.
-COPY ./src /code
-WORKDIR /code
+COPY ./hub20 /app/hub20
+COPY ./requirements.txt /app
+COPY ./setup.py /app
+WORKDIR /app
 
 # Install our requirements.
-RUN pip install -r requirements-dev.txt
-RUN pip install --no-cache-dir -e .
+RUN pip install --no-cache-dir -e /app

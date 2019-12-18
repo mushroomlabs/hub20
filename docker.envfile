@@ -1,4 +1,0 @@
-HUB20_DATABASE_HOST=db
-HUB20_BROKER_URL=amqp://rabbitmq
-HUB20_CACHE_LOCATION=redis://redis:6379/0
-HUB20_SITE_DOMAIN=web.local

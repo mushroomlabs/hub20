@@ -1,16 +1,18 @@
-from typing import Optional, List
+from typing import List, Optional
 
 from django.db.models.query import QuerySet
 from django.http import Http404
 from django.shortcuts import get_object_or_404
-from rest_framework import generics
-from rest_framework import permissions
+from rest_framework import generics, permissions
+from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, RetrieveModelMixin
 from rest_framework.serializers import Serializer
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from hub20.apps.blockchain.app_settings import CHAIN_ID
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
-from . import models
-from . import serializers
+
+from . import models, serializers
+from .permissions import IsAuthenticatedOrApiClient
 
 
 class ReadWriteSerializerMixin(generics.GenericAPIView):
@@ -103,3 +105,38 @@ class TokenBalanceView(generics.RetrieveAPIView):
         user_account = models.UserAccount(self.request.user)
         token = get_object_or_404(EthereumToken, ticker=self.kwargs["code"], chain=CHAIN_ID)
         return user_account.get_balance(token)
+
+
+class StoreListView(generics.ListCreateAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = serializers.StoreSerializer
+
+    def get_queryset(self) -> QuerySet:
+        return self.request.user.store_set.all()
+
+
+class StoreView(generics.RetrieveDestroyAPIView):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = serializers.StoreSerializer
+
+    def get_object(self) -> models.Store:
+        return self.request.user.store_set.filter(pk=self.kwargs["pk"]).first()
+
+
+class CheckoutViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin, DestroyModelMixin):
+    permission_classes = (IsAuthenticatedOrApiClient,)
+    serializer_class = serializers.HttpCheckoutSerializer
+    lookup_value_regex = "[0-9a-f-]{36}"
+
+    def get_queryset(self):
+        return models.Checkout.objects.filter(
+            store__in=models.Store.objects.accessible_to(self.request)
+        )
+
+
+class StoreViewSet(ModelViewSet):
+    permission_classes = (permissions.IsAuthenticated,)
+    serializer_class = serializers.StoreSerializer
+
+    def get_queryset(self) -> QuerySet:
+        return self.request.user.store_set.all()

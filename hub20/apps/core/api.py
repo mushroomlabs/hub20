@@ -1,9 +1,16 @@
 from django.urls import path
+from rest_framework.routers import SimpleRouter
+
 
 from . import views
-from .consumers import NotificationConsumer
+from .consumers import CheckoutConsumer, NotificationConsumer
 
 app_name = "hub20"
+
+
+router = SimpleRouter(trailing_slash=False)
+router.register("stores", views.StoreViewSet, basename="store")
+router.register("checkout", views.CheckoutViewSet, basename="checkout")
 
 
 urlpatterns = [
@@ -13,6 +20,10 @@ urlpatterns = [
     path("payment/order/<int:pk>", views.PaymentOrderView.as_view(), name="payment-order-detail"),
     path("transfers", views.TransferListView.as_view(), name="transfer-list"),
     path("transfers/transfer/<int:pk>", views.TransferView.as_view(), name="transfer-detail"),
-]
+] + router.urls
 
-consumer_patterns = [path("events", NotificationConsumer)]
+
+consumer_patterns = [
+    path("checkout/<uuid:pk>", CheckoutConsumer),
+    path("events", NotificationConsumer),
+]

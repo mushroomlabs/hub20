@@ -101,28 +101,25 @@ CHANNEL_LAYER_PORT = int(os.getenv("HUB20_CHANNEL_LAYER_PORT", 6379))
 CHANNEL_LAYERS = {
     "default": {
         "BACKEND": CHANNEL_LAYER_BACKEND,
-        "CONFIG": {"hosts": [(CHANNEL_LAYER_HOST, CHANNEL_LAYER_PORT)],},
+        "CONFIG": {"hosts": [(CHANNEL_LAYER_HOST, CHANNEL_LAYER_PORT)]},
     },
 }
 
 # Caches
-DEFAULT_CACHE_BACKEND = os.getenv(
+CACHE_BACKEND = os.getenv(
     "HUB20_CACHE_BACKEND", "django.core.cache.backends.filebased.FileBasedCache"
 )
 
-DEFAULT_CACHE_LOCATION = os.getenv("HUB20_CACHE_URL", "/tmp/hub20_cache")
+CACHE_LOCATION = os.getenv("HUB20_CACHE_LOCATION", "/tmp/hub20_cache")
 
-DEFAULT_CACHE_OPTIONS = {
+
+CACHE_OPTIONS = {
     "django_redis.cache.RedisCache": {"CLIENT_CLASS": "django_redis.client.DefaultClient"}
-}.get(DEFAULT_CACHE_BACKEND, {})
+}.get(CACHE_BACKEND, {})
 
 
 CACHES = {
-    "default": {
-        "BACKEND": DEFAULT_CACHE_BACKEND,
-        "LOCATION": os.getenv("HUB20_CACHE_LOCATION", DEFAULT_CACHE_LOCATION),
-        "OPTIONS": DEFAULT_CACHE_OPTIONS,
-    }
+    "default": {"BACKEND": CACHE_BACKEND, "LOCATION": CACHE_LOCATION, "OPTIONS": CACHE_OPTIONS}
 }
 
 
@@ -175,7 +172,7 @@ ADMIN_USERNAME = os.getenv("HUB20_ADMIN_USERNAME", "admin")
 
 # Configuration of authentication/signup/registration via django-allauth/invitations
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "dashboard"
+LOGIN_REDIRECT_URL = "rest_user_details"
 INVITATIONS_ACCEPT_INVITE_AFTER_SIGNUP = True
 INVITATIONS_SIGNUP_REDIRECT = "signup"
 INVITATIONS_ADAPTER = ACCOUNT_ADAPTER = "invitations.models.InvitationsAdapter"

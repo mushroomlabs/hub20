@@ -5,6 +5,7 @@ channels_redis
 django<3
 django-allauth
 django-invitations
+django-ipware
 django-model-utils
 django-pdb
 django-qr-code
@@ -13,8 +14,12 @@ djangorestframework
 django-rest-auth
 django_smtp_ssl
 django-money
+ethereum
 eth-abi<2
 ethtoken
 factory_boy
 psycopg2-binary
+pycryptodome
+pytest-asyncio
+pytest-django
 raiden_contracts

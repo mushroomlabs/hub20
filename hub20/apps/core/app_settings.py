@@ -19,3 +19,5 @@ PAYMENT_SETTINGS = AttributeDict(
         "payment_lifetime": _get_setting("PAYMENT_REQUEST_LIFETIME", 15 * 60),
     }
 )
+
+API_KEY_HEADER_NAME = _get_setting("API_KEY_HEADER_NAME", "X-HUB20-API-KEY")

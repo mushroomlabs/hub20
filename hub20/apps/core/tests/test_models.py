@@ -1,33 +1,30 @@
 from decimal import Decimal
 from unittest.mock import patch
 
+import pytest
+from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
-from eth_utils import to_wei, is_checksum_address
+from eth_utils import is_checksum_address, to_wei
 
-from hub20.apps.blockchain.factories import TransactionFactory, BlockFactory
-from hub20.apps.ethereum_money.factories import (
-    ETHFactory,
-    Erc20TokenFactory,
+from hub20.apps.blockchain.factories import BlockFactory, TransactionFactory
+from hub20.apps.core.app_settings import PAYMENT_SETTINGS, TRANSFER_SETTINGS
+from hub20.apps.core.choices import PAYMENT_EVENT_TYPES, TRANSFER_EVENT_TYPES
+from hub20.apps.core.factories import (
+    CheckoutFactory,
+    Erc20TokenPaymentOrderFactory,
+    Erc20TokenUserBalanceEntryFactory,
+    ExternalTransferFactory,
+    InternalTransferFactory,
+    StoreFactory,
+    UserAccountFactory,
+    WalletFactory,
 )
+from hub20.apps.core.models import ExternalTransfer, UserAccount, Wallet
+from hub20.apps.ethereum_money.factories import Erc20TokenFactory, ETHFactory
 from hub20.apps.ethereum_money.models import EthereumTokenAmount, encode_transfer_data
 from hub20.apps.raiden.factories import ChannelFactory, PaymentEventFactory, TokenNetworkFactory
-from hub20.apps.core.choices import PAYMENT_EVENT_TYPES, TRANSFER_EVENT_TYPES
-from hub20.apps.core.app_settings import PAYMENT_SETTINGS, TRANSFER_SETTINGS
-from hub20.apps.core.factories import (
-    UserAccountFactory,
-    Erc20TokenUserBalanceEntryFactory,
-    InternalTransferFactory,
-    ExternalTransferFactory,
-    WalletFactory,
-    Erc20TokenPaymentOrderFactory,
-)
-from hub20.apps.core.models import UserAccount, Wallet, ExternalTransfer
 
-TEST_SETTINGS = {
-    "CELERY_TASK_ALWAYS_EAGER": True,
-    "CELERY_TASK_EAGER_PROPAGATES": True,
-    "CELERY_BROKER_URL": "memory",
-}
+from .base import TEST_SETTINGS
 
 
 def add_eth_to_wallet(wallet: Wallet, amount: EthereumTokenAmount):
@@ -39,6 +36,7 @@ def add_token_to_wallet(wallet: Wallet, amount: EthereumTokenAmount):
     return TransactionFactory(to_address=amount.currency.address, data=transaction_data, value=0)
 
 
+@pytest.mark.django_db(transaction=True)
 @override_settings(**TEST_SETTINGS)
 class BaseTestCase(TestCase):
     pass
@@ -50,11 +48,11 @@ class BlockchainPaymentTestCase(BaseTestCase):
 
     def test_transaction_sets_payment_as_received(self):
         add_token_to_wallet(self.order.payment_method.wallet, self.order.as_token_amount)
-        self.assertEquals(self.order.status, PAYMENT_EVENT_TYPES.received)
+        self.assertEqual(self.order.status, PAYMENT_EVENT_TYPES.received)
 
     def test_transaction_creates_blockchain_payment(self):
         add_token_to_wallet(self.order.payment_method.wallet, self.order.as_token_amount)
-        self.assertEquals(self.order.payment_set.count(), 1)
+        self.assertEqual(self.order.payment_set.count(), 1)
 
     def test_user_balance_is_updated_on_completed_payment(self):
         add_token_to_wallet(self.order.payment_method.wallet, self.order.as_token_amount)
@@ -64,7 +62,23 @@ class BlockchainPaymentTestCase(BaseTestCase):
 
         user_account = UserAccount(self.order.user)
         balance = user_account.get_balance(self.order.currency)
-        self.assertEquals(balance.amount, self.order.amount)
+        self.assertEqual(balance.amount, self.order.amount)
+
+
+class CheckoutTestCase(BaseTestCase):
+    def setUp(self):
+        self.checkout = CheckoutFactory()
+        self.checkout.store.accepted_currencies.add(self.checkout.payment_order.currency)
+
+    def test_payment_order_user_and_store_owner_are_the_same(self):
+        self.assertEqual(self.checkout.store.owner, self.checkout.payment_order.user)
+
+    def test_checkout_currency_must_be_accepted_by_store(self):
+        self.checkout.clean()
+
+        self.checkout.store.accepted_currencies.clear()
+        with self.assertRaises(ValidationError):
+            self.checkout.clean()
 
 
 class RaidenPaymentTestCase(BaseTestCase):
@@ -92,31 +106,22 @@ class RaidenPaymentTestCase(BaseTestCase):
             receiver_address=self.channel.raiden.address,
         )
         self.assertTrue(self.order.is_finalized)
-        self.assertEquals(self.order.status, PAYMENT_EVENT_TYPES.confirmed)
+        self.assertEqual(self.order.status, PAYMENT_EVENT_TYPES.confirmed)
 
 
-class WalletTestCase(BaseTestCase):
+class StoreTestCase(BaseTestCase):
     def setUp(self):
-        self.wallet = WalletFactory()
+        self.store = StoreFactory()
 
-    def test_wallet_address_is_checksummed(self):
-        self.assertTrue(is_checksum_address(self.wallet.address))
+    def test_store_rsa_keys_are_valid_pem(self):
+        self.assertIsNotNone(self.store.rsa.pk)
+        self.assertTrue(type(self.store.rsa.public_key_pem) is str)
+        self.assertTrue(type(self.store.rsa.private_key_pem) is str)
 
-    @patch("hub20.apps.core.models.accounting.get_max_fee")
-    def test_wallet_balance_selection(self, patched_fee):
-        ETH = ETHFactory()
-        fee_amount = EthereumTokenAmount(amount=Decimal("0.001"), currency=ETH)
-
-        patched_fee.return_value = fee_amount
-
-        token = Erc20TokenFactory()
-        token_amount = EthereumTokenAmount(amount=Decimal("10"), currency=token)
-
-        add_eth_to_wallet(self.wallet, fee_amount)
-        add_token_to_wallet(self.wallet, token_amount)
-
-        self.assertIsNotNone(Wallet.select_for_transfer(token_amount))
-        self.assertIsNone(Wallet.select_for_transfer(2 * fee_amount))
+        self.assertTrue(self.store.rsa.public_key_pem.startswith("-----BEGIN PUBLIC KEY-----"))
+        self.assertTrue(
+            self.store.rsa.private_key_pem.startswith("-----BEGIN RSA PRIVATE KEY-----")
+        )
 
 
 class TransferTestCase(BaseTestCase):
@@ -138,7 +143,7 @@ class InternalTransferTestCase(TransferTestCase):
         )
 
         self.assertTrue(transfer.is_finalized)
-        self.assertEquals(transfer.status, TRANSFER_EVENT_TYPES.confirmed)
+        self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.confirmed)
 
     def test_transfers_change_balance(self):
         transfer = InternalTransferFactory(
@@ -153,8 +158,8 @@ class InternalTransferTestCase(TransferTestCase):
         sender_balance = self.sender_account.get_balance(self.credit.currency)
         receiver_balance = self.receiver_account.get_balance(self.credit.currency)
 
-        self.assertEquals(sender_balance.amount, 0)
-        self.assertEquals(receiver_balance, self.credit.as_token_amount)
+        self.assertEqual(sender_balance.amount, 0)
+        self.assertEqual(receiver_balance, self.credit.as_token_amount)
 
     def test_transfers_fail_with_low_sender_balance(self):
         transfer = InternalTransferFactory(
@@ -165,7 +170,7 @@ class InternalTransferTestCase(TransferTestCase):
         )
 
         self.assertTrue(transfer.is_finalized)
-        self.assertEquals(transfer.status, TRANSFER_EVENT_TYPES.failed)
+        self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.failed)
 
 
 @patch("hub20.apps.core.models.transfers.Wallet.select_for_transfer")
@@ -198,7 +203,7 @@ class ExternalTransferTestCase(TransferTestCase):
         )
 
         self.assertIsNotNone(transfer.status)
-        self.assertEquals(transfer.status, TRANSFER_EVENT_TYPES.failed)
+        self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.failed)
 
     def test_transfers_can_be_executed_with_enough_balance(self, select_for_transfer):
         wallet = WalletFactory()
@@ -211,7 +216,7 @@ class ExternalTransferTestCase(TransferTestCase):
 
         self.assertIsNotNone(transfer.status)
         self.assertFalse(transfer.is_finalized)
-        self.assertEquals(transfer.status, TRANSFER_EVENT_TYPES.executed)
+        self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.executed)
 
     def test_transfers_are_confirmed_after_block_confirmation(self, select_for_transfer):
         wallet = WalletFactory()
@@ -224,8 +229,44 @@ class ExternalTransferTestCase(TransferTestCase):
 
         self.assertIsNotNone(transfer.status)
         self.assertFalse(transfer.is_finalized)
-        self.assertEquals(transfer.status, TRANSFER_EVENT_TYPES.executed)
+        self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.executed)
 
         BlockFactory.create_batch(TRANSFER_SETTINGS.minimum_confirmations)
         self.assertTrue(transfer.is_finalized)
-        self.assertEquals(transfer.status, TRANSFER_EVENT_TYPES.confirmed)
+        self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.confirmed)
+
+
+class WalletTestCase(BaseTestCase):
+    def setUp(self):
+        self.wallet = WalletFactory()
+
+    def test_wallet_address_is_checksummed(self):
+        self.assertTrue(is_checksum_address(self.wallet.address))
+
+    @patch("hub20.apps.core.models.accounting.get_max_fee")
+    def test_wallet_balance_selection(self, patched_fee):
+        ETH = ETHFactory()
+        fee_amount = EthereumTokenAmount(amount=Decimal("0.001"), currency=ETH)
+
+        patched_fee.return_value = fee_amount
+
+        token = Erc20TokenFactory()
+        token_amount = EthereumTokenAmount(amount=Decimal("10"), currency=token)
+
+        add_eth_to_wallet(self.wallet, fee_amount)
+        add_token_to_wallet(self.wallet, token_amount)
+
+        self.assertIsNotNone(Wallet.select_for_transfer(token_amount))
+        self.assertIsNone(Wallet.select_for_transfer(2 * fee_amount))
+
+
+__all__ = [
+    "BlockchainPaymentTestCase",
+    "CheckoutTestCase",
+    "RaidenPaymentTestCase",
+    "StoreTestCase",
+    "TransferTestCase",
+    "InternalTransferTestCase",
+    "ExternalTransferTestCase",
+    "WalletTestCase",
+]

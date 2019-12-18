@@ -1,17 +1,19 @@
-from typing import Dict
 import copy
+from typing import Dict
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from ipware import get_client_ip
 from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 from hub20.apps.blockchain.serializers import EthereumAddressField, HexadecimalField
 from hub20.apps.ethereum_money.serializers import (
+    CurrencyRelatedField,
     EthereumTokenSerializer,
     TokenValueField,
-    CurrencyRelatedField,
 )
+
 from . import models
 
 User = get_user_model()
@@ -198,4 +200,92 @@ class PaymentOrderSerializer(serializers.ModelSerializer):
 
 
 class PaymentOrderReadSerializer(PaymentOrderSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name="hub20:payment-order-detail")
     currency = EthereumTokenSerializer(read_only=True)
+
+
+class CheckoutSerializer(serializers.ModelSerializer):
+    currency = CurrencyRelatedField(source="payment_order.currency")
+    amount = TokenValueField(source="payment_order.amount")
+    status = serializers.CharField(source="payment_order.status", read_only=True)
+    payment_method = PaymentOrderMethodSerializer(
+        source="payment_order.payment_method", read_only=True
+    )
+    voucher = serializers.SerializerMethodField()
+
+    def validate(self, data):
+        request = self.context.get("request")
+        try:
+            store = models.Store.objects.accessible_to(request).get()
+        except models.Store.DoesNotExist:
+            raise serializers.ValidationError("Needs store api key or authenticated owner")
+
+        currency = data["payment_order"]["currency"]
+
+        if currency not in store.accepted_currencies.all():
+            raise serializers.ValidationError(f"{currency.ticker} is not accepted at {store.name}")
+
+        data["store"] = store
+        return data
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        client_ip, _ = get_client_ip(request)
+        store = validated_data["store"]
+        with transaction.atomic():
+            payment_order = models.PaymentOrder.objects.create(
+                user=store.owner, **validated_data["payment_order"]
+            )
+
+            return models.Checkout.objects.create(
+                store=store,
+                external_identifier=validated_data["external_identifier"],
+                payment_order=payment_order,
+                requester_ip=client_ip,
+            )
+
+    def get_voucher(self, obj):
+        return obj.issue_voucher()
+
+    class Meta:
+        model = models.Checkout
+        fields = (
+            "external_identifier",
+            "currency",
+            "amount",
+            "payment_method",
+            "status",
+            "voucher",
+        )
+
+
+class HttpCheckoutSerializer(CheckoutSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name="hub20:checkout-detail")
+
+    class Meta:
+        model = models.Checkout
+        fields = ("url",) + CheckoutSerializer.Meta.fields
+
+
+class StoreSerializer(serializers.ModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name="hub20:store-detail")
+    site_url = serializers.URLField(source="url")
+    api_key = serializers.CharField(read_only=True)
+    public_key = serializers.CharField(source="rsa.public_key_pem", read_only=True)
+    accepted_currencies = CurrencyRelatedField(many=True)
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        return models.Store.objects.create(owner=request.user, **validated_data)
+
+    class Meta:
+        model = models.Store
+        fields = (
+            "url",
+            "name",
+            "site_url",
+            "api_key",
+            "public_key",
+            "accepted_currencies",
+        )
+        read_only_fields = ("api_key", "public_key")

@@ -1,41 +1,43 @@
 import datetime
 import logging
 
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from hub20.apps.blockchain.models import Block, Transaction
-from hub20.apps.ethereum_money.signals import account_deposit_received
-from hub20.apps.raiden.models import Raiden, Payment as RaidenPaymentEvent
-from hub20.apps.raiden.signals import raiden_payment_received
+from hub20.apps.core import tasks
 from hub20.apps.core.app_settings import PAYMENT_SETTINGS, TRANSFER_SETTINGS
 from hub20.apps.core.choices import PAYMENT_EVENT_TYPES, TRANSFER_EVENT_TYPES
 from hub20.apps.core.models import (
-    PaymentOrder,
-    PaymentOrderMethod,
     BlockchainPayment,
-    RaidenPayment,
-    InternalPayment,
-    PaymentOrderEvent,
-    InternalTransfer,
-    Transfer,
+    Checkout,
     ExternalTransfer,
+    InternalPayment,
+    InternalTransfer,
+    PaymentOrder,
+    PaymentOrderEvent,
+    PaymentOrderMethod,
+    RaidenPayment,
+    Store,
+    StoreAPIKey,
+    StoreRSAKeyPair,
+    Transfer,
     Wallet,
 )
-from hub20.apps.core.consumers import NotificationConsumer
 from hub20.apps.core.signals import (
-    payment_received,
-    payment_confirmed,
+    blockchain_payment_sent,
     order_paid,
+    payment_confirmed,
+    payment_received,
     transfer_confirmed,
     transfer_executed,
     transfer_failed,
     transfer_scheduled,
 )
-from hub20.apps.core.serializers import BlockchainPaymentSerializer
-from hub20.apps.core import tasks
+from hub20.apps.ethereum_money.models import EthereumToken
+from hub20.apps.ethereum_money.signals import account_deposit_received
+from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
+from hub20.apps.raiden.signals import raiden_payment_received
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +57,21 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
         order=order, amount=amount.amount, currency=amount.currency, transaction=transaction,
     )
     payment_received.send_robust(sender=BlockchainPayment, payment=payment)
+
+
+@receiver(blockchain_payment_sent, sender=EthereumToken)
+def on_blockchain_payment_sent_maybe_publish_checkout(sender, **kw):
+    recipient_address = kw["recipient"]
+
+    checkout = Checkout.objects.filter(
+        payment_order__payment_method__wallet__account__address=recipient_address
+    ).first()
+
+    if not checkout:
+        return
+
+    if not checkout.payment_order.is_finalized:
+        tasks.publish_checkout_event.delay(checkout.pk, event="payment.sent")
 
 
 @receiver(raiden_payment_received, sender=RaidenPaymentEvent)
@@ -125,8 +142,6 @@ def on_block_added_check_confirmed_payments(sender, **kw):
 
     block_number_to_confirm = block.number - PAYMENT_SETTINGS.minimum_confirmations
     if created and block_number_to_confirm >= 0:
-        logger.info(f"Block {block} created")
-
         payments = BlockchainPayment.objects.all()
 
         for payment in payments.filter(
@@ -144,8 +159,6 @@ def on_block_added_check_confirmed_transfers(sender, **kw):
 
     block_number_to_confirm = block.number - TRANSFER_SETTINGS.minimum_confirmations
     if created and block_number_to_confirm >= 0:
-        logger.info(f"Block {block} created")
-
         transactions = Transaction.objects.filter(
             block__number=block_number_to_confirm, block__chain=block.chain
         )
@@ -167,16 +180,31 @@ def on_payment_received_update_status(sender, **kw):
 
 
 @receiver(payment_received, sender=BlockchainPayment)
-def on_payment_received_send_notification(sender, **kw):
+def on_blockchain_payment_received_maybe_publish_checkout(sender, **kw):
     payment = kw["payment"]
-    serializer = BlockchainPaymentSerializer(payment)
 
-    logger.info(f"Notifying requester of {payment} that it was received")
-    layer = get_channel_layer()
-    channel_group_name = NotificationConsumer.get_group_name(payment.order.user)
-    async_to_sync(layer.group_send)(
-        channel_group_name, {"type": "notify_payment_status_change", "message": serializer.data}
-    )
+    checkouts = Checkout.objects.filter(payment_order__payment=payment)
+    checkout_id = checkouts.values_list("id", flat=True).first()
+
+    if checkout_id is None:
+        return
+
+    tasks.publish_checkout_event.delay(checkout_id, event="payment.received")
+
+
+@receiver(payment_confirmed, sender=InternalPayment)
+@receiver(payment_confirmed, sender=BlockchainPayment)
+@receiver(payment_confirmed, sender=RaidenPayment)
+def on_payment_confirmed_publish_checkout(sender, **kw):
+    payment = kw["payment"]
+
+    checkouts = Checkout.objects.filter(payment_order__payment=payment)
+    checkout_id = checkouts.values_list("id", flat=True).first()
+
+    if checkout_id is None:
+        return
+
+    tasks.publish_checkout_event.delay(checkout_id, event="payment.confirmed")
 
 
 @receiver(payment_confirmed, sender=BlockchainPayment)
@@ -198,8 +226,12 @@ def on_order_paid_credit_user(sender, **kw):
 def on_order_paid_free_payment_channels(sender, **kw):
     order = kw["payment_order"]
 
-    if order.payment_method:
+    try:
         order.payment_method.delete()
+    except PaymentOrder.payment_method.RelatedObjectDoesNotExist:
+        pass
+    except Exception as exc:
+        logger.exception(exc)
 
 
 @receiver(post_save, sender=InternalTransfer)
@@ -249,16 +281,32 @@ def on_internal_transfer_confirmed_move_balances(sender, **kw):
     transfer.sender.balance_entries.create(amount=-transfer.amount, currency=transfer.currency)
 
 
+@receiver(post_save, sender=Store)
+def on_store_created_generate_key_pair(sender, **kw):
+    store = kw["instance"]
+    if kw["created"]:
+        StoreRSAKeyPair.generate(store)
+
+
+@receiver(post_save, sender=Store)
+def on_store_created_generate_api_key(sender, **kw):
+    store = kw["instance"]
+    if kw["created"]:
+        StoreAPIKey.generate(store)
+
+
 __all__ = [
     "on_account_deposit_check_blockchain_payments",
+    "on_blockchain_payment_sent_maybe_publish_checkout",
+    "on_blockchain_payment_received_maybe_publish_checkout",
     "on_block_added_check_confirmed_payments",
     "on_block_added_check_confirmed_transfers",
     "on_payment_created_set_created_status",
     "on_payment_order_method_created_schedule_expiration_task",
     "on_payment_event_created_send_order_paid_signal",
     "on_payment_received_update_status",
-    "on_payment_received_send_notification",
     "on_payment_confirmed_finalize",
+    "on_payment_confirmed_publish_checkout",
     "on_order_paid_credit_user",
     "on_order_paid_free_payment_channels",
     "on_order_created_set_payment_methods",
@@ -268,4 +316,6 @@ __all__ = [
     "on_internal_transfer_confirmed_move_balances",
     "on_external_transfer_executed_mark_as_executed",
     "on_external_transfer_confirmed_destroy_reserve",
+    "on_store_created_generate_key_pair",
+    "on_store_created_generate_api_key",
 ]

@@ -1,24 +1,23 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Optional, Tuple, Union
 from decimal import Decimal
+from typing import Any, Optional, Tuple, Union
 
+import ethereum
 from django.conf import settings
 from django.db import models
 from django.db.models import Sum
-import ethereum
+from eth_utils import to_checksum_address
 from ethereum.abi import ContractTranslator
-
 from ethtoken import token
 from ethtoken.abi import EIP20_ABI
-from eth_utils import to_checksum_address
 from model_utils.managers import QueryManager
 from web3 import Web3
 
-from hub20.apps.blockchain.fields import EthereumAddressField, HexField
-from hub20.apps.blockchain.models import make_web3, Transaction
 from hub20.apps.blockchain.choices import ETHEREUM_CHAINS
+from hub20.apps.blockchain.fields import EthereumAddressField, HexField
+from hub20.apps.blockchain.models import Transaction, make_web3
 from hub20.apps.ethereum_money.app_settings import TRANSFER_GAS_LIMIT
 
 
@@ -32,7 +31,7 @@ def get_max_fee() -> EthereumTokenAmount:
 
 def encode_transfer_data(recipient_address, amount: EthereumTokenAmount):
     translator = ContractTranslator(EIP20_ABI)
-    encoded_data = translator.encode("transfer", (recipient_address, amount.as_wei))
+    encoded_data = translator.encode_function_call("transfer", (recipient_address, amount.as_wei))
     return f"0x{encoded_data.hex()}"
 
 
