@@ -6,3 +6,5 @@ autopep8
 yapf
 remote-pdb
 ipython
+mkdocs
+mkdocs-material

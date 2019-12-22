@@ -11,6 +11,7 @@ syntax: glob
 /log
 /data
 /docker
+/site
 docker.secrets
 celerybeat-schedule
 dist
