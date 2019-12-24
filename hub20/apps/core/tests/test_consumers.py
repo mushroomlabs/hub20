@@ -1,4 +1,5 @@
 import pytest
+from asgiref.sync import sync_to_async
 from channels.routing import URLRouter
 from channels.testing import WebsocketCommunicator
 
@@ -21,7 +22,7 @@ async def test_checkout_consumer():
 
     assert ok, "Failed to connect"
 
-    blockchain_payment_sent.send(
+    await sync_to_async(blockchain_payment_sent.send)(
         sender=EthereumToken,
         amount=checkout.payment_order.as_token_amount,
         recipient=checkout.payment_order.payment_method.wallet.address,

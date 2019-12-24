@@ -82,7 +82,7 @@ TEMPLATES = [
 
 DATABASES = {
     "default": {
-        "ENGINE": os.getenv("HUB20_DATABASE_ENGINE"),
+        "ENGINE": "django.db.backends.postgresql",  # PostgreSQL is required
         "HOST": os.getenv("HUB20_DATABASE_HOST"),
         "PORT": os.getenv("HUB20_DATABASE_PORT", 5432),
         "NAME": os.getenv("HUB20_DATABASE_NAME"),
@@ -102,7 +102,7 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": CHANNEL_LAYER_BACKEND,
         "CONFIG": {"hosts": [(CHANNEL_LAYER_HOST, CHANNEL_LAYER_PORT)]},
-    },
+    }
 }
 
 # Caches
@@ -505,6 +505,25 @@ BLOCKCHAIN_START_BLOCK_NUMBER = os.getenv("HUB20_BLOCKCHAIN_STARTING_BLOCK")
 # Logging Configuration
 LOG_FILE = os.getenv("HUB20_SITE_LOG_FILE")
 LOG_LEVEL = os.getenv("HUB20_LOG_LEVEL", "DEBUG" if DEBUG else "INFO")
+
+
+LOGGING_HANDLERS = {
+    "null": {"level": "DEBUG", "class": "logging.NullHandler"},
+    "console": {"level": LOG_LEVEL, "class": "logging.StreamHandler", "formatter": "verbose"},
+}
+
+if LOG_FILE:
+    LOGGING_HANDLERS["file"] = {
+        "level": LOG_LEVEL,
+        "class": os.getenv("HUB20_LOG_FILE_HANDLER", "logging.handlers.RotatingFileHandler"),
+        "formatter": "verbose",
+        "filename": LOG_FILE,
+        "maxBytes": int(os.getenv("HUB20_LOG_FILE_MAX_FILE_SIZE", 16 * 1024 * 1024)),
+        "backupCount": int(os.getenv("HUB20_LOG_FILE_BACKUP", 3)),
+    }
+
+LOGGING_HANDLER_METHODS = ["console", "file"] if "file" in LOGGING_HANDLERS else ["console"]
+
 LOGGING = {
     "version": 1,
     "formatters": {
@@ -513,29 +532,26 @@ LOGGING = {
         },
         "simple": {"format": "%(levelname)s:%(module)s %(lineno)d %(message)s"},
     },
-    "handlers": {
-        "null": {"level": "DEBUG", "class": "logging.NullHandler"},
-        "console": {"level": "DEBUG", "class": "logging.StreamHandler", "formatter": "verbose"},
-        "file": {
-            "level": "DEBUG",
-            "class": "logging.handlers.RotatingFileHandler",
-            "formatter": "verbose",
-            "filename": LOG_FILE,
-            "maxBytes": 16 * 1024 * 1024,
-            "backupCount": 3,
-        },
-    },
+    "handlers": LOGGING_HANDLERS,
     "loggers": {
         "django": {"handlers": ["null"], "propagate": True, "level": "INFO"},
-        "django.db.backends:": {"handlers": ["file"], "level": "ERROR", "propagate": False},
-        "django.request": {"handlers": ["file"], "level": "ERROR", "propagate": False},
+        "django.db.backends:": {
+            "handlers": LOGGING_HANDLER_METHODS,
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": LOGGING_HANDLER_METHODS,
+            "level": "ERROR",
+            "propagate": False,
+        },
     },
 }
 
 
 for app in PROJECT_APPS:
     LOGGING["loggers"][app] = {
-        "handlers": ["console", "file"],
-        "level": "DEBUG" if DEBUG else "INFO",
+        "handlers": LOGGING_HANDLER_METHODS,
+        "level": LOG_LEVEL,
         "propagate": False,
     }

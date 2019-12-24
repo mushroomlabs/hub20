@@ -9,63 +9,12 @@ services:
       POSTGRES_USER: ${HUB20_DATABASE_USER}
       POSTGRES_PASSWORD: ${HUB20_DATABASE_PASSWORD}
     ports:
-      - "5432:5432"
+      - "${HUB20_DATABASE_PORT}:5432"
     volumes:
-      - ./docker/database:/var/lib/postgresql/data
-    env_file:
-      - dev.envfile
+      - ./docker/volumes/database:/var/lib/postgresql/data
 
   # Redis for cache and session
   redis:
     image: redis:latest
     ports:
       - "6379:6379"
-
-  # RabbitMQ for celery and interprocess pub-sub
-  rabbitmq:
-    image: rabbitmq:latest
-    ports:
-      - "5672:5672"
-  # Django web application
-  web:
-    command: >
-      /bin/bash -c "
-        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
-        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
-        while ! nc -w 1 -z rabbitmq 5672; do sleep 0.5; done;
-        django-admin runserver 0.0.0.0:8000
-      "
-    image: hub20
-    build: .
-    volumes:
-      - ./hub20:/app/hub20
-    depends_on:
-      - db
-      - rabbitmq
-      - redis
-      - worker
-
-    ports:
-      - "8000:8000"
-    env_file:
-      - dev.envfile      
-
-  # Celery worker
-  worker:
-    command: >
-      /bin/bash -c "
-        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
-        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
-        while ! nc -w 1 -z rabbitmq 5672; do sleep 0.5; done;
-        celery worker -A hub20.api -l info
-      "
-    image: hub20
-    build: .
-    volumes:
-      - ./hub20:/app/hub20
-    depends_on:
-      - db
-      - rabbitmq
-      - redis
-    env_file:
-      - dev.envfile

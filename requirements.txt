@@ -21,6 +21,4 @@ factory_boy
 psycopg2-binary
 pycryptodome
 pyjwt
-pytest-asyncio
-pytest-django
 raiden_contracts

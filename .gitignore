@@ -10,7 +10,7 @@ syntax: glob
 /config
 /log
 /data
-/docker
+/docker/volumes
 /site
 docker.secrets
 celerybeat-schedule

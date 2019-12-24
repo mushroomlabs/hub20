@@ -4,6 +4,9 @@ jedi
 black
 autopep8
 yapf
+pytest-asyncio
+pytest-django
+pytest-env
 remote-pdb
 ipython
 mkdocs
