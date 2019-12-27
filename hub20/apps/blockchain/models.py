@@ -1,22 +1,19 @@
-import logging
 import datetime
+import logging
 from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
-from django.db import models
-from django.db import transaction as database_transaction
-from django.db.models import Max, Avg
+from django.db import models, transaction as database_transaction
+from django.db.models import Avg, Max
 from django.utils import timezone
-
 from web3 import Web3
-from web3.providers import WebsocketProvider, HTTPProvider, IPCProvider
 from web3.middleware import geth_poa_middleware
+from web3.providers import HTTPProvider, IPCProvider, WebsocketProvider
 
-from .app_settings import START_BLOCK_NUMBER
+from .app_settings import CHAIN_ID, START_BLOCK_NUMBER
 from .choices import ETHEREUM_CHAINS
-from .fields import Uint256Field, EthereumAddressField, HexField
-
+from .fields import EthereumAddressField, HexField, Uint256Field
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +42,9 @@ def make_web3():
     w3 = Web3(provider_class(web3_endpoint))
     w3.middleware_stack.inject(geth_poa_middleware, layer=0)
     w3.eth.setGasPriceStrategy(database_history_gas_price_strategy)
+
+    chain_id = int(w3.net.version)
+    assert chain_id == CHAIN_ID, f"web3 connected to network {chain_id}, expected {CHAIN_ID}"
     return w3
 
 
