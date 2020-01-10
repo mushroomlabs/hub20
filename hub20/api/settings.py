@@ -55,7 +55,6 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-APPEND_SLASH = False
 ROOT_URLCONF = "hub20.api.urls"
 ASGI_APPLICATION = "hub20.api.routing.application"
 

@@ -1,6 +1,13 @@
 version: '2'
 
 services:
+  geth-dev:
+    image: ethereum/client-go:latest
+    volumes:
+      - ./docker/volumes/geth/chain/goerli:/root/.ethereum
+    command:
+      --goerli --rpc --rpcaddr 0.0.0.0 --ws --wsaddr 0.0.0.0 --nousb
+
   db:
     image: postgres
     restart: always
@@ -8,13 +15,112 @@ services:
       POSTGRES_DB: ${HUB20_DATABASE_NAME}
       POSTGRES_USER: ${HUB20_DATABASE_USER}
       POSTGRES_PASSWORD: ${HUB20_DATABASE_PASSWORD}
-    ports:
-      - "${HUB20_DATABASE_PORT}:5432"
     volumes:
       - ./docker/volumes/database:/var/lib/postgresql/data
+    env_file:
+      - docker.envfile
 
   # Redis for cache and session
   redis:
     image: redis:latest
-    ports:
-      - "6379:6379"
+
+  # Web API
+  web:
+    stdin_open: true
+    tty: true
+    command: >
+      /bin/bash -c "
+        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+        django-admin migrate;
+        django-admin runserver 0.0.0.0:8000
+      "
+
+    image: mushroomlabs/hub20
+    build: .
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - docker.envfile
+
+  # Celery app
+  celery:
+    stdin_open: true
+    tty: true
+    command: >
+      /bin/bash -c "
+        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+        celery worker -A hub20.api -l info
+      "
+
+    image: mushroomlabs/hub20
+    build: .
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - docker.envfile
+
+  # Background command to synchonize blockchain
+  job_sync_blockchain:
+    command: >
+      /bin/bash -c "
+        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+        django-admin sync_blockchain
+      "
+
+    image: mushroomlabs/hub20
+    build: .
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - docker.envfile
+
+  # Background command to synchonize raiden
+  job_sync_raiden:
+    command: >
+      /bin/bash -c "
+        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+        django-admin sync_raiden
+      "
+
+    image: mushroomlabs/hub20
+    build: .
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - docker.envfile
+
+
+  # Background command to track payments
+  job_track_payments:
+    command: >
+      /bin/bash -c "
+        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+        django-admin track_pending_payments
+      "
+
+    image: mushroomlabs/hub20
+    build: .
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - docker.envfile

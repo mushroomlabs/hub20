@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED 1
 RUN apt-get update
 RUN apt-get install -y netcat
 
-# Copy all our files into the image.
+# Copy all relevant files into the image.
 COPY ./hub20 /app/hub20
 COPY ./requirements.txt /app
 COPY ./setup.py /app
