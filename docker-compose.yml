@@ -1,24 +1,23 @@
-version: '2'
+version: '2.2'
 
 services:
   geth-dev:
     image: ethereum/client-go:latest
     volumes:
-      - ./docker/volumes/geth/chain/goerli:/root/.ethereum
+      - "./docker/volumes/geth/chain/${HUB20_WEB3_NETWORK}:/root/.ethereum"
     command:
-      --goerli --rpc --rpcaddr 0.0.0.0 --ws --wsaddr 0.0.0.0 --nousb
+      "--rpc --rpcaddr 0.0.0.0 --ws --wsaddr 0.0.0.0 --nousb ${HUB20_GETH_EXTRA_OPTS}"
 
   db:
     image: postgres
     restart: always
+    volumes:
+      - "./docker/volumes/database/${HUB20_DATABASE_NAME}:/var/lib/postgresql/data"
+
     environment:
       POSTGRES_DB: ${HUB20_DATABASE_NAME}
       POSTGRES_USER: ${HUB20_DATABASE_USER}
       POSTGRES_PASSWORD: ${HUB20_DATABASE_PASSWORD}
-    volumes:
-      - ./docker/volumes/database:/var/lib/postgresql/data
-    env_file:
-      - docker.envfile
 
   # Redis for cache and session
   redis:
@@ -43,8 +42,9 @@ services:
     depends_on:
       - db
       - redis
+
     env_file:
-      - docker.envfile
+      - ./.env     
 
   # Celery app
   celery:
@@ -64,8 +64,30 @@ services:
     depends_on:
       - db
       - redis
+
     env_file:
-      - docker.envfile
+      - ./.env
+
+  # Celery beat (periodic tasks)
+  celery_beat:
+    command: >
+      /bin/bash -c "
+        mkdir -p ${HUB20_DATA_FOLDER}/celery
+        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+        celery beat -A hub20.api -l info -s ${HUB20_DATA_FOLDER}/celery/celerybeat-schedule.db --pidfile=${HUB20_DATA_FOLDER}/celery/celerybeat.pid
+      "
+    image: mushroomlabs/hub20
+    build: .
+    volumes:
+      - .:/app
+      - "./docker/volumes/celery:${HUB20_DATA_FOLDER}/celery"
+    depends_on:
+      - db
+      - redis
+
+    env_file:
+      - ./.env    
 
   # Background command to synchonize blockchain
   job_sync_blockchain:
@@ -83,8 +105,6 @@ services:
     depends_on:
       - db
       - redis
-    env_file:
-      - docker.envfile
 
   # Background command to synchonize raiden
   job_sync_raiden:
@@ -102,9 +122,9 @@ services:
     depends_on:
       - db
       - redis
-    env_file:
-      - docker.envfile
 
+    env_file:
+      - ./.env
 
   # Background command to track payments
   job_track_payments:
@@ -122,5 +142,10 @@ services:
     depends_on:
       - db
       - redis
+
     env_file:
-      - docker.envfile
+      - ./.env
+      
+
+      
+

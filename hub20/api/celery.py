@@ -9,9 +9,13 @@ class Hub20CeleryConfig:
     broker_use_ssl = "HUB20_BROKER_USE_SSL" in os.environ
     beat_schedule = {
         "sync-token-network-events": {
-            "task": "raiden.tasks.sync_token_network_events",
+            "task": "hub20.apps.raiden.tasks.sync_token_network_events",
             "schedule": crontab(minute="*/10"),
-        }
+        },
+        "fetch-exchange-rates": {
+            "task": "hub20.apps.ethereum_money.tasks.get_exchange_rates",
+            "schedule": crontab(minute="*/2"),
+        },
     }
     task_always_eager = "HUB20_TEST" in os.environ
     task_eager_propagates = "HUB20_TEST" in os.environ

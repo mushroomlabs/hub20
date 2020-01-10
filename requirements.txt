@@ -19,6 +19,7 @@ eth-abi<2
 ethtoken
 factory_boy
 psycopg2-binary
+pycoingecko
 pycryptodome
 pyjwt
 pytest-asyncio
