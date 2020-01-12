@@ -290,7 +290,7 @@ class CoingeckoDefinition(models.Model):
     slug = models.SlugField(max_length=256)
     description = models.TextField(null=True)
     logo_url = models.URLField(null=True, max_length=500)
-    coingecko_rank = models.PositiveSmallIntegerField(null=True)
+    coingecko_rank = models.PositiveIntegerField(null=True, db_index=True)
     coingecko_score = models.FloatField(null=True)
     developer_score = models.FloatField(null=True)
     liquidity_score = models.FloatField(null=True)

@@ -19,7 +19,6 @@ from hub20.apps.core.models import (
     PaymentOrderMethod,
     RaidenPayment,
     Store,
-    StoreAPIKey,
     StoreRSAKeyPair,
     Transfer,
     Wallet,
@@ -54,7 +53,7 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
         return
 
     payment = BlockchainPayment.objects.create(
-        order=order, amount=amount.amount, currency=amount.currency, transaction=transaction,
+        order=order, amount=amount.amount, currency=amount.currency, transaction=transaction
     )
     payment_received.send_robust(sender=BlockchainPayment, payment=payment)
 
@@ -288,13 +287,6 @@ def on_store_created_generate_key_pair(sender, **kw):
         StoreRSAKeyPair.generate(store)
 
 
-@receiver(post_save, sender=Store)
-def on_store_created_generate_api_key(sender, **kw):
-    store = kw["instance"]
-    if kw["created"]:
-        StoreAPIKey.generate(store)
-
-
 __all__ = [
     "on_account_deposit_check_blockchain_payments",
     "on_blockchain_payment_sent_maybe_publish_checkout",
@@ -317,5 +309,4 @@ __all__ = [
     "on_external_transfer_executed_mark_as_executed",
     "on_external_transfer_confirmed_destroy_reserve",
     "on_store_created_generate_key_pair",
-    "on_store_created_generate_api_key",
 ]

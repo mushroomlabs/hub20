@@ -21,7 +21,9 @@ EthereumAccount = get_ethereum_account_model()
 @receiver(post_save, sender=EthereumToken)
 def on_mainnet_token_created_get_coingecko_definition(sender, **kw):
     token = kw["instance"]
-    if kw["created"] and token.chain == ETHEREUM_CHAINS.mainnet:
+    is_fixture = "raw" in kw and kw["raw"]
+
+    if kw["created"] and not is_fixture and token.chain == ETHEREUM_CHAINS.mainnet:
         CoingeckoDefinition.make_definition(token)
 
 

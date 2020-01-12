@@ -13,6 +13,7 @@ syntax: glob
 /docker/volumes
 /site
 /.env
+docker-compose.override.yml
 celerybeat-schedule
 dist
 build

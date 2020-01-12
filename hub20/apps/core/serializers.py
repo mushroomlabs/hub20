@@ -183,20 +183,8 @@ class PaymentOrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.PaymentOrder
-        fields = [
-            "url",
-            "amount",
-            "currency",
-            "created",
-            "payment_method",
-            "payments",
-            "status",
-        ]
-        read_only_fields = [
-            "payment_method",
-            "status",
-            "created",
-        ]
+        fields = ["url", "amount", "currency", "created", "payment_method", "payments", "status"]
+        read_only_fields = ["payment_method", "status", "created"]
 
 
 class PaymentOrderReadSerializer(PaymentOrderSerializer):
@@ -205,6 +193,7 @@ class PaymentOrderReadSerializer(PaymentOrderSerializer):
 
 
 class CheckoutSerializer(serializers.ModelSerializer):
+    store = serializers.PrimaryKeyRelatedField(queryset=models.Store.objects.all())
     currency = CurrencyRelatedField(source="payment_order.currency")
     amount = TokenValueField(source="payment_order.amount")
     status = serializers.CharField(source="payment_order.status", read_only=True)
@@ -214,18 +203,11 @@ class CheckoutSerializer(serializers.ModelSerializer):
     voucher = serializers.SerializerMethodField()
 
     def validate(self, data):
-        request = self.context.get("request")
-        try:
-            store = models.Store.objects.accessible_to(request).get()
-        except models.Store.DoesNotExist:
-            raise serializers.ValidationError("Needs store api key or authenticated owner")
-
         currency = data["payment_order"]["currency"]
-
+        store = data["store"]
         if currency not in store.accepted_currencies.all():
             raise serializers.ValidationError(f"{currency.ticker} is not accepted at {store.name}")
 
-        data["store"] = store
         return data
 
     def create(self, validated_data):
@@ -250,6 +232,7 @@ class CheckoutSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Checkout
         fields = (
+            "store",
             "external_identifier",
             "currency",
             "amount",
@@ -270,22 +253,17 @@ class HttpCheckoutSerializer(CheckoutSerializer):
 class StoreSerializer(serializers.ModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="hub20:store-detail")
     site_url = serializers.URLField(source="url")
-    api_key = serializers.CharField(read_only=True)
     public_key = serializers.CharField(source="rsa.public_key_pem", read_only=True)
     accepted_currencies = CurrencyRelatedField(many=True)
 
     def create(self, validated_data):
         request = self.context.get("request")
-        return models.Store.objects.create(owner=request.user, **validated_data)
+        currencies = validated_data.pop("accepted_currencies", [])
+        store = models.Store.objects.create(owner=request.user, **validated_data)
+        store.accepted_currencies.set(currencies)
+        return store
 
     class Meta:
         model = models.Store
-        fields = (
-            "url",
-            "name",
-            "site_url",
-            "api_key",
-            "public_key",
-            "accepted_currencies",
-        )
-        read_only_fields = ("api_key", "public_key")
+        fields = ("id", "url", "name", "site_url", "public_key", "accepted_currencies")
+        read_only_fields = ("id", "public_key")

@@ -3,8 +3,9 @@ from typing import List, Optional
 from django.db.models.query import QuerySet
 from django.http import Http404
 from django.shortcuts import get_object_or_404
-from rest_framework import generics, permissions
+from rest_framework import generics
 from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, RetrieveModelMixin
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.serializers import Serializer
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
@@ -12,7 +13,6 @@ from hub20.apps.blockchain.app_settings import CHAIN_ID
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
 
 from . import models, serializers
-from .permissions import IsAuthenticatedOrApiClient
 
 
 class ReadWriteSerializerMixin(generics.GenericAPIView):
@@ -53,14 +53,14 @@ class BasePaymentOrderView(ReadWriteSerializerMixin):
 
 
 class PaymentOrderListView(BasePaymentOrderView, generics.ListCreateAPIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self) -> QuerySet:
         return self.request.user.paymentorder_set.all()
 
 
 class PaymentOrderView(BasePaymentOrderView, generics.RetrieveDestroyAPIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
 
     def get_object(self) -> models.PaymentOrder:
         return get_object_or_404(
@@ -69,7 +69,7 @@ class PaymentOrderView(BasePaymentOrderView, generics.RetrieveDestroyAPIView):
 
 
 class TransferListView(generics.ListCreateAPIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     serializer_class = serializers.TransferSerializer
 
     def get_queryset(self) -> QuerySet:
@@ -77,7 +77,7 @@ class TransferListView(generics.ListCreateAPIView):
 
 
 class TransferView(generics.RetrieveAPIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     serializer_class = serializers.TransferSerializer
 
     def get_object(self):
@@ -90,7 +90,7 @@ class TransferView(generics.RetrieveAPIView):
 
 
 class TokenBalanceListView(generics.ListAPIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     serializer_class = serializers.TokenBalanceSerializer
 
     def get_queryset(self) -> List[EthereumTokenAmount]:
@@ -98,7 +98,7 @@ class TokenBalanceListView(generics.ListAPIView):
 
 
 class TokenBalanceView(generics.RetrieveAPIView):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     serializer_class = serializers.TokenBalanceSerializer
 
     def get_object(self) -> EthereumTokenAmount:
@@ -107,36 +107,28 @@ class TokenBalanceView(generics.RetrieveAPIView):
         return user_account.get_balance(token)
 
 
-class StoreListView(generics.ListCreateAPIView):
-    permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = serializers.StoreSerializer
-
-    def get_queryset(self) -> QuerySet:
-        return self.request.user.store_set.all()
-
-
-class StoreView(generics.RetrieveDestroyAPIView):
-    permission_classes = (permissions.IsAuthenticated,)
-    serializer_class = serializers.StoreSerializer
-
-    def get_object(self) -> models.Store:
-        return self.request.user.store_set.filter(pk=self.kwargs["pk"]).first()
-
-
 class CheckoutViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin, DestroyModelMixin):
-    permission_classes = (IsAuthenticatedOrApiClient,)
+    permission_classes = (AllowAny,)
     serializer_class = serializers.HttpCheckoutSerializer
     lookup_value_regex = "[0-9a-f-]{36}"
 
     def get_queryset(self):
-        return models.Checkout.objects.filter(
-            store__in=models.Store.objects.accessible_to(self.request)
-        )
+        return models.Checkout.objects.all()
+
+    def get_object(self):
+        return get_object_or_404(models.Checkout, id=self.kwargs["pk"])
 
 
 class StoreViewSet(ModelViewSet):
-    permission_classes = (permissions.IsAuthenticated,)
+    permission_classes = (IsAuthenticated,)
     serializer_class = serializers.StoreSerializer
 
+    def get_permissions(self):
+        perms = (AllowAny,) if self.action == "retrieve" else (IsAuthenticated,)
+        return (perm() for perm in perms)
+
     def get_queryset(self) -> QuerySet:
-        return self.request.user.store_set.all()
+        return models.Store.objects.all()
+
+    def get_object(self, *args, **kw):
+        return get_object_or_404(models.Store, id=self.kwargs["pk"])

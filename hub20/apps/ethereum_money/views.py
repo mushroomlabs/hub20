@@ -6,13 +6,16 @@ from rest_framework import generics
 from hub20.apps.blockchain.app_settings import CHAIN_ID
 
 from . import models, serializers
+from .app_settings import TRACKED_TOKENS
 
 
 class TokenListView(generics.ListAPIView):
     serializer_class = serializers.EthereumTokenSerializer
 
     def get_queryset(self) -> QuerySet:
-        return models.EthereumToken.objects.filter(chain=CHAIN_ID, address__isnull=False)
+        return models.EthereumToken.objects.filter(
+            chain=CHAIN_ID, address__isnull=False, ticker__in=TRACKED_TOKENS
+        ).order_by("coingecko__coingecko_rank")
 
 
 class TokenView(generics.RetrieveAPIView):
