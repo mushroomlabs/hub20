@@ -1,9 +1,9 @@
-from typing import List, Dict, Any, Union, Optional
 from datetime import datetime
+from typing import Any, Dict, List, Optional, Union
 
+import requests
 from attributedict.collections import AttributeDict
 from django.utils.timezone import make_aware
-import requests
 
 from . import models
 
@@ -16,9 +16,16 @@ def _make_request(url: str, method: str = "GET", **params: Any) -> Union[List, D
         "DELETE": requests.delete,
     }[method.upper()]
 
-    response = action(url)
-    response.raise_for_status()
-    return response.json()
+    try:
+        response = action(url)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.ConnectionError:
+        raise RaidenConnectionError(f"Could not connect to {url}")
+
+
+class RaidenConnectionError(Exception):
+    pass
 
 
 class RaidenClient:
@@ -29,6 +36,7 @@ class RaidenClient:
         self, payment_data: Dict, channel: models.Channel
     ) -> Optional[AttributeDict]:
         event_name = payment_data.pop("event")
+        payment_data.pop("token_address", None)
 
         if event_name == "EventPaymentReceivedSuccess":
             payment_data["sender_address"] = payment_data.pop("initiator")

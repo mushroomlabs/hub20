@@ -2,15 +2,13 @@ import logging
 import time
 
 from django.core.management.base import BaseCommand
-
 from web3 import Web3
 
 from hub20.apps.blockchain.models import make_web3
 from hub20.apps.ethereum_money.models import EthereumToken
 from hub20.apps.raiden import models
-from hub20.apps.raiden.client import RaidenClient
+from hub20.apps.raiden.client import RaidenClient, RaidenConnectionError
 from hub20.apps.raiden.contracts import get_token_network_registry_contract
-
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +52,13 @@ class Command(BaseCommand):
         while True:
             for raiden in models.Raiden.objects.all():
                 client = RaidenClient(raiden)
-                sync_token_networks(client, w3)
-                sync_channels(client)
-                sync_payments(client)
+                try:
+                    sync_token_networks(client, w3)
+                    sync_channels(client)
+                    sync_payments(client)
+                except RaidenConnectionError as exc:
+                    logger.warn(str(exc))
+                    time.sleep(5)
+                except Exception as exc:
+                    logger.exception(exc)
             time.sleep(3)
