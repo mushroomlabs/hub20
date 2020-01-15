@@ -4,6 +4,7 @@ channels
 channels_redis
 django<3
 django-allauth
+django-cors-headers
 django-invitations
 django-ipware
 django-model-utils

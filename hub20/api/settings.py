@@ -26,6 +26,7 @@ THIRD_PARTY_APPS = [
     "allauth",
     "allauth.account",
     "channels",
+    "corsheaders",
     "djmoney",
     "django_pdb",
     "rest_framework",
@@ -48,6 +49,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + PROJECT_APPS
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -120,6 +122,10 @@ CACHE_OPTIONS = {
 CACHES = {
     "default": {"BACKEND": CACHE_BACKEND, "LOCATION": CACHE_LOCATION, "OPTIONS": CACHE_OPTIONS}
 }
+
+
+# CORS Configuration (It is an api, let's allow everyone to connect)
+CORS_ORIGIN_ALLOW_ALL = True
 
 
 # Password validation
