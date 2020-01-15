@@ -44,7 +44,7 @@ services:
       - redis
 
     env_file:
-      - ./.env     
+      - ./.env
 
   # Celery app
   celery:
@@ -87,7 +87,7 @@ services:
       - redis
 
     env_file:
-      - ./.env    
+      - ./.env
 
   # Background command to synchonize blockchain
   job_sync_blockchain:
@@ -105,6 +105,10 @@ services:
     depends_on:
       - db
       - redis
+
+    env_file:
+      - ./.env
+
 
   # Background command to synchonize raiden
   job_sync_raiden:
@@ -145,7 +149,3 @@ services:
 
     env_file:
       - ./.env
-      
-
-      
-

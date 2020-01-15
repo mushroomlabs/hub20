@@ -508,6 +508,12 @@ BLOCKCHAIN_NETWORK_ID = os.getenv("HUB20_BLOCKCHAIN_NETWORK_ID")
 BLOCKCHAIN_START_BLOCK_NUMBER = os.getenv("HUB20_BLOCKCHAIN_STARTING_BLOCK")
 
 
+ETHEREUM_MONEY_TRACKED_FIAT_CURRENCIES = [
+    c for c in os.getenv("HUB20_TRACKED_CURRENCIES", "").split(",") if c
+]
+ETHEREUM_MONEY_TRACKED_TOKENS = [t for t in os.getenv("HUB20_TRACKED_TOKENS", "").split(",") if t]
+
+
 # Logging Configuration
 LOG_FILE = os.getenv("HUB20_SITE_LOG_FILE")
 LOG_LEVEL = os.getenv("HUB20_LOG_LEVEL", "DEBUG" if DEBUG else "INFO")
