@@ -25,6 +25,7 @@ from hub20.apps.core.models import (
 )
 from hub20.apps.core.signals import (
     blockchain_payment_sent,
+    order_canceled,
     order_paid,
     payment_confirmed,
     payment_received,
@@ -134,6 +135,13 @@ def on_payment_event_created_send_order_paid_signal(sender, **kw):
         order_paid.send(sender=PaymentOrder, payment_order=payment_event.order)
 
 
+@receiver(post_save, sender=PaymentOrderEvent)
+def on_payment_order_canceled_event_send_order_canceled_signal(sender, **kw):
+    payment_event = kw["instance"]
+    if payment_event.created and payment_event.status == PAYMENT_EVENT_TYPES.canceled:
+        order_canceled.send(sender=PaymentOrder, payment_order=payment_event.order)
+
+
 @receiver(post_save, sender=Block)
 def on_block_added_check_confirmed_payments(sender, **kw):
     block = kw["instance"]
@@ -222,7 +230,8 @@ def on_order_paid_credit_user(sender, **kw):
 
 
 @receiver(order_paid, sender=PaymentOrder)
-def on_order_paid_free_payment_channels(sender, **kw):
+@receiver(order_canceled, sender=PaymentOrder)
+def on_order_finalized_free_payment_channels(sender, **kw):
     order = kw["payment_order"]
 
     try:
@@ -299,8 +308,9 @@ __all__ = [
     "on_payment_received_update_status",
     "on_payment_confirmed_finalize",
     "on_payment_confirmed_publish_checkout",
+    "on_payment_order_canceled_event_send_order_canceled_signal",
     "on_order_paid_credit_user",
-    "on_order_paid_free_payment_channels",
+    "on_order_finalized_free_payment_channels",
     "on_order_created_set_payment_methods",
     "on_transfer_created_mark_transfer_scheduled",
     "on_transfer_failed_mark_as_failed",

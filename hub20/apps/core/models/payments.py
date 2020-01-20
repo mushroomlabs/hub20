@@ -4,22 +4,24 @@ from django.conf import settings
 from django.db import models
 from django.db.models import Sum
 from model_utils.managers import InheritanceManager
-from model_utils.models import TimeStampedModel, StatusModel
+from model_utils.models import StatusModel, TimeStampedModel
 
 from hub20.apps.blockchain.models import Transaction
-from hub20.apps.ethereum_money import get_ethereum_account_model
-from hub20.apps.ethereum_money.models import EthereumTokenValueModel
-from hub20.apps.raiden.models import Raiden, Payment as RaidenPaymentEvent
 from hub20.apps.core.app_settings import PAYMENT_SETTINGS
 from hub20.apps.core.choices import PAYMENT_EVENT_TYPES
-from .accounting import Wallet
+from hub20.apps.ethereum_money import get_ethereum_account_model
+from hub20.apps.ethereum_money.models import EthereumTokenValueModel
+from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
 
+from .accounting import Wallet
 
 EthereumAccount = get_ethereum_account_model()
 
 
 def generate_payment_order_id():
-    return random.randint(1, 2 ** 63 - 1)
+    # Javascript can not handle numbers bigger than 2^53 - 1, so let's make
+    # that our upper bound
+    return random.randint(1, 2 ** 53 - 1)
 
 
 class PaymentOrder(TimeStampedModel, EthereumTokenValueModel):
@@ -79,6 +81,12 @@ class PaymentOrder(TimeStampedModel, EthereumTokenValueModel):
 
         if self.total_confirmed >= self.amount:
             self.events.create(status=self.STATUS.confirmed)
+
+    def cancel(self):
+        if self.is_finalized:
+            return
+
+        self.events.create(status=self.STATUS.canceled)
 
 
 class PaymentOrderMethod(TimeStampedModel):

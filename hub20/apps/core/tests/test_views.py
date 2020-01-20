@@ -18,4 +18,15 @@ class StoreViewTestCase(TestCase):
         self.assertEqual(response.data["id"], str(self.store.id))
 
 
+class CheckoutViewTestCase(TestCase):
+    def setUp(self):
+        self.checkout = factories.CheckoutFactory()
+
+    def test_delete_request_cancels_order(self):
+        url = reverse("hub20:checkout-detail", kwargs={"pk": self.checkout.pk})
+        response = self.client.delete(url)
+        self.checkout.refresh_from_db()
+        self.assertIsNone(response.data["payment_method"])
+
+
 __all__ = ["StoreViewTestCase"]

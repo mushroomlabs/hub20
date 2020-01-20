@@ -67,6 +67,11 @@ class PaymentOrderView(BasePaymentOrderView, generics.RetrieveDestroyAPIView):
             models.PaymentOrder, pk=self.kwargs.get("pk"), user=self.request.user
         )
 
+    def destroy(self, request, *args, **kw):
+        obj = self.get_object()
+        obj.cancel()
+        return self.retrieve(request, *args, **kw)
+
 
 class TransferListView(generics.ListCreateAPIView):
     permission_classes = (IsAuthenticated,)
@@ -117,6 +122,11 @@ class CheckoutViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin, Dest
 
     def get_object(self):
         return get_object_or_404(models.Checkout, id=self.kwargs["pk"])
+
+    def destroy(self, request, pk=None):
+        obj = self.get_object()
+        obj.payment_order.cancel()
+        return self.retrieve(request, pk=pk)
 
 
 class StoreViewSet(ModelViewSet):

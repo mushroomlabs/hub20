@@ -232,6 +232,8 @@ class CheckoutSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Checkout
         fields = (
+            "id",
+            "created",
             "store",
             "external_identifier",
             "currency",
@@ -240,6 +242,7 @@ class CheckoutSerializer(serializers.ModelSerializer):
             "status",
             "voucher",
         )
+        read_only_fields = ("id",)
 
 
 class HttpCheckoutSerializer(CheckoutSerializer):
@@ -248,6 +251,7 @@ class HttpCheckoutSerializer(CheckoutSerializer):
     class Meta:
         model = models.Checkout
         fields = ("url",) + CheckoutSerializer.Meta.fields
+        read_only_fields = CheckoutSerializer.Meta.read_only_fields
 
 
 class StoreSerializer(serializers.ModelSerializer):
