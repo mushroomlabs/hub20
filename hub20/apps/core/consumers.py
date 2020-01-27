@@ -59,6 +59,10 @@ class CheckoutConsumer(JsonWebsocketConsumer):
     def _refresh(self):
         self.checkout.refresh_from_db()
 
-    def refresh_voucher(self, event):
+    def publish_payment_event(self, message):
+        logger.info(f"Message received: {message}")
         self._refresh()
-        self.send_json({"voucher": self.checkout.issue_voucher(), "event": event["event_name"]})
+        message.pop("type", None)
+        message["event"] = message.pop("event_name", None)
+        message["voucher"] = self.checkout.issue_voucher()
+        self.send_json(message)

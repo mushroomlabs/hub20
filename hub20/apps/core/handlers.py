@@ -7,7 +7,7 @@ from django.dispatch import receiver
 from hub20.apps.blockchain.models import Block, Transaction
 from hub20.apps.core import tasks
 from hub20.apps.core.app_settings import PAYMENT_SETTINGS, TRANSFER_SETTINGS
-from hub20.apps.core.choices import PAYMENT_EVENT_TYPES, TRANSFER_EVENT_TYPES
+from hub20.apps.core.choices import PAYMENT_EVENT_TYPES, PAYMENT_METHODS, TRANSFER_EVENT_TYPES
 from hub20.apps.core.models import (
     BlockchainPayment,
     Checkout,
@@ -62,7 +62,8 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
 @receiver(blockchain_payment_sent, sender=EthereumToken)
 def on_blockchain_payment_sent_maybe_publish_checkout(sender, **kw):
     recipient_address = kw["recipient"]
-
+    payment_amount = kw["amount"]
+    tx_hash = kw["transaction_hash"]
     checkout = Checkout.objects.filter(
         payment_order__payment_method__wallet__account__address=recipient_address
     ).first()
@@ -71,7 +72,14 @@ def on_blockchain_payment_sent_maybe_publish_checkout(sender, **kw):
         return
 
     if not checkout.payment_order.is_finalized:
-        tasks.publish_checkout_event.delay(checkout.pk, event="payment.sent")
+        tasks.publish_checkout_event.delay(
+            checkout.pk,
+            event="payment.sent",
+            amount=payment_amount.amount,
+            token=payment_amount.currency.ticker,
+            identifier=tx_hash,
+            payment_method=PAYMENT_METHODS.blockchain,
+        )
 
 
 @receiver(raiden_payment_received, sender=RaidenPaymentEvent)
@@ -196,7 +204,9 @@ def on_blockchain_payment_received_maybe_publish_checkout(sender, **kw):
     if checkout_id is None:
         return
 
-    tasks.publish_checkout_event.delay(checkout_id, event="payment.received")
+    tasks.publish_checkout_event.delay(
+        checkout_id, amount=payment.amount, token=payment.currency.ticker, event="payment.received"
+    )
 
 
 @receiver(payment_confirmed, sender=InternalPayment)
@@ -208,10 +218,22 @@ def on_payment_confirmed_publish_checkout(sender, **kw):
     checkouts = Checkout.objects.filter(payment_order__payment=payment)
     checkout_id = checkouts.values_list("id", flat=True).first()
 
+    payment_method = {
+        InternalPayment: PAYMENT_METHODS.internal,
+        BlockchainPayment: PAYMENT_METHODS.blockchain,
+        RaidenPayment: PAYMENT_METHODS.raiden,
+    }.get(sender)
+
     if checkout_id is None:
         return
 
-    tasks.publish_checkout_event.delay(checkout_id, event="payment.confirmed")
+    tasks.publish_checkout_event.delay(
+        checkout_id,
+        amount=payment.amount,
+        token=payment.currency.ticker,
+        event="payment.confirmed",
+        payment_method=payment_method,
+    )
 
 
 @receiver(payment_confirmed, sender=BlockchainPayment)

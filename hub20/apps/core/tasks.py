@@ -37,9 +37,12 @@ def expire_payment_method(payment_method_id):
 
 
 @shared_task
-def publish_checkout_event(checkout_id, event="checkout.event"):
+def publish_checkout_event(checkout_id, event="checkout.event", **event_data):
     layer = get_channel_layer()
     channel_group_name = CheckoutConsumer.get_group_name(checkout_id)
-    async_to_sync(layer.group_send)(
-        channel_group_name, {"type": "refresh_voucher", "event_name": event}
-    )
+
+    logger.info(f"Publishing event {{ event }}. Data: {event_data}")
+
+    event_data.update({"type": "publish_payment_event", "event_name": event})
+
+    async_to_sync(layer.group_send)(channel_group_name, event_data)

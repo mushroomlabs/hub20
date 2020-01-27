@@ -61,9 +61,12 @@ def on_account_deposit_create_balance_entry(sender, **kw):
     transaction = kw["transaction"]
     amount = kw["amount"]
 
-    account.balance_entries.create(
-        amount=amount.amount, currency=amount.currency, transaction=transaction
-    )
+    try:
+        account.balance_entries.create(
+            amount=amount.amount, currency=amount.currency, transaction=transaction
+        )
+    except Exception as exc:
+        logger.exception(exc)
 
 
 __all__ = [

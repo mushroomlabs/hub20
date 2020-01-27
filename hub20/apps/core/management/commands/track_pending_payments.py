@@ -61,11 +61,12 @@ async def track_pending_transactions(w3):
                 if fn.function_identifier == contract.functions.transfer.function_identifier:
                     recipient = args["_to"]
                     transfer_amount = token.from_wei(args["_value"])
+
                     blockchain_payment_sent.send(
                         sender=EthereumToken,
                         recipient=recipient,
                         amount=transfer_amount,
-                        transaction_data=tx,
+                        transaction_hash=tx.hash.hex(),
                     )
 
         for tx in eth_payments:

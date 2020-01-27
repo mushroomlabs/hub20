@@ -1,6 +1,6 @@
 from django.dispatch import Signal
 
-blockchain_payment_sent = Signal(providing_args=["recipient", "amount", "transaction_data"])
+blockchain_payment_sent = Signal(providing_args=["recipient", "amount", "transaction_hash"])
 payment_received = Signal(providing_args=["payment"])
 payment_confirmed = Signal(providing_args=["payment"])
 order_canceled = Signal(providing_args=["payment_order"])
