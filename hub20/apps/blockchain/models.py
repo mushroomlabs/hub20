@@ -4,8 +4,9 @@ from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
-from django.db import models, transaction as database_transaction
+from django.db import models
 from django.db.models import Avg, Max
+from django.db.transaction import atomic
 from django.utils import timezone
 from web3 import Web3
 from web3.middleware import geth_poa_middleware
@@ -76,24 +77,36 @@ class Block(models.Model):
 
     @classmethod
     def make(cls, block_data, chain_id):
-        with database_transaction.atomic():
-            block = cls.objects.filter(chain=chain_id, number=block_data.number).first()
+        block_time = datetime.datetime.fromtimestamp(block_data.timestamp)
+        block, _ = cls.objects.update_or_create(
+            chain=chain_id,
+            hash=block_data.hash,
+            defaults={
+                "number": block_data.number,
+                "timestamp": timezone.make_aware(block_time),
+                "parent_hash": block_data.parentHash,
+                "uncle_hashes": block_data.uncles,
+            },
+        )
+        return block
 
-            if block is None:
-                block_time = datetime.datetime.fromtimestamp(block_data.timestamp)
-                block = cls.objects.create(
-                    chain=chain_id,
-                    hash=block_data.hash,
-                    number=block_data.number,
-                    timestamp=timezone.make_aware(block_time),
-                    parent_hash=block_data.parentHash,
-                    uncle_hashes=block_data.uncles,
-                )
-                for tx_data in block_data.transactions:
-                    transaction = Transaction.make(tx_data, block=block)
-                    logger.info(f"Saved {transaction}")
+    @classmethod
+    @atomic()
+    def make_all(cls, block_number, w3):
+        logger.info(f"Saving block {block_number}")
+        chain_id = int(w3.net.version)
+        block_data = w3.eth.getBlock(block_number, full_transactions=True)
 
-            return block
+        block = cls.make(block_data, chain_id)
+
+        for tx_data in block_data.transactions:
+            transaction = Transaction.make(tx_data, block)
+            tx_receipt = w3.eth.waitForTransactionReceipt(transaction.hash)
+
+            for log_data in tx_receipt.logs:
+                TransactionLog.make(log_data, transaction)
+
+        return block
 
     @classmethod
     def fetch_by_hash(cls, block_hash, w3: Web3 = None):
@@ -130,21 +143,21 @@ class Transaction(models.Model):
 
     @classmethod
     def make(cls, transaction_data, block: Block):
-        try:
-            return cls.objects.get(hash=transaction_data.hash, block=block)
-        except cls.DoesNotExist:
-            return cls.objects.create(
-                block=block,
-                hash=transaction_data.hash,
-                from_address=transaction_data["from"],
-                to_address=transaction_data.to,
-                gas=transaction_data.gas,
-                gas_price=transaction_data.gasPrice,
-                nonce=transaction_data.nonce,
-                index=transaction_data.transactionIndex,
-                value=transaction_data.value,
-                data=transaction_data.input,
-            )
+        tx, _ = cls.objects.get_or_create(
+            hash=transaction_data.hash,
+            block=block,
+            defaults={
+                "from_address": transaction_data["from"],
+                "to_address": transaction_data.to,
+                "gas": transaction_data.gas,
+                "gas_price": transaction_data.gasPrice,
+                "nonce": transaction_data.nonce,
+                "index": transaction_data.transactionIndex,
+                "value": transaction_data.value,
+                "data": transaction_data.input,
+            },
+        )
+        return tx
 
     @classmethod
     def fetch_by_hash(cls, transaction_hash: str, w3: Web3 = None):
@@ -166,4 +179,23 @@ class Transaction(models.Model):
         return f"Tx {hash_hex}"
 
 
-__all__ = ["Block", "Transaction"]
+class TransactionLog(models.Model):
+    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE, related_name="logs")
+    index = models.SmallIntegerField()
+    data = models.TextField()
+    topics = ArrayField(models.TextField())
+
+    @classmethod
+    def make(cls, log_data, transaction: Transaction):
+        tx_log, _ = cls.objects.get_or_create(
+            index=log_data.logIndex,
+            transaction=transaction,
+            defaults={"data": log_data.data, "topics": [l.hex() for l in log_data.topics]},
+        )
+        return tx_log
+
+    class Meta:
+        unique_together = ("transaction", "index")
+
+
+__all__ = ["Block", "Transaction", "TransactionLog"]

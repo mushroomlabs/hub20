@@ -1,7 +1,13 @@
 import factory
 from factory import fuzzy
 
-from hub20.apps.blockchain.factories import EthereumProvider, TEST_CHAIN_ID
+from hub20.apps.blockchain.factories import (
+    TEST_CHAIN_ID,
+    EthereumProvider,
+    TransactionFactory,
+    TransactionLogFactory,
+)
+from hub20.apps.blockchain.models import Transaction
 from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
 
@@ -66,6 +72,13 @@ class ETHAmountFactory(factory.Factory):
         model = EthereumTokenAmount
 
 
+class Erc20TransferFactory(TransactionFactory):
+    log = factory.RelatedFactory(TransactionLogFactory, "transaction")
+
+    class Meta:
+        model = Transaction
+
+
 __all__ = [
     "EthereumAccountFactory",
     "ETHFactory",
@@ -74,4 +87,5 @@ __all__ = [
     "Erc20TokenValueModelFactory",
     "Erc20TokenAmountFactory",
     "ETHAmountFactory",
+    "Erc20TransferFactory",
 ]

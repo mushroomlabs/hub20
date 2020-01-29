@@ -1,11 +1,9 @@
-from django.utils import timezone
-
 import factory
 import factory.fuzzy
+from django.utils import timezone
 
-from ..models import Block, Transaction
+from ..models import Block, Transaction, TransactionLog
 from .providers import EthereumProvider
-
 
 factory.Faker.add_provider(EthereumProvider)
 
@@ -47,3 +45,13 @@ class TransactionFactory(factory.django.DjangoModelFactory):
 
     class Meta:
         model = Transaction
+
+
+class TransactionLogFactory(factory.django.DjangoModelFactory):
+    transaction = factory.SubFactory(TransactionFactory)
+    index = factory.Sequence(lambda n: n)
+    topics = ["0x0", "0x0", "0x0"]
+    data = "0x0"
+
+    class Meta:
+        model = TransactionLog

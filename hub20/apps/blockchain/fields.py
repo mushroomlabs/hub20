@@ -1,9 +1,6 @@
-from django import forms
-from django.core import exceptions
 from django.db import DefaultConnectionProxy, models
 from django.utils.translation import gettext_lazy as _
-
-import ethereum.utils
+from ethereum.utils import checksum_encode
 from hexbytes import HexBytes
 
 from .validators import validate_checksumed_address
@@ -29,25 +26,21 @@ class EthereumAddressField(models.CharField):
 
     def to_python(self, value):
         value = super().to_python(value)
-        if value:
-            return ethereum.utils.checksum_encode(value)
-        else:
-            return value
+        return value and checksum_encode(value)
 
     def get_prep_value(self, value):
         value = super().get_prep_value(value)
-        if value:
-            return ethereum.utils.checksum_encode(value)
-        else:
-            return value
+        return value and checksum_encode(value)
 
 
 class Uint256Field(models.DecimalField):
+    """
+    Field to store ethereum uint256 values. Uses Decimal db type without
+    decimals to store in the database, but retrieve as `int` instead of
+    `Decimal` (https://docs.python.org/3/library/decimal.html)
+    """
+
     description = _("Ethereum uint256 number")
-    """
-    Field to store ethereum uint256 values. Uses Decimal db type without decimals to store
-    in the database, but retrieve as `int` instead of `Decimal` (https://docs.python.org/3/library/decimal.html)
-    """
 
     def __init__(self, *args, **kwargs):
         kwargs["max_digits"] = 79  # 2 ** 256 is 78 digits

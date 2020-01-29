@@ -5,7 +5,7 @@ from django.dispatch import receiver
 from eth_utils import from_wei
 
 from hub20.apps.blockchain.choices import ETHEREUM_CHAINS
-from hub20.apps.blockchain.models import Transaction
+from hub20.apps.blockchain.models import Transaction, TransactionLog
 from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.models import (
     CoingeckoDefinition,
@@ -33,7 +33,6 @@ def on_transaction_mined_check_for_deposit(sender, **kw):
     if kw["created"]:
         accounts = EthereumAccount.objects.all()
         accounts_by_address = {account.address: account for account in accounts}
-        token = EthereumToken.ERC20tokens.filter(address=tx.to_address).first()
 
         if tx.to_address in accounts_by_address.keys():
             ETH = EthereumToken.ETH(tx.block.chain)
@@ -45,11 +44,20 @@ def on_transaction_mined_check_for_deposit(sender, **kw):
                 amount=eth_amount,
             )
 
-        elif token is not None:
+
+@receiver(post_save, sender=TransactionLog)
+def on_transaction_event_check_for_token_transfer(sender, **kw):
+    tx_log = kw["instance"]
+    if kw["created"]:
+        tx = tx_log.transaction
+        token = EthereumToken.ERC20tokens.filter(address=tx.to_address).first()
+
+        if token is not None:
             recipient_address, transfer_amount = token._decode_token_transfer_input(tx)
             is_token_transfer = recipient_address is not None and transfer_amount is not None
-            if is_token_transfer and recipient_address in accounts_by_address:
-                account = accounts_by_address[recipient_address]
+
+            account = EthereumAccount.objects.filter(address=recipient_address).first()
+            if is_token_transfer and account:
                 account_deposit_received.send(
                     sender=Transaction, account=account, transaction=tx, amount=transfer_amount
                 )
@@ -72,5 +80,6 @@ def on_account_deposit_create_balance_entry(sender, **kw):
 __all__ = [
     "on_mainnet_token_created_get_coingecko_definition",
     "on_transaction_mined_check_for_deposit",
+    "on_transaction_event_check_for_token_transfer",
     "on_account_deposit_create_balance_entry",
 ]

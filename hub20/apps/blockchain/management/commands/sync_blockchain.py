@@ -36,21 +36,18 @@ async def make_blocks_in_range(w3, start, end, speed=25):
             if (counter % speed) == 0:
                 await asyncio.sleep(1)
 
-            block_data = w3.eth.getBlock(block_number, full_transactions=True)
-            Block.make(block_data, chain_id)
+            Block.make_all(block_number, w3)
     else:
         await asyncio.sleep(1)
 
 
 async def save_new_blocks(w3):
-    chain_id = int(w3.net.version)
     current_block_number = w3.eth.blockNumber
     while True:
         logger.info(f"Current block number: {current_block_number}")
         block_number = w3.eth.blockNumber
         if block_number > current_block_number:
-            block_data = w3.eth.getBlock(block_number, full_transactions=True)
-            Block.make(block_data, chain_id)
+            Block.make_all(block_number, w3)
             current_block_number = block_number
         else:
             await asyncio.sleep(5)

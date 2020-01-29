@@ -20,7 +20,7 @@ from hub20.apps.core.factories import (
     WalletFactory,
 )
 from hub20.apps.core.models import ExternalTransfer, UserAccount, Wallet
-from hub20.apps.ethereum_money.factories import Erc20TokenFactory, ETHFactory
+from hub20.apps.ethereum_money.factories import Erc20TokenFactory, Erc20TransferFactory, ETHFactory
 from hub20.apps.ethereum_money.models import EthereumTokenAmount, encode_transfer_data
 from hub20.apps.raiden.factories import ChannelFactory, PaymentEventFactory, TokenNetworkFactory
 
@@ -33,7 +33,12 @@ def add_eth_to_wallet(wallet: Wallet, amount: EthereumTokenAmount):
 
 def add_token_to_wallet(wallet: Wallet, amount: EthereumTokenAmount):
     transaction_data = encode_transfer_data(wallet.address, amount)
-    return TransactionFactory(to_address=amount.currency.address, data=transaction_data, value=0)
+    return Erc20TransferFactory(
+        to_address=amount.currency.address,
+        data=transaction_data,
+        value=0,
+        log__data=amount.as_hex,
+    )
 
 
 @pytest.mark.django_db(transaction=True)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from decimal import Decimal
 from typing import Any, Optional, Tuple, Union
@@ -23,6 +24,8 @@ from hub20.apps.blockchain.choices import ETHEREUM_CHAINS
 from hub20.apps.blockchain.fields import EthereumAddressField, HexField
 from hub20.apps.blockchain.models import Transaction, make_web3
 from hub20.apps.ethereum_money.app_settings import TRANSFER_GAS_LIMIT
+
+logger = logging.getLogger(__name__)
 
 
 def get_max_fee() -> EthereumTokenAmount:
@@ -121,23 +124,25 @@ class EthereumToken(models.Model):
         try:
             # transaction input strings are '0x', so we they should be 138 chars long
             assert len(transaction.data) == 138, "Not a ERC20 transfer transaction"
+            assert transaction.logs.count() == 1, "Transaction does not contain log changes"
+
             recipient_address = to_checksum_address(transaction.data[-104:-64])
-            transfer_amount = self.from_wei(int(transaction.data[-64:], 16))
-            return recipient_address, transfer_amount
-        except AssertionError:
+
+            wei_transferred = int(transaction.data[-64:], 16)
+            tx_log = transaction.logs.first()
+
+            assert int(tx_log.data, 16) == wei_transferred, "Log data and tx amount do not match"
+
+            return recipient_address, self.from_wei(wei_transferred)
+        except AssertionError as exc:
+            logger.info(f"Failed to get transfer data from transaction: {exc}")
             return None, None
-
-    def get_recipient(self, transaction: Transaction) -> Optional[str]:
-        if self.address is None:
-            return transaction.to_address
-        else:
-            return self._decode_token_transfer_input(transaction)[0]
-
-    def get_transfer_amount(self, transaction: Transaction) -> Optional[EthereumTokenAmount]:
-        if self.address is None:
-            return self.from_wei(transaction.value)
-        else:
-            return self._decode_token_transfer_input(transaction)[0]
+        except ValueError:
+            logger.info(f"Failed to extract transfer amounts from {transaction.hash.hex()}")
+            return None, None
+        except Exception as exc:
+            logger.exception(exc)
+            return None, None
 
     def from_wei(self, wei_amount: int) -> EthereumTokenAmount:
         value = Decimal(wei_amount) / (10 ** self.decimals)
@@ -219,6 +224,10 @@ class EthereumTokenAmount:
     @property
     def as_wei(self) -> int:
         return int(self.amount * (10 ** self.currency.decimals))
+
+    @property
+    def as_hex(self) -> str:
+        return hex(self.as_wei)
 
     @property
     def is_ETH(self) -> bool:
