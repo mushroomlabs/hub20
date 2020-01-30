@@ -23,13 +23,12 @@ class CurrencyRelatedField(serializers.SlugRelatedField):
 
 class EthereumTokenSerializer(serializers.ModelSerializer):
     code = serializers.CharField(source="ticker")
-    logo = serializers.URLField(source="coingecko.logo_url")
     network_id = serializers.IntegerField(source="chain")
 
     class Meta:
         model = models.EthereumToken
-        fields = ("code", "name", "address", "network_id", "decimals", "logo")
-        read_only_fields = ("code", "name", "address", "network_id", "decimals", "logo")
+        fields = ("code", "name", "address", "network_id", "decimals")
+        read_only_fields = ("code", "name", "address", "network_id", "decimals")
 
 
 class HyperlinkedEthereumTokenSerializer(EthereumTokenSerializer):
@@ -41,14 +40,3 @@ class HyperlinkedEthereumTokenSerializer(EthereumTokenSerializer):
         model = models.EthereumToken
         fields = ("url",) + EthereumTokenSerializer.Meta.fields
         read_only_fields = ("url",) + EthereumTokenSerializer.Meta.read_only_fields
-
-
-class ExchangeRateSerializer(serializers.ModelSerializer):
-    token = serializers.CharField(source="token.ticker")
-    currency = serializers.CharField(source="currency_code")
-    time = serializers.DateTimeField(source="created")
-
-    class Meta:
-        model = models.ExchangeRate
-        fields = ("token", "currency", "rate", "time")
-        read_only_fields = ("token", "currency", "rate", "time")

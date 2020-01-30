@@ -1,13 +1,6 @@
 version: '2.2'
 
 services:
-  # geth-dev:
-  #   image: ethereum/client-go:latest
-  #   volumes:
-  #     - "./docker/volumes/geth/chain/${HUB20_WEB3_NETWORK}:/root/.ethereum"
-  #   command:
-  #     "--rpc --rpcaddr 0.0.0.0 --ws --wsaddr 0.0.0.0 --nousb ${HUB20_GETH_EXTRA_OPTS}"
-
   db:
     image: postgres
     restart: always
@@ -111,7 +104,6 @@ services:
 
     env_file:
       - ./.env
-
 
   # Background command to synchonize raiden
   job_sync_raiden:

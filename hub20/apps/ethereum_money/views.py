@@ -29,17 +29,3 @@ class TokenView(generics.RetrieveAPIView):
             raise Http404(f"{address} is not a valid token address")
 
         return get_object_or_404(models.EthereumToken, chain=CHAIN_ID, address=address)
-
-
-class ExchangeRateView(generics.RetrieveAPIView):
-    serializer_class = serializers.ExchangeRateSerializer
-
-    def get_object(self) -> models.ExchangeRate:
-        rate = models.ExchangeRate.objects.filter(
-            token__ticker=self.kwargs.get("token"), currency_code=self.kwargs.get("currency")
-        ).last()
-
-        if rate is None:
-            raise Http404
-
-        return rate
