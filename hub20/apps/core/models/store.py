@@ -1,5 +1,6 @@
 import datetime
 import uuid
+from enum import Enum
 from typing import Optional
 
 import jwt
@@ -12,6 +13,13 @@ from model_utils.models import TimeStampedModel
 from hub20.apps.ethereum_money.models import EthereumToken
 
 from .payments import PaymentOrder
+
+
+class CheckoutEvents(Enum):
+    BLOCKCHAIN_BLOCK_CREATED = "blockchain.block.created"
+    BLOCKCHAIN_TRANSFER_BROADCAST = "blockchain.transfer.broadcast"
+    BLOCKCHAIN_TRANSFER_MINED = "blockchain.transfer.mined"
+    RAIDEN_TRANSFER_RECEIVED = "raiden.transfer.received"
 
 
 class Store(models.Model):

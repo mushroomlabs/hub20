@@ -17,7 +17,7 @@ class CurrencyRelatedField(serializers.SlugRelatedField):
     queryset = models.EthereumToken.objects.filter(chain=CHAIN_ID, ticker__in=TRACKED_TOKENS)
 
     def __init__(self, *args, **kw):
-        kw.setdefault("slug_field", "ticker")
+        kw.setdefault("slug_field", "address")
         super().__init__(*args, **kw)
 
 
@@ -30,6 +30,17 @@ class EthereumTokenSerializer(serializers.ModelSerializer):
         model = models.EthereumToken
         fields = ("code", "name", "address", "network_id", "decimals", "logo")
         read_only_fields = ("code", "name", "address", "network_id", "decimals", "logo")
+
+
+class HyperlinkedEthereumTokenSerializer(EthereumTokenSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="ethereum_money:token-detail", lookup_field="address"
+    )
+
+    class Meta:
+        model = models.EthereumToken
+        fields = ("url",) + EthereumTokenSerializer.Meta.fields
+        read_only_fields = ("url",) + EthereumTokenSerializer.Meta.read_only_fields
 
 
 class ExchangeRateSerializer(serializers.ModelSerializer):

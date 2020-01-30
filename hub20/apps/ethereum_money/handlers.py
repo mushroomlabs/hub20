@@ -48,6 +48,8 @@ def on_transaction_mined_check_for_deposit(sender, **kw):
 @receiver(post_save, sender=TransactionLog)
 def on_transaction_event_check_for_token_transfer(sender, **kw):
     tx_log = kw["instance"]
+
+    logger.info(f"Event log for {tx_log.transaction} created")
     if kw["created"]:
         tx = tx_log.transaction
         token = EthereumToken.ERC20tokens.filter(address=tx.to_address).first()

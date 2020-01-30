@@ -47,7 +47,6 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
     account = kw["account"]
     transaction = kw["transaction"]
     amount = kw["amount"]
-
     order = PaymentOrder.objects.filter(payment_method__wallet__account=account).first()
 
     if not order:

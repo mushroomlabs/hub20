@@ -30,6 +30,7 @@ def mock_exchange_rates(currency_codes):
         "RDN": "raiden-network",
         "WIZ": "weth",
         "WETH": "weth",
+        "TTT": "weth",
     }
 
     gecko = CoinGeckoAPI()

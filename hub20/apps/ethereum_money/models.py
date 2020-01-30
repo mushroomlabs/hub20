@@ -8,7 +8,7 @@ from typing import Any, Optional, Tuple, Union
 import ethereum
 from django.conf import settings
 from django.db import models
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.utils import translation
 from eth_utils import to_checksum_address
 from ethereum.abi import ContractTranslator
@@ -79,22 +79,28 @@ class EthereumAccount(AbstractEthereumAccount):
 
 
 class EthereumToken(models.Model):
+    NULL_ADDRESS = "0x0000000000000000000000000000000000000000"
     chain = models.PositiveIntegerField(choices=ETHEREUM_CHAINS)
     ticker = models.CharField(max_length=8)
     name = models.CharField(max_length=500)
     decimals = models.PositiveIntegerField(default=18)
-    address = EthereumAddressField(null=True, blank=True)
+    address = EthereumAddressField(default=NULL_ADDRESS)
 
     objects = models.Manager()
-    ERC20tokens = QueryManager(address__isnull=False)
-    ethereum = QueryManager(address__isnull=True)
+    ERC20tokens = QueryManager(~Q(address=NULL_ADDRESS))
+    ethereum = QueryManager(address=NULL_ADDRESS)
 
     @property
     def is_ERC20(self) -> bool:
-        return self.address is not None
+        return self.address != self.NULL_ADDRESS
 
     def __str__(self) -> str:
-        return f"{self.ticker} ({self.get_chain_display()})"
+        components = [self.ticker]
+        if self.is_ERC20:
+            components.append(self.address)
+
+        components.append(self.get_chain_display())
+        return " - ".join(components)
 
     def build_transfer_transaction(self, w3: Web3, sender, recipient, amount: EthereumTokenAmount):
 
@@ -178,7 +184,7 @@ class EthereumToken(models.Model):
         return obj
 
     class Meta:
-        unique_together = (("chain", "ticker"), ("chain", "address"))
+        unique_together = (("chain", "address"),)
 
 
 class EthereumTokenAmountField(models.DecimalField):
@@ -231,7 +237,7 @@ class EthereumTokenAmount:
 
     @property
     def is_ETH(self) -> bool:
-        return self.currency.address is None
+        return self.currency.address == EthereumToken.NULL_ADDRESS
 
     def _check_currency_type(self, other: EthereumTokenAmount):
         if not self.currency == other.currency:
