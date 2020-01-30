@@ -14,9 +14,7 @@ class TokenListView(generics.ListAPIView):
     serializer_class = serializers.HyperlinkedEthereumTokenSerializer
 
     def get_queryset(self) -> QuerySet:
-        return models.EthereumToken.objects.filter(
-            chain=CHAIN_ID, address__isnull=False, ticker__in=TRACKED_TOKENS
-        ).order_by("coingecko__coingecko_rank")
+        return models.EthereumToken.objects.filter(chain=CHAIN_ID, code__in=TRACKED_TOKENS)
 
 
 class TokenView(generics.RetrieveAPIView):

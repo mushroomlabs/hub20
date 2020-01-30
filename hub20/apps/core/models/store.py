@@ -76,7 +76,7 @@ class Checkout(TimeStampedModel):
                 "iat": datetime.datetime.utcnow(),
                 "iss": self.external_identifier,
                 "status": self.payment_order.status,
-                "currency": self.payment_order.currency.ticker,
+                "currency": self.payment_order.currency.code,
                 "total_amount": str(self.payment_order.amount),
                 "total_confirmed": str(self.payment_order.total_confirmed),
                 "payment_order_id": self.payment_order.id,

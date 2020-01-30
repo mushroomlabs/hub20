@@ -36,7 +36,7 @@ class TokenBalanceSerializer(serializers.Serializer):
     def get_url(self, obj):
         return reverse(
             "hub20:balance-detail",
-            kwargs={"code": obj.currency.ticker},
+            kwargs={"code": obj.currency.code},
             request=self.context.get("request"),
         )
 
@@ -207,7 +207,7 @@ class CheckoutSerializer(serializers.ModelSerializer):
         token = data["payment_order"]["currency"]
         store = data["store"]
         if token not in store.accepted_currencies.all():
-            raise serializers.ValidationError(f"{token.ticker} is not accepted at {store.name}")
+            raise serializers.ValidationError(f"{token.code} is not accepted at {store.name}")
 
         return data
 

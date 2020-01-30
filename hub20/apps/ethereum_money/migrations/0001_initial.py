@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('chain', models.PositiveIntegerField(choices=[(1, 'Mainnet'), (2, 'Test Network'), (3, 'Ropsten'), (4, 'Rinkeby'), (5, 'Görli'), (42, 'Kovan')])),
-                ('ticker', models.CharField(max_length=8)),
+                ('code', models.CharField(max_length=8)),
                 ('name', models.CharField(max_length=500)),
                 ('decimals', models.PositiveIntegerField(default=18)),
                 ('address', hub20.apps.blockchain.fields.EthereumAddressField(default='0x0000000000000000000000000000000000000000')),

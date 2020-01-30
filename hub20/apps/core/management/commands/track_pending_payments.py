@@ -54,7 +54,7 @@ async def track_pending_transactions(w3):
 
             contract = w3.eth.contract(abi=EIP20_ABI, address=token.address)
             for tx in txs:
-                logger.info(f"Processing {token.ticker} transaction: {tx.hash.hex()}")
+                logger.info(f"Processing {token.code} transaction: {tx.hash.hex()}")
                 fn, args = contract.decode_function_input(tx.input)
 
                 # TODO: is this really the best way to identify the function?

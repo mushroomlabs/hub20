@@ -14,7 +14,7 @@ class TokenValueField(serializers.DecimalField):
 
 
 class CurrencyRelatedField(serializers.SlugRelatedField):
-    queryset = models.EthereumToken.objects.filter(chain=CHAIN_ID, ticker__in=TRACKED_TOKENS)
+    queryset = models.EthereumToken.objects.filter(chain=CHAIN_ID, code__in=TRACKED_TOKENS)
 
     def __init__(self, *args, **kw):
         kw.setdefault("slug_field", "address")
@@ -22,7 +22,6 @@ class CurrencyRelatedField(serializers.SlugRelatedField):
 
 
 class EthereumTokenSerializer(serializers.ModelSerializer):
-    code = serializers.CharField(source="ticker")
     network_id = serializers.IntegerField(source="chain")
 
     class Meta:

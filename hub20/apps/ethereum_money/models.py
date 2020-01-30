@@ -78,7 +78,7 @@ class EthereumAccount(AbstractEthereumAccount):
 class EthereumToken(models.Model):
     NULL_ADDRESS = "0x0000000000000000000000000000000000000000"
     chain = models.PositiveIntegerField(choices=ETHEREUM_CHAINS)
-    ticker = models.CharField(max_length=8)
+    code = models.CharField(max_length=8)
     name = models.CharField(max_length=500)
     decimals = models.PositiveIntegerField(default=18)
     address = EthereumAddressField(default=NULL_ADDRESS)
@@ -92,7 +92,7 @@ class EthereumToken(models.Model):
         return self.address != self.NULL_ADDRESS
 
     def __str__(self) -> str:
-        components = [self.ticker]
+        components = [self.code]
         if self.is_ERC20:
             components.append(self.address)
 
@@ -102,7 +102,7 @@ class EthereumToken(models.Model):
     def build_transfer_transaction(self, w3: Web3, sender, recipient, amount: EthereumTokenAmount):
 
         chain_id = int(w3.net.version)
-        message = f"Web3 client is on network {chain_id}, token {self.ticker} is on {self.chain}"
+        message = f"Web3 client is on network {chain_id}, token {self.code} is on {self.chain}"
         assert self.chain == chain_id, message
 
         transaction_params = {
@@ -154,7 +154,7 @@ class EthereumToken(models.Model):
     @staticmethod
     def ETH(chain_id: int):
         eth, _ = EthereumToken.objects.get_or_create(
-            chain=chain_id, ticker="ETH", defaults={"name": "Ethereum"}
+            chain=chain_id, code="ETH", defaults={"name": "Ethereum"}
         )
         return eth
 
@@ -174,7 +174,7 @@ class EthereumToken(models.Model):
             chain=chain_id,
             defaults={
                 "name": proxy.name(),
-                "ticker": proxy.symbol(),
+                "code": proxy.symbol(),
                 "decimals": proxy.decimals(),
             },
         )
@@ -222,7 +222,7 @@ class EthereumTokenAmount:
 
     @property
     def formatted(self):
-        return f"{self.amount} {self.currency.ticker}"
+        return f"{self.amount} {self.currency.code}"
 
     @property
     def as_wei(self) -> int:

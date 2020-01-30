@@ -75,7 +75,7 @@ def on_blockchain_payment_sent_maybe_publish_checkout(sender, **kw):
             checkout.pk,
             event="payment.sent",
             amount=payment_amount.amount,
-            token=payment_amount.currency.ticker,
+            token=payment_amount.currency.code,
             identifier=tx_hash,
             payment_method=PAYMENT_METHODS.blockchain,
         )
@@ -204,7 +204,7 @@ def on_blockchain_payment_received_maybe_publish_checkout(sender, **kw):
         return
 
     tasks.publish_checkout_event.delay(
-        checkout_id, amount=payment.amount, token=payment.currency.ticker, event="payment.received"
+        checkout_id, amount=payment.amount, token=payment.currency.code, event="payment.received"
     )
 
 
@@ -229,7 +229,7 @@ def on_payment_confirmed_publish_checkout(sender, **kw):
     tasks.publish_checkout_event.delay(
         checkout_id,
         amount=payment.amount,
-        token=payment.currency.ticker,
+        token=payment.currency.code,
         event="payment.confirmed",
         payment_method=payment_method,
     )
