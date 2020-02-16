@@ -2,7 +2,7 @@ attributedict
 celery
 channels
 channels_redis
-django<3
+django==2.2.10
 django-allauth
 django-cors-headers
 django-invitations
