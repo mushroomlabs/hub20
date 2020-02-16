@@ -1,18 +1,18 @@
-from typing import Optional
 import datetime
 import random
+from typing import Optional
 
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
-from model_utils.models import StatusModel
-from model_utils.managers import QueryManager
 from model_utils.choices import Choices
+from model_utils.managers import QueryManager
+from model_utils.models import StatusModel
+from raiden_contracts.constants import CONTRACT_TOKEN_NETWORK, CONTRACT_TOKEN_NETWORK_REGISTRY
 from raiden_contracts.contract_manager import (
     ContractManager,
     contracts_precompiled_path,
     get_contracts_deployment_info,
 )
-from raiden_contracts.constants import CONTRACT_TOKEN_NETWORK_REGISTRY, CONTRACT_TOKEN_NETWORK
 from web3 import Web3
 from web3.contract import Contract
 
@@ -24,7 +24,6 @@ from hub20.apps.ethereum_money.models import (
     EthereumTokenAmount,
     EthereumTokenAmountField,
 )
-
 
 CHANNEL_STATUSES = Choices("open", "settling", "settled", "unusable", "closed", "closing")
 
@@ -78,7 +77,7 @@ class TokenNetwork(models.Model):
         return token_network
 
     def __str__(self):
-        return f"{self.address} - ({self.token.get_chain_display()} {self.token.ticker})"
+        return f"{self.address} - ({self.token.get_chain_display()} {self.token.code})"
 
 
 class TokenNetworkChannel(models.Model):

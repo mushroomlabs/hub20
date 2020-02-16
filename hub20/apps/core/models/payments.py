@@ -43,7 +43,7 @@ class PaymentOrder(TimeStampedModel, EthereumTokenValueModel):
 
     @property
     def due_amount(self):
-        return max(0, self.total_transferred - self.amount)
+        return max(0, self.amount - self.total_transferred)
 
     @property
     def status(self):
@@ -114,25 +114,48 @@ class Payment(TimeStampedModel, EthereumTokenValueModel):
     order = models.ForeignKey(PaymentOrder, on_delete=models.PROTECT)
     objects = InheritanceManager()
 
+    @property
     def is_confirmed(self):
         return True
 
+    @property
+    def route(self):
+        return self.__class__.ROUTE
+
 
 class InternalPayment(Payment):
+    ROUTE = "internal"
+
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     memo = models.TextField(null=True, blank=True)
 
+    @property
+    def identifier(self):
+        return str(self.id)
+
 
 class BlockchainPayment(Payment):
+    ROUTE = "blockchain"
+
     transaction = models.OneToOneField(Transaction, on_delete=models.CASCADE)
 
     @property
     def is_confirmed(self):
         return self.transaction.block.confirmations >= PAYMENT_SETTINGS.minimum_confirmations
 
+    @property
+    def identifier(self):
+        return str(self.transaction.hash)
+
 
 class RaidenPayment(Payment):
+    ROUTE = "raiden"
+
     payment = models.OneToOneField(RaidenPaymentEvent, on_delete=models.PROTECT)
+
+    @property
+    def identifier(self):
+        return f"{self.payment.identifier}-{self.id}"
 
 
 __all__ = [

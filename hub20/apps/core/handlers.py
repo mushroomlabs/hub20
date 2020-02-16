@@ -47,7 +47,6 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
     account = kw["account"]
     transaction = kw["transaction"]
     amount = kw["amount"]
-
     order = PaymentOrder.objects.filter(payment_method__wallet__account=account).first()
 
     if not order:
@@ -56,7 +55,7 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
     payment = BlockchainPayment.objects.create(
         order=order, amount=amount.amount, currency=amount.currency, transaction=transaction
     )
-    payment_received.send_robust(sender=BlockchainPayment, payment=payment)
+    payment_received.send(sender=BlockchainPayment, payment=payment)
 
 
 @receiver(blockchain_payment_sent, sender=EthereumToken)
@@ -76,7 +75,7 @@ def on_blockchain_payment_sent_maybe_publish_checkout(sender, **kw):
             checkout.pk,
             event="payment.sent",
             amount=payment_amount.amount,
-            token=payment_amount.currency.ticker,
+            token=payment_amount.currency.address,
             identifier=tx_hash,
             payment_method=PAYMENT_METHODS.blockchain,
         )
@@ -205,7 +204,12 @@ def on_blockchain_payment_received_maybe_publish_checkout(sender, **kw):
         return
 
     tasks.publish_checkout_event.delay(
-        checkout_id, amount=payment.amount, token=payment.currency.ticker, event="payment.received"
+        checkout_id,
+        amount=payment.amount,
+        token=payment.currency.address,
+        identifier=payment.transaction.hash.hex(),
+        payment_method=PAYMENT_METHODS.blockchain,
+        event="payment.received",
     )
 
 
@@ -230,7 +234,7 @@ def on_payment_confirmed_publish_checkout(sender, **kw):
     tasks.publish_checkout_event.delay(
         checkout_id,
         amount=payment.amount,
-        token=payment.currency.ticker,
+        token=payment.currency.address,
         event="payment.confirmed",
         payment_method=payment_method,
     )

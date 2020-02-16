@@ -36,7 +36,7 @@ class TokenBalanceSerializer(serializers.Serializer):
     def get_url(self, obj):
         return reverse(
             "hub20:balance-detail",
-            kwargs={"code": obj.currency.ticker},
+            kwargs={"code": obj.currency.code},
             request=self.context.get("request"),
         )
 
@@ -45,7 +45,7 @@ class TransferSerializer(serializers.ModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="hub20:transfer-detail")
     address = EthereumAddressField(write_only=True, required=False)
     recipient = UserRelatedField(write_only=True, required=False, allow_null=True)
-    currency = CurrencyRelatedField()
+    token = CurrencyRelatedField()
     target = serializers.CharField(read_only=True)
     status = serializers.CharField(read_only=True)
 
@@ -104,7 +104,7 @@ class TransferSerializer(serializers.ModelSerializer):
             "address",
             "recipient",
             "amount",
-            "currency",
+            "token",
             "memo",
             "identifier",
             "status",
@@ -127,11 +127,13 @@ class PaymentOrderMethodSerializer(serializers.ModelSerializer):
 
 class PaymentSerializer(serializers.ModelSerializer):
     currency = EthereumTokenSerializer()
+    identifier = serializers.CharField()
+    confirmed = serializers.BooleanField(source="is_confirmed")
 
     class Meta:
         model = models.Payment
-        fields = ("created", "currency", "amount")
-        read_only_fields = ("created", "currency", "amount")
+        fields = ("created", "currency", "amount", "identifier", "route", "confirmed")
+        read_only_fields = ("created", "currency", "amount", "identifier", "route", "confirmed")
 
 
 class InternalPaymentSerializer(serializers.ModelSerializer):
@@ -152,12 +154,11 @@ class BlockchainPaymentSerializer(PaymentSerializer):
 
 class RaidenPaymentSerializer(PaymentSerializer):
     raiden = serializers.CharField(source="payment.channel.raiden.address")
-    identifier = serializers.CharField(source="payment.identifier")
 
     class Meta:
         model = models.RaidenPayment
-        fields = PaymentSerializer.Meta.fields + ("raiden", "identifier")
-        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("raiden", "identifier")
+        fields = PaymentSerializer.Meta.fields + ("raiden",)
+        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("raiden",)
 
 
 class PaymentOrderSerializer(serializers.ModelSerializer):
@@ -194,19 +195,20 @@ class PaymentOrderReadSerializer(PaymentOrderSerializer):
 
 class CheckoutSerializer(serializers.ModelSerializer):
     store = serializers.PrimaryKeyRelatedField(queryset=models.Store.objects.all())
-    currency = CurrencyRelatedField(source="payment_order.currency")
+    token = CurrencyRelatedField(source="payment_order.currency")
     amount = TokenValueField(source="payment_order.amount")
     status = serializers.CharField(source="payment_order.status", read_only=True)
     payment_method = PaymentOrderMethodSerializer(
         source="payment_order.payment_method", read_only=True
     )
+    payments = PaymentSerializer(many=True, source="payment_order.payments", read_only=True)
     voucher = serializers.SerializerMethodField()
 
     def validate(self, data):
-        currency = data["payment_order"]["currency"]
+        token = data["payment_order"]["currency"]
         store = data["store"]
-        if currency not in store.accepted_currencies.all():
-            raise serializers.ValidationError(f"{currency.ticker} is not accepted at {store.name}")
+        if token not in store.accepted_currencies.all():
+            raise serializers.ValidationError(f"{token.code} is not accepted at {store.name}")
 
         return data
 
@@ -236,9 +238,10 @@ class CheckoutSerializer(serializers.ModelSerializer):
             "created",
             "store",
             "external_identifier",
-            "currency",
+            "token",
             "amount",
             "payment_method",
+            "payments",
             "status",
             "voucher",
         )

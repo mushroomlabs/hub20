@@ -5,4 +5,6 @@ from . import models
 
 @admin.register(models.EthereumToken)
 class TokenAdmin(admin.ModelAdmin):
-    list_display = ["ticker", "name", "address", "chain"]
+    search_fields = ["code", "name", "address"]
+    list_display = ["code", "name", "address", "chain"]
+    list_filter = ["chain"]

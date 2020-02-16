@@ -8,15 +8,12 @@ from typing import Any, Optional, Tuple, Union
 import ethereum
 from django.conf import settings
 from django.db import models
-from django.db.models import Sum
-from django.utils import translation
+from django.db.models import Q, Sum
 from eth_utils import to_checksum_address
 from ethereum.abi import ContractTranslator
 from ethtoken import token
 from ethtoken.abi import EIP20_ABI
 from model_utils.managers import QueryManager
-from model_utils.models import TimeStampedModel
-from pycoingecko import CoinGeckoAPI
 from web3 import Web3
 
 from hub20.apps.blockchain.app_settings import CHAIN_ID
@@ -79,27 +76,33 @@ class EthereumAccount(AbstractEthereumAccount):
 
 
 class EthereumToken(models.Model):
+    NULL_ADDRESS = "0x0000000000000000000000000000000000000000"
     chain = models.PositiveIntegerField(choices=ETHEREUM_CHAINS)
-    ticker = models.CharField(max_length=8)
+    code = models.CharField(max_length=8)
     name = models.CharField(max_length=500)
     decimals = models.PositiveIntegerField(default=18)
-    address = EthereumAddressField(null=True, blank=True)
+    address = EthereumAddressField(default=NULL_ADDRESS)
 
     objects = models.Manager()
-    ERC20tokens = QueryManager(address__isnull=False)
-    ethereum = QueryManager(address__isnull=True)
+    ERC20tokens = QueryManager(~Q(address=NULL_ADDRESS))
+    ethereum = QueryManager(address=NULL_ADDRESS)
 
     @property
     def is_ERC20(self) -> bool:
-        return self.address is not None
+        return self.address != self.NULL_ADDRESS
 
     def __str__(self) -> str:
-        return f"{self.ticker} ({self.get_chain_display()})"
+        components = [self.code]
+        if self.is_ERC20:
+            components.append(self.address)
+
+        components.append(self.get_chain_display())
+        return " - ".join(components)
 
     def build_transfer_transaction(self, w3: Web3, sender, recipient, amount: EthereumTokenAmount):
 
         chain_id = int(w3.net.version)
-        message = f"Web3 client is on network {chain_id}, token {self.ticker} is on {self.chain}"
+        message = f"Web3 client is on network {chain_id}, token {self.code} is on {self.chain}"
         assert self.chain == chain_id, message
 
         transaction_params = {
@@ -151,7 +154,7 @@ class EthereumToken(models.Model):
     @staticmethod
     def ETH(chain_id: int):
         eth, _ = EthereumToken.objects.get_or_create(
-            chain=chain_id, ticker="ETH", defaults={"name": "Ethereum"}
+            chain=chain_id, code="ETH", defaults={"name": "Ethereum"}
         )
         return eth
 
@@ -171,14 +174,14 @@ class EthereumToken(models.Model):
             chain=chain_id,
             defaults={
                 "name": proxy.name(),
-                "ticker": proxy.symbol(),
+                "code": proxy.symbol(),
                 "decimals": proxy.decimals(),
             },
         )
         return obj
 
     class Meta:
-        unique_together = (("chain", "ticker"), ("chain", "address"))
+        unique_together = (("chain", "address"),)
 
 
 class EthereumTokenAmountField(models.DecimalField):
@@ -219,7 +222,7 @@ class EthereumTokenAmount:
 
     @property
     def formatted(self):
-        return f"{self.amount} {self.currency.ticker}"
+        return f"{self.amount} {self.currency.code}"
 
     @property
     def as_wei(self) -> int:
@@ -231,7 +234,7 @@ class EthereumTokenAmount:
 
     @property
     def is_ETH(self) -> bool:
-        return self.currency.address is None
+        return self.currency.address == EthereumToken.NULL_ADDRESS
 
     def _check_currency_type(self, other: EthereumTokenAmount):
         if not self.currency == other.currency:
@@ -282,81 +285,11 @@ class EthereumTokenAmount:
         return cls(amount=amount, currency=currency)
 
 
-class ExchangeRate(TimeStampedModel):
-    token = models.ForeignKey(EthereumToken, on_delete=models.CASCADE)
-    currency_code = models.CharField(max_length=3, db_index=True)
-    rate = models.DecimalField(max_digits=30, decimal_places=18)
-
-    def __str__(self):
-        return f"{self.token.ticker}/{self.currency_code}: {self.rate:.5g}"
-
-    class Meta:
-        ordering = ("created",)
-
-
-class CoingeckoDefinition(models.Model):
-    token = models.OneToOneField(EthereumToken, on_delete=models.CASCADE, related_name="coingecko")
-    slug = models.SlugField(max_length=256)
-    description = models.TextField(null=True)
-    logo_url = models.URLField(null=True, max_length=500)
-    coingecko_rank = models.PositiveIntegerField(null=True, db_index=True)
-    coingecko_score = models.FloatField(null=True)
-    developer_score = models.FloatField(null=True)
-    liquidity_score = models.FloatField(null=True)
-
-    @staticmethod
-    def assert_mainnet():
-        msg = (
-            "We can only load coingecko token data when connected to Mainnet, "
-            f"and we are now connected to {ETHEREUM_CHAINS[CHAIN_ID]}"
-        )
-
-        assert CHAIN_ID == ETHEREUM_CHAINS.mainnet, msg
-
-    @classmethod
-    def make_definition(cls, token: EthereumToken):
-        gecko = CoinGeckoAPI()
-        if token.address is not None:
-            coin_data = gecko.get_coin_info_from_contract_address_by_id(
-                id="ethereum", contract_address=token.address
-            )
-        else:
-            coin_data = gecko.get_coin_by_id(id="ethereum")
-        return cls.process(coin_data)
-
-    @classmethod
-    def process(cls, coin_data):
-        language_info = translation.get_language_info(translation.get_language())
-        language_code = language_info.get("code")
-
-        token_address = coin_data.get("contract_address")
-        token = EthereumToken.make(
-            address=token_address and to_checksum_address(token_address),
-            chain_id=ETHEREUM_CHAINS.mainnet,
-        )
-
-        token_logo_urls = coin_data.get("image", {})
-        logo_url = token_logo_urls.get("large")
-
-        attrs = ["coingecko_rank", "coingecko_score", "developer_score", "liquidity_score"]
-
-        defaults = {k: coin_data.get(k) for k in attrs}
-        defaults["description"] = coin_data.get("description", {}).get(language_code)
-        defaults["logo_url"] = logo_url
-
-        definition, _ = cls.objects.update_or_create(
-            token=token, slug=coin_data["id"], defaults=defaults
-        )
-
-        return definition
-
-
 __all__ = [
     "EthereumToken",
     "EthereumTokenAmount",
     "EthereumTokenValueModel",
     "EthereumAccount",
-    "ExchangeRate",
     "AccountBalanceEntry",
     "get_max_fee",
     "encode_transfer_data",

@@ -14,30 +14,28 @@ class TokenValueField(serializers.DecimalField):
 
 
 class CurrencyRelatedField(serializers.SlugRelatedField):
-    queryset = models.EthereumToken.objects.filter(chain=CHAIN_ID, ticker__in=TRACKED_TOKENS)
+    queryset = models.EthereumToken.objects.filter(chain=CHAIN_ID, code__in=TRACKED_TOKENS)
 
     def __init__(self, *args, **kw):
-        kw.setdefault("slug_field", "ticker")
+        kw.setdefault("slug_field", "address")
         super().__init__(*args, **kw)
 
 
 class EthereumTokenSerializer(serializers.ModelSerializer):
-    code = serializers.CharField(source="ticker")
-    logo = serializers.URLField(source="coingecko.logo_url")
     network_id = serializers.IntegerField(source="chain")
 
     class Meta:
         model = models.EthereumToken
-        fields = ("code", "name", "address", "network_id", "decimals", "logo")
-        read_only_fields = ("code", "name", "address", "network_id", "decimals", "logo")
+        fields = ("code", "name", "address", "network_id", "decimals")
+        read_only_fields = ("code", "name", "address", "network_id", "decimals")
 
 
-class ExchangeRateSerializer(serializers.ModelSerializer):
-    token = serializers.CharField(source="token.ticker")
-    currency = serializers.CharField(source="currency_code")
-    time = serializers.DateTimeField(source="created")
+class HyperlinkedEthereumTokenSerializer(EthereumTokenSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="ethereum_money:token-detail", lookup_field="address"
+    )
 
     class Meta:
-        model = models.ExchangeRate
-        fields = ("token", "currency", "rate", "time")
-        read_only_fields = ("token", "currency", "rate", "time")
+        model = models.EthereumToken
+        fields = ("url",) + EthereumTokenSerializer.Meta.fields
+        read_only_fields = ("url",) + EthereumTokenSerializer.Meta.read_only_fields
