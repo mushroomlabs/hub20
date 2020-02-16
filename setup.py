@@ -16,6 +16,13 @@ setup(
     include_package_data=True,
     install_requires=install_requires,
     zip_safe=False,
-    classifiers=["Operating System :: Linux"],
+    classifiers=[
+        "Development Status :: 2 - Pre-Alpha",
+        "Environment :: Web Environment",
+        "Framework :: Django",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: POSIX",
+        "Programming Language :: Python :: 3",
+    ],
     keywords="hub20 ethereum payment-gateway",
 )
