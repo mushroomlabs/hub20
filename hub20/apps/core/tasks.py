@@ -41,7 +41,7 @@ def publish_checkout_event(checkout_id, event="checkout.event", **event_data):
     layer = get_channel_layer()
     channel_group_name = CheckoutConsumer.get_group_name(checkout_id)
 
-    logger.info(f"Publishing event {{ event }}. Data: {event_data}")
+    logger.info(f"Publishing event {event}. Data: {event_data}")
 
     event_data.update({"type": "publish_payment_event", "event_name": event})
 

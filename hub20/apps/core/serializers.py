@@ -127,11 +127,13 @@ class PaymentOrderMethodSerializer(serializers.ModelSerializer):
 
 class PaymentSerializer(serializers.ModelSerializer):
     currency = EthereumTokenSerializer()
+    identifier = serializers.CharField()
+    confirmed = serializers.BooleanField(source="is_confirmed")
 
     class Meta:
         model = models.Payment
-        fields = ("created", "currency", "amount")
-        read_only_fields = ("created", "currency", "amount")
+        fields = ("created", "currency", "amount", "identifier", "route", "confirmed")
+        read_only_fields = ("created", "currency", "amount", "identifier", "route", "confirmed")
 
 
 class InternalPaymentSerializer(serializers.ModelSerializer):
@@ -152,12 +154,11 @@ class BlockchainPaymentSerializer(PaymentSerializer):
 
 class RaidenPaymentSerializer(PaymentSerializer):
     raiden = serializers.CharField(source="payment.channel.raiden.address")
-    identifier = serializers.CharField(source="payment.identifier")
 
     class Meta:
         model = models.RaidenPayment
-        fields = PaymentSerializer.Meta.fields + ("raiden", "identifier")
-        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("raiden", "identifier")
+        fields = PaymentSerializer.Meta.fields + ("raiden",)
+        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("raiden",)
 
 
 class PaymentOrderSerializer(serializers.ModelSerializer):

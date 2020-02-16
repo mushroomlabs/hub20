@@ -66,6 +66,7 @@ services:
     command: >
       /bin/bash -c "
         mkdir -p ${HUB20_DATA_FOLDER}/celery
+        rm ${HUB20_DATA_FOLDER}/celery/celerybeat.pid || true
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
         while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
         celery beat -A hub20.api -l info -s ${HUB20_DATA_FOLDER}/celery/celerybeat-schedule.db --pidfile=${HUB20_DATA_FOLDER}/celery/celerybeat.pid
@@ -75,6 +76,7 @@ services:
     volumes:
       - .:/app
       - "./docker/volumes/celery:${HUB20_DATA_FOLDER}/celery"
+
     depends_on:
       - db
       - redis
