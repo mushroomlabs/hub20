@@ -16,7 +16,7 @@ django-rest-auth
 django_smtp_ssl
 django-money
 ethereum
-eth-abi<2
+eth-abi
 ethtoken
 factory_boy
 psycopg2-binary
@@ -29,3 +29,4 @@ pytest-env
 remote-pdb
 raiden_contracts
 uvicorn
+web3<6.0.0,>=5.4.0

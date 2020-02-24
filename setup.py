@@ -7,10 +7,14 @@ with open("requirements.txt") as req_file:
         req for req in req_file if req.strip() and not req.lstrip().startswith("#")
     ]
 
+with open("README.md") as readme_file:
+    description = readme_file.read()
+
 
 setup(
     name="hub20",
     url="https://github.com/mushroomlabs/hub20",
+    description=description,
     version="0.0.1",
     packages=find_packages(),
     include_package_data=True,
