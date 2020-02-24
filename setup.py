@@ -15,7 +15,7 @@ setup(
     name="hub20",
     url="https://github.com/mushroomlabs/hub20",
     description=description,
-    version="0.0.1",
+    version="0.0.3",
     packages=find_packages(),
     include_package_data=True,
     install_requires=install_requires,

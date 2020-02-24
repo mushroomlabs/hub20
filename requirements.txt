@@ -19,6 +19,7 @@ ethereum
 eth-abi
 ethtoken
 factory_boy
+mypy_extensions
 psycopg2-binary
 pycoingecko
 pycryptodome
