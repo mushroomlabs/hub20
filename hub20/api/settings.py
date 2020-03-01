@@ -171,6 +171,7 @@ STATICFILES_FINDERS = (
 )
 
 STATIC_URL = "/static/"
+STATIC_ROOT = os.getenv("HUB20_STATIC_ROOT", os.path.abspath(os.path.join(BASE_DIR, "static")))
 
 ADMIN_USERNAME = os.getenv("HUB20_ADMIN_USERNAME", "admin")
 
