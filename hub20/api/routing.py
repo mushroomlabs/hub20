@@ -1,8 +1,10 @@
 from channels.routing import ProtocolTypeRouter, URLRouter
+from django import setup
 
-from hub20.apps.core.api import consumer_patterns
+setup()
 
-from .middleware import TokenAuthMiddlewareStack
+from hub20.apps.core.api import consumer_patterns  # isort:skip
+from .middleware import TokenAuthMiddlewareStack  # isort:skip
 
 
 application = ProtocolTypeRouter(
