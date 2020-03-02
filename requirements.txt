@@ -27,6 +27,7 @@ pyjwt
 pytest-asyncio
 pytest-django
 pytest-env
+python-dotenv
 remote-pdb
 raiden_contracts
 uvicorn
