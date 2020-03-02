@@ -41,7 +41,7 @@ def make_web3():
     }.get(urlparse(web3_endpoint).scheme, IPCProvider)
 
     w3 = Web3(provider_class(web3_endpoint))
-    w3.middleware_stack.inject(geth_poa_middleware, layer=0)
+    w3.middleware_onion.inject(geth_poa_middleware, layer=0)
     w3.eth.setGasPriceStrategy(database_history_gas_price_strategy)
 
     chain_id = int(w3.net.version)
