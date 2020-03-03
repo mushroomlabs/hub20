@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from decimal import Decimal
-from typing import Any, Optional, Tuple, Union
+from typing import Any, Tuple, Union
 
 import ethereum
 from django.conf import settings
@@ -159,24 +159,21 @@ class EthereumToken(models.Model):
         return eth
 
     @classmethod
-    def make(cls, address: Optional[str], chain_id: int = CHAIN_ID):
+    def make(cls, address: str, chain_id: int = CHAIN_ID):
         if chain_id != CHAIN_ID:
             raise ValueError(
                 f"Can not make token on chain {chain_id} while connected to {CHAIN_ID}"
             )
 
-        if address is None:
+        if address == EthereumToken.NULL_ADDRESS:
             return EthereumToken.ETH(chain_id)
 
         proxy = token(address)
+
         obj, _ = cls.objects.update_or_create(
             address=address,
             chain=chain_id,
-            defaults={
-                "name": proxy.name(),
-                "code": proxy.symbol(),
-                "decimals": proxy.decimals(),
-            },
+            defaults={"name": proxy.name(), "code": proxy.symbol(), "decimals": proxy.decimals()},
         )
         return obj
 
