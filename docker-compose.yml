@@ -16,6 +16,14 @@ services:
   redis:
     image: redis:latest
 
+  nginx:
+    image: nginx:latest
+    volumes:
+      - ./docker/volumes/nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./docker/volumes/media/hub20:/var/www/html/hub20
+    depends_on:
+      - web
+
   # Web API
   web:
     stdin_open: true
@@ -25,13 +33,15 @@ services:
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
         while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
         django-admin migrate;
-        django-admin runserver 0.0.0.0:8000
+        django-admin collectstatic --noinput
+        uvicorn hub20.api.routing:application --port 8000 --host 0.0.0.0 --reload
       "
 
     image: mushroomlabs/hub20
     build: .
     volumes:
       - .:/app
+      - ./docker/volumes/media/hub20/static:${HUB20_STATIC_ROOT:-/app/hub20/static}
     depends_on:
       - db
       - redis
