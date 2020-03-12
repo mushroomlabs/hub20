@@ -536,6 +536,7 @@ LOGGING_HANDLER_METHODS = ["console", "file"] if "file" in LOGGING_HANDLERS else
 
 LOGGING = {
     "version": 1,
+    "disable_existing_loggers": "HUB20_LOG_DISABLE_EXISTING_LOGGERS" in os.environ,
     "formatters": {
         "verbose": {
             "format": "%(asctime)s %(levelname)s:%(pathname)s %(process)d %(lineno)d %(message)s"
