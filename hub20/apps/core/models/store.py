@@ -82,6 +82,7 @@ class Checkout(TimeStampedModel):
                 },
                 "payments": [
                     {
+                        "id": str(p.id),
                         "amount": str(p.amount),
                         "confirmed": p.is_confirmed,
                         "identifier": p.identifier,

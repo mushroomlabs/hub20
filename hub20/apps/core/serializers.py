@@ -126,14 +126,25 @@ class PaymentOrderMethodSerializer(serializers.ModelSerializer):
 
 
 class PaymentSerializer(serializers.ModelSerializer):
+    id = serializers.UUIDField()
+    url = serializers.HyperlinkedIdentityField(view_name="hub20:payments-detail")
     currency = EthereumTokenSerializer()
     identifier = serializers.CharField()
     confirmed = serializers.BooleanField(source="is_confirmed")
 
     class Meta:
         model = models.Payment
-        fields = ("created", "currency", "amount", "identifier", "route", "confirmed")
-        read_only_fields = ("created", "currency", "amount", "identifier", "route", "confirmed")
+        fields = ("id", "url", "created", "currency", "amount", "identifier", "route", "confirmed")
+        read_only_fields = (
+            "id",
+            "url",
+            "created",
+            "currency",
+            "amount",
+            "identifier",
+            "route",
+            "confirmed",
+        )
 
 
 class InternalPaymentSerializer(serializers.ModelSerializer):

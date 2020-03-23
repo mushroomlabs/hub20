@@ -1,4 +1,5 @@
 import random
+import uuid
 
 from django.conf import settings
 from django.db import models
@@ -111,6 +112,7 @@ class PaymentOrderEvent(TimeStampedModel, StatusModel):
 
 
 class Payment(TimeStampedModel, EthereumTokenValueModel):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
     order = models.ForeignKey(PaymentOrder, on_delete=models.PROTECT)
     objects = InheritanceManager()
 

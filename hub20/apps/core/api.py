@@ -8,6 +8,7 @@ app_name = "hub20"
 
 
 router = SimpleRouter(trailing_slash=False)
+router.register("payments", views.PaymentViewSet, basename="payments")
 router.register("stores", views.StoreViewSet, basename="store")
 router.register("checkout", views.CheckoutViewSet, basename="checkout")
 

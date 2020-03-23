@@ -129,6 +129,28 @@ class CheckoutViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin, Dest
         return self.retrieve(request, pk=pk)
 
 
+class PaymentViewSet(GenericViewSet, RetrieveModelMixin):
+    permission_classes = (AllowAny,)
+    lookup_value_regex = "[0-9a-f-]{36}"
+
+    def get_queryset(self):
+        return models.Payment.objects.all()
+
+    def get_serializer_class(self):
+        payment = self.get_object()
+        return {
+            models.InternalPayment: serializers.InternalPaymentSerializer,
+            models.BlockchainPayment: serializers.BlockchainPaymentSerializer,
+            models.RaidenPayment: serializers.RaidenPaymentSerializer,
+        }.get(type(payment), serializers.PaymentSerializer)
+
+    def get_object(self):
+        try:
+            return models.Payment.objects.get_subclass(id=self.kwargs["pk"])
+        except models.Payment.DoesNotExist:
+            raise Http404
+
+
 class StoreViewSet(ModelViewSet):
     permission_classes = (IsAuthenticated,)
     serializer_class = serializers.StoreSerializer
