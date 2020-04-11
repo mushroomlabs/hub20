@@ -149,6 +149,16 @@ def on_payment_order_canceled_event_send_order_canceled_signal(sender, **kw):
         order_canceled.send(sender=PaymentOrder, payment_order=payment_event.order)
 
 
+@receiver(post_save, sender=PaymentOrderEvent)
+def on_payment_order_expired_event_maybe_publish_checkout(sender, **kw):
+    payment_event = kw["instance"]
+    created = kw["created"]
+    if created and payment_event.status == PAYMENT_EVENT_TYPES.expired:
+        checkout = Checkout.objects.filter(payment_order=payment_event.order).first()
+        if checkout:
+            tasks.publish_checkout_event.delay(checkout.pk, event="checkout.expired")
+
+
 @receiver(post_save, sender=Block)
 def on_block_added_check_confirmed_payments(sender, **kw):
     block = kw["instance"]
@@ -331,6 +341,7 @@ __all__ = [
     "on_payment_created_set_created_status",
     "on_payment_order_method_created_schedule_expiration_task",
     "on_payment_event_created_send_order_paid_signal",
+    "on_payment_order_expired_event_maybe_publish_checkout",
     "on_payment_received_update_status",
     "on_payment_confirmed_finalize",
     "on_payment_confirmed_publish_checkout",
