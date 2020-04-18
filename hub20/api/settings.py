@@ -124,8 +124,8 @@ CACHES = {
 }
 
 
-# CORS Configuration (It is an api, let's allow everyone to connect)
-CORS_ORIGIN_ALLOW_ALL = True
+# This needs to be set up if you don't have a front-end proxy server
+CORS_ORIGIN_ALLOW_ALL = "HUB20_CORS_HEADERS_ENABLED" in os.environ
 
 
 # Password validation
