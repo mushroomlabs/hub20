@@ -5,6 +5,8 @@ from celery.schedules import crontab
 
 
 class Hub20CeleryConfig:
+    name = "Hub20"
+
     broker_url = "memory" if "HUB20_TEST" in os.environ else os.getenv("HUB20_BROKER_URL")
     broker_use_ssl = "HUB20_BROKER_USE_SSL" in os.environ
     beat_schedule = {
