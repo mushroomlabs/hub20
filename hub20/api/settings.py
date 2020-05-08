@@ -28,13 +28,10 @@ THIRD_PARTY_APPS = [
     "channels",
     "corsheaders",
     "djmoney",
-    "django_pdb",
     "rest_framework",
     "rest_framework.authtoken",
     "rest_auth",
     "rest_auth.registration",
-    "invitations",
-    "qr_code",
 ]
 
 PROJECT_APPS = [
@@ -179,9 +176,6 @@ ADMIN_USERNAME = os.getenv("HUB20_ADMIN_USERNAME", "admin")
 # Configuration of authentication/signup/registration via django-allauth/invitations
 LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "rest_user_details"
-INVITATIONS_ACCEPT_INVITE_AFTER_SIGNUP = True
-INVITATIONS_SIGNUP_REDIRECT = "signup"
-INVITATIONS_ADAPTER = ACCOUNT_ADAPTER = "invitations.models.InvitationsAdapter"
 ACCOUNT_LOGIN_ON_PASSWORD_RESET = True
 ACCOUNT_EMAIL_REQUIRED = False
 ACCOUNT_EMAIL_VERIFICATION = "none"
