@@ -3,7 +3,8 @@ from concurrent.futures import TimeoutError
 from typing import Optional
 
 from celery import shared_task
-from hub20.apps.blockchain.models import make_web3, Block, Transaction
+
+from hub20.apps.blockchain.models import Block, Transaction, make_web3
 
 from .models import TokenNetwork, TokenNetworkChannel
 
@@ -23,6 +24,8 @@ def _get_channel_from_event(token_network, event) -> Optional[TokenNetworkChanne
     if event_name == "ChannelClosed":
         channel_identifier = event.args.channel_identifier
         return token_network.channels.filter(identifier=channel_identifier).first()
+
+    return None
 
 
 def process_events(token_network, event_filter, w3):

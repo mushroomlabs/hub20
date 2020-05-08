@@ -1,5 +1,5 @@
 import copy
-from typing import Dict
+from typing import Dict, Type, Union
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -90,7 +90,7 @@ class TransferSerializer(serializers.ModelSerializer):
         return transfer_data
 
     def create(self, validated_data):
-        transfer_class = (
+        transfer_class: Union[Type[models.InternalTransfer], Type[models.ExternalTransfer]] = (
             models.InternalTransfer if "recipient" in validated_data else models.ExternalTransfer
         )
         request = self.context["request"]

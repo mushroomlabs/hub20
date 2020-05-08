@@ -1,15 +1,14 @@
 import random
 from datetime import timedelta
 
-from django.utils import timezone
 import factory
+from django.utils import timezone
 from factory import fuzzy
 
 from hub20.apps.blockchain.factories import EthereumProvider
 from hub20.apps.ethereum_money.factories import Erc20TokenFactory
 
 from . import models
-
 
 factory.Faker.add_provider(EthereumProvider)
 
@@ -66,7 +65,7 @@ class PaymentEventFactory(factory.django.DjangoModelFactory):
     @staticmethod
     def make_sequenced_timestamp(payment_event):
         since = payment_event.channel.last_event_timestamp or timezone.now()
-        return since + timedelta(microseconds=random.randint(1, 1e8))
+        return since + timedelta(microseconds=random.randint(1, int(1e8)))
 
     class Meta:
         model = models.Payment

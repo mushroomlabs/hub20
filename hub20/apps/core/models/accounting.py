@@ -1,22 +1,21 @@
 import logging
 import random
-from typing import List, Optional, TypeVar
+from typing import List, Optional, TypeVar, Union
 
 from django.conf import settings
 from django.contrib.sites.models import Site
 from django.db import models
-from model_utils.models import TimeStampedModel
 from model_utils.managers import InheritanceManager
+from model_utils.models import TimeStampedModel
 
 from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.models import (
-    EthereumTokenValueModel,
-    EthereumTokenAmount,
     EthereumToken,
+    EthereumTokenAmount,
+    EthereumTokenValueModel,
     get_max_fee,
 )
 from hub20.apps.raiden.models import Channel
-
 
 logger = logging.getLogger(__name__)
 Wallet_T = TypeVar("Wallet_T", bound="Wallet")
@@ -102,7 +101,7 @@ class UserAccount:
 
 
 class HubSite(Site):
-    def get_funds(self, currency: EthereumToken) -> EthereumTokenAmount:
+    def get_funds(self, currency: EthereumToken) -> Union[int, EthereumTokenAmount]:
         wallet_funds = sum([wallet.get_balance(currency) for wallet in Wallet.objects.all()])
         channel_funds = sum([c.balance_amount for c in Channel.objects.filter(currency=currency)])
         return wallet_funds + channel_funds

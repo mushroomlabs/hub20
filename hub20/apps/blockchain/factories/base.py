@@ -1,3 +1,5 @@
+from typing import List
+
 import factory
 import factory.fuzzy
 from django.utils import timezone
@@ -26,7 +28,7 @@ class BlockFactory(factory.django.DjangoModelFactory):
     number = factory.Sequence(lambda n: n)
     timestamp = factory.LazyAttribute(lambda obj: timezone.now())
     parent_hash = factory.LazyAttribute(lambda obj: make_parent_hash(obj))
-    uncle_hashes = []
+    uncle_hashes: List = []
 
     class Meta:
         model = Block
