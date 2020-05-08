@@ -7,9 +7,13 @@ from django.test import TestCase, override_settings
 from eth_utils import is_checksum_address, to_wei
 
 from hub20.apps.blockchain.factories import BlockFactory, TransactionFactory
-from hub20.apps.core.app_settings import PAYMENT_SETTINGS, TRANSFER_SETTINGS
-from hub20.apps.core.choices import PAYMENT_EVENT_TYPES, TRANSFER_EVENT_TYPES
-from hub20.apps.core.factories import (
+from hub20.apps.ethereum_money.factories import Erc20TokenFactory, Erc20TransferFactory, ETHFactory
+from hub20.apps.ethereum_money.models import EthereumTokenAmount, encode_transfer_data
+from hub20.apps.raiden.factories import ChannelFactory, PaymentEventFactory, TokenNetworkFactory
+
+from ..settings import app_settings
+from ..choices import PAYMENT_EVENT_TYPES, TRANSFER_EVENT_TYPES
+from ..factories import (
     CheckoutFactory,
     Erc20TokenPaymentOrderFactory,
     Erc20TokenUserBalanceEntryFactory,
@@ -19,11 +23,7 @@ from hub20.apps.core.factories import (
     UserAccountFactory,
     WalletFactory,
 )
-from hub20.apps.core.models import ExternalTransfer, UserAccount, Wallet
-from hub20.apps.ethereum_money.factories import Erc20TokenFactory, Erc20TransferFactory, ETHFactory
-from hub20.apps.ethereum_money.models import EthereumTokenAmount, encode_transfer_data
-from hub20.apps.raiden.factories import ChannelFactory, PaymentEventFactory, TokenNetworkFactory
-
+from ..models import ExternalTransfer, UserAccount, Wallet
 from .base import TEST_SETTINGS
 
 
@@ -34,10 +34,7 @@ def add_eth_to_wallet(wallet: Wallet, amount: EthereumTokenAmount):
 def add_token_to_wallet(wallet: Wallet, amount: EthereumTokenAmount):
     transaction_data = encode_transfer_data(wallet.address, amount)
     return Erc20TransferFactory(
-        to_address=amount.currency.address,
-        data=transaction_data,
-        value=0,
-        log__data=amount.as_hex,
+        to_address=amount.currency.address, data=transaction_data, value=0, log__data=amount.as_hex
     )
 
 
@@ -62,7 +59,7 @@ class BlockchainPaymentTestCase(BaseTestCase):
     def test_user_balance_is_updated_on_completed_payment(self):
         add_token_to_wallet(self.order.payment_method.wallet, self.order.as_token_amount)
         BlockFactory.create_batch(
-            PAYMENT_SETTINGS.minimum_confirmations, chain=self.order.currency.chain
+            app_settings.Payment.minimum_confirmations, chain=self.order.currency.chain
         )
 
         user_account = UserAccount(self.order.user)
@@ -187,7 +184,7 @@ class ExternalTransferTestCase(TransferTestCase):
 
     def _build_transfer(self, wallet: Wallet) -> ExternalTransfer:
         transfer = ExternalTransferFactory.build(
-            sender=self.sender, currency=self.credit.currency, amount=self.credit.amount,
+            sender=self.sender, currency=self.credit.currency, amount=self.credit.amount
         )
 
         out_tx = TransactionFactory(
@@ -204,7 +201,7 @@ class ExternalTransferTestCase(TransferTestCase):
     def test_external_transfers_fail_without_funds(self, select_for_transfer):
         select_for_transfer.return_value = None
         transfer = ExternalTransferFactory(
-            sender=self.sender, currency=self.credit.currency, amount=self.credit.amount,
+            sender=self.sender, currency=self.credit.currency, amount=self.credit.amount
         )
 
         self.assertIsNotNone(transfer.status)
@@ -236,7 +233,7 @@ class ExternalTransferTestCase(TransferTestCase):
         self.assertFalse(transfer.is_finalized)
         self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.executed)
 
-        BlockFactory.create_batch(TRANSFER_SETTINGS.minimum_confirmations)
+        BlockFactory.create_batch(app_settings.Transfer.minimum_confirmations)
         self.assertTrue(transfer.is_finalized)
         self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.confirmed)
 

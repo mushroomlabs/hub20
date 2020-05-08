@@ -5,10 +5,15 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from hub20.apps.blockchain.models import Block, Transaction
-from hub20.apps.core import tasks
-from hub20.apps.core.app_settings import PAYMENT_SETTINGS, TRANSFER_SETTINGS
-from hub20.apps.core.choices import PAYMENT_EVENT_TYPES, PAYMENT_METHODS, TRANSFER_EVENT_TYPES
-from hub20.apps.core.models import (
+from hub20.apps.ethereum_money.models import EthereumToken
+from hub20.apps.ethereum_money.signals import account_deposit_received
+from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
+from hub20.apps.raiden.signals import raiden_payment_received
+
+from . import tasks
+from .settings import app_settings
+from .choices import PAYMENT_EVENT_TYPES, PAYMENT_METHODS, TRANSFER_EVENT_TYPES
+from .models import (
     BlockchainPayment,
     Checkout,
     ExternalTransfer,
@@ -23,7 +28,7 @@ from hub20.apps.core.models import (
     Transfer,
     Wallet,
 )
-from hub20.apps.core.signals import (
+from .signals import (
     blockchain_payment_sent,
     order_canceled,
     order_paid,
@@ -34,10 +39,7 @@ from hub20.apps.core.signals import (
     transfer_failed,
     transfer_scheduled,
 )
-from hub20.apps.ethereum_money.models import EthereumToken
-from hub20.apps.ethereum_money.signals import account_deposit_received
-from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
-from hub20.apps.raiden.signals import raiden_payment_received
+
 
 logger = logging.getLogger(__name__)
 
@@ -164,7 +166,7 @@ def on_block_added_check_confirmed_payments(sender, **kw):
     block = kw["instance"]
     created = kw["created"]
 
-    block_number_to_confirm = block.number - PAYMENT_SETTINGS.minimum_confirmations
+    block_number_to_confirm = block.number - app_settings.Payment.minimum_confirmations
     if created and block_number_to_confirm >= 0:
         payments = BlockchainPayment.objects.all()
 
@@ -181,7 +183,7 @@ def on_block_added_check_confirmed_transfers(sender, **kw):
     block = kw["instance"]
     created = kw["created"]
 
-    block_number_to_confirm = block.number - TRANSFER_SETTINGS.minimum_confirmations
+    block_number_to_confirm = block.number - app_settings.Transfer.minimum_confirmations
     if created and block_number_to_confirm >= 0:
         transactions = Transaction.objects.filter(
             block__number=block_number_to_confirm, block__chain=block.chain

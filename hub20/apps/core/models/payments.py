@@ -8,12 +8,12 @@ from model_utils.managers import InheritanceManager
 from model_utils.models import StatusModel, TimeStampedModel
 
 from hub20.apps.blockchain.models import Transaction
-from hub20.apps.core.app_settings import PAYMENT_SETTINGS
-from hub20.apps.core.choices import PAYMENT_EVENT_TYPES
 from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.models import EthereumTokenValueModel
 from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
 
+from ..settings import app_settings
+from ..choices import PAYMENT_EVENT_TYPES
 from .accounting import Wallet
 
 EthereumAccount = get_ethereum_account_model()
@@ -91,7 +91,7 @@ class PaymentOrder(TimeStampedModel, EthereumTokenValueModel):
 
 
 class PaymentOrderMethod(TimeStampedModel):
-    EXPIRATION_TIME = PAYMENT_SETTINGS.payment_lifetime
+    EXPIRATION_TIME = app_settings.Payment.lifetime
 
     order = models.OneToOneField(
         PaymentOrder, on_delete=models.CASCADE, related_name="payment_method"
@@ -143,7 +143,7 @@ class BlockchainPayment(Payment):
 
     @property
     def is_confirmed(self):
-        return self.transaction.block.confirmations >= PAYMENT_SETTINGS.minimum_confirmations
+        return self.transaction.block.confirmations >= app_settings.Payment.minimum_confirmations
 
     @property
     def identifier(self):
