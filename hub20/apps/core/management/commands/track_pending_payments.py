@@ -10,7 +10,7 @@ from hub20.apps.core.models import Wallet
 from hub20.apps.ethereum_money.models import EthereumToken
 
 logger = logging.getLogger(__name__)
-SLEEP_INTERVAL = 3
+BLOCK_INTERVAL = 10
 
 
 def track_pending_transactions(w3):
@@ -19,7 +19,7 @@ def track_pending_transactions(w3):
     tx_filter = w3.eth.filter("pending")
 
     while True:
-        time.sleep(SLEEP_INTERVAL)
+        time.sleep(BLOCK_INTERVAL / 2)
         wallets = Wallet.objects.filter(paymentordermethod__isnull=False)
         tokens = EthereumToken.ERC20tokens.filter(
             chain=chain_id, paymentorder__payment_method__isnull=False
@@ -34,6 +34,8 @@ def track_pending_transactions(w3):
             continue
 
         try:
+            expiration_time = datetime.datetime.now() + datetime.timedelta(seconds=BLOCK_INTERVAL)
+            prio = 0
             pending_entries = [entry.hex() for entry in tx_filter.get_new_entries()]
             recorded_tx_hashes = Transaction.objects.filter(hash__in=pending_entries).values_list(
                 "hash", flat=True
@@ -41,11 +43,15 @@ def track_pending_transactions(w3):
             for tx_hash in set(pending_entries) - set(recorded_tx_hashes):
                 address_list = ", ".join([str(a) for a in wallet_addresses])
                 logger.info(f"Checking {tx_hash} for blockchain transfers at {address_list}")
-                tasks.check_transaction_for_eth_transfer.delay(tx_hash, wallet_addresses)
+                tasks.check_transaction_for_eth_transfer.apply_async(
+                    args=(tx_hash, wallet_addresses), expires=expiration_time, priority=prio
+                )
 
                 if token_addresses:
-                    tasks.check_transaction_for_erc20_transfer.delay(
-                        tx_hash, wallet_addresses, token_addresses
+                    tasks.check_transaction_for_erc20_transfer.apply_async(
+                        args=(tx_hash, wallet_addresses, token_addresses),
+                        expires=expiration_time,
+                        priority=prio,
                     )
         except TimeoutError:
             logger.warn("Timeout error when getting new entries")
