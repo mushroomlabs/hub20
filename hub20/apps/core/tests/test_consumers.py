@@ -17,15 +17,15 @@ application = URLRouter(consumer_patterns)
 @pytest.mark.asyncio
 @pytest.mark.django_db(transaction=True)
 async def test_checkout_consumer():
-    checkout = CheckoutFactory()
-    checkout.store.accepted_currencies.add(checkout.payment_order.currency)
+    checkout = await sync_to_async(CheckoutFactory)()
+    await sync_to_async(checkout.store.accepted_currencies.add)(checkout.payment_order.currency)
 
     communicator = WebsocketCommunicator(application, f"checkout/{checkout.id}")
     ok, protocol_or_error = await communicator.connect()
 
     assert ok, "Failed to connect"
 
-    tx = TransactionFactory()
+    tx = await sync_to_async(TransactionFactory)()
     await sync_to_async(blockchain_payment_sent.send)(
         sender=EthereumToken,
         amount=checkout.payment_order.as_token_amount,

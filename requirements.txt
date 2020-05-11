@@ -21,6 +21,15 @@ psycopg2-binary
 pycoingecko
 pycryptodome
 pyjwt
+python-dotenv
 raiden_contracts
 uvicorn
 web3<6.0.0,>=5.4.0
+
+# Testing / Document Generation
+mkdocs
+mkdocs-material
+pytest-asyncio
+pytest-django
+pytest-env
+factory_boy

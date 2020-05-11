@@ -5,10 +5,3 @@ black
 autopep8
 yapf
 ipython
-mkdocs
-mkdocs-material
-python-dotenv
-pytest-asyncio
-pytest-django
-pytest-env
-factory_boy

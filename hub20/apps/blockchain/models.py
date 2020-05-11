@@ -19,19 +19,10 @@ from .fields import EthereumAddressField, HexField, Uint256Field
 logger = logging.getLogger(__name__)
 
 
-def database_history_gas_price_strategy(w3: Web3, transaction_params=None) -> int:
-    BLOCK_HISTORY_SIZE = 100
-    chain_id = int(w3.net.version)
-    current_block_number = w3.eth.blockNumber
-    default_price = Web3.toWei(1.2, "gwei")
-
-    txs = Transaction.objects.filter(
-        block__chain=chain_id, block__number__gte=current_block_number - BLOCK_HISTORY_SIZE
-    )
-    return int(txs.aggregate(avg_price=Avg("gas_price")).get("avg_price")) or default_price
+_WEB3 = None
 
 
-def make_web3():
+def _build_web3():
     web3_endpoint = settings.WEB3_PROVIDER_URI
     provider_class = {
         "http": HTTPProvider,
@@ -47,6 +38,27 @@ def make_web3():
     chain_id = int(w3.net.version)
     assert chain_id == CHAIN_ID, f"web3 connected to network {chain_id}, expected {CHAIN_ID}"
     return w3
+
+
+def make_web3():
+    global _WEB3
+
+    if _WEB3 is None:
+        _WEB3 = _build_web3()
+
+    return _WEB3
+
+
+def database_history_gas_price_strategy(w3: Web3, transaction_params=None) -> int:
+    BLOCK_HISTORY_SIZE = 100
+    chain_id = int(w3.net.version)
+    current_block_number = w3.eth.blockNumber
+    default_price = Web3.toWei(1.2, "gwei")
+
+    txs = Transaction.objects.filter(
+        block__chain=chain_id, block__number__gte=current_block_number - BLOCK_HISTORY_SIZE
+    )
+    return int(txs.aggregate(avg_price=Avg("gas_price")).get("avg_price")) or default_price
 
 
 class Block(models.Model):
