@@ -8,7 +8,6 @@ from Crypto.PublicKey import RSA
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
-from model_utils.models import TimeStampedModel
 
 from hub20.apps.ethereum_money.models import EthereumToken
 
@@ -19,6 +18,8 @@ class CheckoutEvents(Enum):
     BLOCKCHAIN_BLOCK_CREATED = "blockchain.block.created"
     BLOCKCHAIN_TRANSFER_BROADCAST = "blockchain.transfer.broadcast"
     BLOCKCHAIN_TRANSFER_MINED = "blockchain.transfer.mined"
+    BLOCKCHAIN_NODE_UNAVAILABLE = "blockchain.ethereum_node.unavailable"
+    BLOCKCHAIN_NODE_OK = "blockchain.ethereum_node.ok"
     RAIDEN_TRANSFER_RECEIVED = "raiden.transfer.received"
 
 
@@ -54,45 +55,37 @@ class StoreRSAKeyPair(models.Model):
         return pair
 
 
-class Checkout(TimeStampedModel):
-    id = models.UUIDField(default=uuid.uuid4, primary_key=True)
+class Checkout(PaymentOrder):
     store = models.ForeignKey(Store, on_delete=models.CASCADE)
-    payment_order = models.ForeignKey(PaymentOrder, on_delete=models.CASCADE)
     external_identifier = models.TextField()
     requester_ip = models.GenericIPAddressField(null=True)
 
     def clean(self):
-        if self.store.owner != self.payment_order.user:
-            raise ValidationError("Creator or payment order must be the same as store owner")
+        if self.store.owner != self.user:
+            raise ValidationError("Creator of payment order must be the same as store owner")
 
-        if self.payment_order.currency not in self.store.accepted_currencies.all():
-            raise ValidationError(
-                f"{self.store.name} does not accept payment in {self.payment_order.currency}"
-            )
+        if self.currency not in self.store.accepted_currencies.all():
+            raise ValidationError(f"{self.store.name} does not accept payment in {self.currency}")
 
     def issue_voucher(self, **data):
         data.update(
             {
                 "iat": datetime.datetime.utcnow(),
                 "iss": self.external_identifier,
-                "status": self.payment_order.status,
-                "token": {
-                    "symbol": self.payment_order.currency.code,
-                    "address": self.payment_order.currency.address,
-                },
+                "status": self.status,
+                "token": {"symbol": self.currency.code, "address": self.currency.address},
                 "payments": [
                     {
                         "id": str(p.id),
                         "amount": str(p.amount),
                         "confirmed": p.is_confirmed,
                         "identifier": p.identifier,
-                        "route": p.route,
+                        "route": p.route.get_route_name(),
                     }
-                    for p in self.payment_order.payments
+                    for p in self.payments
                 ],
-                "total_amount": str(self.payment_order.amount),
-                "total_confirmed": str(self.payment_order.total_confirmed),
-                "payment_order_id": self.payment_order.id,
+                "total_amount": str(self.amount),
+                "total_confirmed": str(self.total_confirmed),
                 "checkout_id": str(self.id),
             }
         )
@@ -101,4 +94,4 @@ class Checkout(TimeStampedModel):
         return jwt.encode(data, private_key, algorithm="RS256").decode()
 
 
-__all__ = ["Store", "StoreRSAKeyPair", "Checkout"]
+__all__ = ["Store", "StoreRSAKeyPair", "Checkout", "CheckoutEvents"]

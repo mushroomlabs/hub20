@@ -1,15 +1,15 @@
 import factory
 from factory import fuzzy
 
-from hub20.apps.blockchain.factories.providers import EthereumProvider
+from hub20.apps.blockchain.factories import EthereumProvider, SyncedChainFactory
+from hub20.apps.core import models
 from hub20.apps.ethereum_money.factories import (
-    ETHFactory,
     Erc20TokenFactory,
     EthereumAccountFactory,
+    ETHFactory,
 )
-from hub20.apps.core import models
-from .base import UserFactory
 
+from .base import UserFactory
 
 factory.Faker.add_provider(EthereumProvider)
 
@@ -17,6 +17,7 @@ factory.Faker.add_provider(EthereumProvider)
 class PaymentOrderFactory(factory.django.DjangoModelFactory):
     user = factory.SubFactory(UserFactory)
     amount = fuzzy.FuzzyDecimal(0, 10, precision=6)
+    chain = factory.SubFactory(SyncedChainFactory)
 
     class Meta:
         abstract = False

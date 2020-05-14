@@ -7,11 +7,11 @@ from django.test import TestCase, override_settings
 from eth_utils import is_checksum_address, to_wei
 
 from hub20.apps.blockchain.factories import BlockFactory, TransactionFactory
+from hub20.apps.blockchain.models import Chain
 from hub20.apps.ethereum_money.factories import Erc20TokenFactory, Erc20TransferFactory, ETHFactory
 from hub20.apps.ethereum_money.models import EthereumTokenAmount, encode_transfer_data
 from hub20.apps.raiden.factories import ChannelFactory, PaymentEventFactory, TokenNetworkFactory
 
-from ..settings import app_settings
 from ..choices import PAYMENT_EVENT_TYPES, TRANSFER_EVENT_TYPES
 from ..factories import (
     CheckoutFactory,
@@ -23,18 +23,31 @@ from ..factories import (
     UserAccountFactory,
     WalletFactory,
 )
-from ..models import ExternalTransfer, UserAccount, Wallet
+from ..models import (
+    BlockchainPaymentRoute,
+    ExternalTransfer,
+    RaidenPaymentRoute,
+    UserAccount,
+    Wallet,
+)
+from ..settings import app_settings
 from .base import TEST_SETTINGS
 
 
-def add_eth_to_wallet(wallet: Wallet, amount: EthereumTokenAmount):
-    return TransactionFactory(to_address=wallet.address, value=to_wei(amount.amount, "ether"))
+def add_eth_to_wallet(wallet: Wallet, amount: EthereumTokenAmount, chain: Chain):
+    return TransactionFactory(
+        to_address=wallet.address, value=to_wei(amount.amount, "ether"), block__chain=chain
+    )
 
 
-def add_token_to_wallet(wallet: Wallet, amount: EthereumTokenAmount):
+def add_token_to_wallet(wallet: Wallet, amount: EthereumTokenAmount, chain: Chain):
     transaction_data = encode_transfer_data(wallet.address, amount)
     return Erc20TransferFactory(
-        to_address=amount.currency.address, data=transaction_data, value=0, log__data=amount.as_hex
+        to_address=amount.currency.address,
+        data=transaction_data,
+        value=0,
+        log__data=amount.as_hex,
+        block__chain=chain,
     )
 
 
@@ -47,19 +60,33 @@ class BaseTestCase(TestCase):
 class BlockchainPaymentTestCase(BaseTestCase):
     def setUp(self):
         self.order = Erc20TokenPaymentOrderFactory()
+        self.blockchain_route = BlockchainPaymentRoute.objects.filter(order=self.order).first()
+
+    def test_order_has_blockchain_route(self):
+        self.assertIsNotNone(self.blockchain_route)
 
     def test_transaction_sets_payment_as_received(self):
-        add_token_to_wallet(self.order.payment_method.wallet, self.order.as_token_amount)
+        add_token_to_wallet(
+            self.blockchain_route.wallet, self.order.as_token_amount, self.order.chain
+        )
         self.assertEqual(self.order.status, PAYMENT_EVENT_TYPES.received)
 
     def test_transaction_creates_blockchain_payment(self):
-        add_token_to_wallet(self.order.payment_method.wallet, self.order.as_token_amount)
-        self.assertEqual(self.order.payment_set.count(), 1)
+        tx = add_token_to_wallet(
+            self.blockchain_route.wallet, self.order.as_token_amount, self.order.chain
+        )
+        self.assertEqual(self.order.payments.count(), 1)
 
     def test_user_balance_is_updated_on_completed_payment(self):
-        add_token_to_wallet(self.order.payment_method.wallet, self.order.as_token_amount)
+        tx = add_token_to_wallet(
+            self.blockchain_route.wallet, self.order.as_token_amount, self.order.chain
+        )
+        self.order.chain.highest_block = (
+            tx.block.number + app_settings.Payment.minimum_confirmations
+        )
+        self.order.chain.save()
         BlockFactory.create_batch(
-            app_settings.Payment.minimum_confirmations, chain=self.order.currency.chain
+            app_settings.Payment.minimum_confirmations, chain=self.order.chain
         )
 
         user_account = UserAccount(self.order.user)
@@ -70,10 +97,10 @@ class BlockchainPaymentTestCase(BaseTestCase):
 class CheckoutTestCase(BaseTestCase):
     def setUp(self):
         self.checkout = CheckoutFactory()
-        self.checkout.store.accepted_currencies.add(self.checkout.payment_order.currency)
+        self.checkout.store.accepted_currencies.add(self.checkout.currency)
 
-    def test_payment_order_user_and_store_owner_are_the_same(self):
-        self.assertEqual(self.checkout.store.owner, self.checkout.payment_order.user)
+    def test_checkout_user_and_store_owner_are_the_same(self):
+        self.assertEqual(self.checkout.store.owner, self.checkout.user)
 
     def test_checkout_currency_must_be_accepted_by_store(self):
         self.checkout.clean()
@@ -91,20 +118,16 @@ class RaidenPaymentTestCase(BaseTestCase):
         self.channel.raiden.token_networks.add(token_network)
 
         self.order = Erc20TokenPaymentOrderFactory(currency=token_network.token)
+        self.raiden_route = RaidenPaymentRoute.objects.filter(order=self.order).first()
 
-    def test_order_payment_method_includes_raiden(self):
-        self.assertIsNotNone(self.order.payment_method)
-        self.assertIsNotNone(self.order.payment_method.raiden)
-
-    def test_order_payment_method_includes_identifier(self):
-        self.assertIsNotNone(self.order.payment_method)
-        self.assertIsNotNone(self.order.payment_method.identifier)
+    def test_order_has_raiden_route(self):
+        self.assertIsNotNone(self.raiden_route)
 
     def test_payment_via_raiden_sets_order_as_paid(self):
         PaymentEventFactory(
             channel=self.channel,
             amount=self.order.amount,
-            identifier=self.order.payment_method.identifier,
+            identifier=self.raiden_route.identifier,
             receiver_address=self.channel.raiden.address,
         )
         self.assertTrue(self.order.is_finalized)
@@ -209,8 +232,8 @@ class ExternalTransferTestCase(TransferTestCase):
 
     def test_transfers_can_be_executed_with_enough_balance(self, select_for_transfer):
         wallet = WalletFactory()
-        add_token_to_wallet(wallet, self.credit.as_token_amount)
-        add_eth_to_wallet(wallet, self.fee_amount)
+        add_token_to_wallet(wallet, self.credit.as_token_amount, self.ETH.chain)
+        add_eth_to_wallet(wallet, self.fee_amount, self.ETH.chain)
 
         select_for_transfer.return_value = wallet
 
@@ -223,8 +246,8 @@ class ExternalTransferTestCase(TransferTestCase):
     def test_transfers_are_confirmed_after_block_confirmation(self, select_for_transfer):
         wallet = WalletFactory()
 
-        add_eth_to_wallet(wallet, self.fee_amount)
-        add_token_to_wallet(wallet, self.credit.as_token_amount)
+        add_eth_to_wallet(wallet, self.fee_amount, self.ETH.chain)
+        add_token_to_wallet(wallet, self.credit.as_token_amount, self.ETH.chain)
         select_for_transfer.return_value = wallet
 
         transfer = self._build_transfer(wallet)
@@ -233,7 +256,11 @@ class ExternalTransferTestCase(TransferTestCase):
         self.assertFalse(transfer.is_finalized)
         self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.executed)
 
-        BlockFactory.create_batch(app_settings.Transfer.minimum_confirmations)
+        self.ETH.chain.highest_block = app_settings.Transfer.minimum_confirmations
+        self.ETH.chain.save()
+        BlockFactory.create_batch(
+            app_settings.Transfer.minimum_confirmations, chain=self.ETH.chain
+        )
         self.assertTrue(transfer.is_finalized)
         self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.confirmed)
 
@@ -255,8 +282,8 @@ class WalletTestCase(BaseTestCase):
         token = Erc20TokenFactory()
         token_amount = EthereumTokenAmount(amount=Decimal("10"), currency=token)
 
-        add_eth_to_wallet(self.wallet, fee_amount)
-        add_token_to_wallet(self.wallet, token_amount)
+        add_eth_to_wallet(self.wallet, fee_amount, ETH.chain)
+        add_token_to_wallet(self.wallet, token_amount, token.chain)
 
         self.assertIsNotNone(Wallet.select_for_transfer(token_amount))
         self.assertIsNone(Wallet.select_for_transfer(2 * fee_amount))

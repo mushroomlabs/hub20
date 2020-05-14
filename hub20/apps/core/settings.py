@@ -1,10 +1,7 @@
 import logging
-from typing import Any, Dict, Optional
 
 from django.conf import settings
 from django.test.signals import setting_changed
-from rest_framework.settings import APISettings
-
 
 logger = logging.getLogger(__name__)
 
@@ -15,7 +12,8 @@ class AppSettings:
 
     class Payment:
         minimum_confirmations = 5
-        lifetime = 15 * 60
+        blockchain_route_lifetime = 100  # In blocks
+        raiden_route_lifetime = 15 * 60  # In seconds
 
     def __init__(self):
         self.load()
@@ -24,13 +22,13 @@ class AppSettings:
         ATTRS = {
             "TRANSFER_MININUM_CONFIRMATIONS": (self.Transfer, "minimum_confirmations"),
             "PAYMENT_MININUM_CONFIRMATIONS": (self.Payment, "minimum_confirmations"),
-            "PAYMENT_REQUEST_LIFETIME": (self.Payment, "lifetime"),
+            "PAYMENT_BLOCKCHAIN_ROUTE_LIFETIME": (self.Payment, "blockchain_route_lifetime"),
         }
         user_settings = getattr(settings, "HUB20", {})
 
         for setting, value in user_settings.items():
             if setting not in ATTRS:
-                logger.warning(f"Ignoring {attr} as it is not a setting for HUB20")
+                logger.warning(f"Ignoring {setting} as it is not a setting for HUB20")
                 continue
 
             setting_class, attr = ATTRS[setting]

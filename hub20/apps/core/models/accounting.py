@@ -41,7 +41,9 @@ class Wallet(models.Model):
         )
 
     def get_balances(self, chain_id: int) -> List[EthereumTokenAmount]:
-        return [self.get_balance(token) for token in EthereumToken.objects.filter(chain=chain_id)]
+        return [
+            self.get_balance(token) for token in EthereumToken.objects.filter(chain_id=chain_id)
+        ]
 
     @classmethod
     def select_for_transfer(cls, transfer_amount: EthereumTokenAmount) -> Optional[Wallet_T]:
@@ -97,7 +99,9 @@ class UserAccount:
         return EthereumTokenAmount.aggregated(self.user.balance_entries.all(), currency=currency)
 
     def get_balances(self, chain_id: int) -> List[EthereumTokenAmount]:
-        return [self.get_balance(token) for token in EthereumToken.objects.filter(chain=chain_id)]
+        return [
+            self.get_balance(token) for token in EthereumToken.objects.filter(chain_id=chain_id)
+        ]
 
 
 class HubSite(Site):

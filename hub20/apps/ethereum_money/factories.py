@@ -2,8 +2,8 @@ import factory
 from factory import fuzzy
 
 from hub20.apps.blockchain.factories import (
-    TEST_CHAIN_ID,
     EthereumProvider,
+    SyncedChainFactory,
     TransactionFactory,
     TransactionLogFactory,
 )
@@ -25,7 +25,7 @@ class EthereumAccountFactory(factory.django.DjangoModelFactory):
 
 
 class EthereumCurrencyFactory(factory.django.DjangoModelFactory):
-    chain = TEST_CHAIN_ID
+    chain = factory.SubFactory(SyncedChainFactory)
 
 
 class ETHFactory(EthereumCurrencyFactory):

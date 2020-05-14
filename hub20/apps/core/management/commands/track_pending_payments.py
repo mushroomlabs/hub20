@@ -1,10 +1,11 @@
+import datetime
 import logging
 import time
 from concurrent.futures import TimeoutError
 
 from django.core.management.base import BaseCommand
 
-from hub20.apps.blockchain.models import Transaction, make_web3
+from hub20.apps.blockchain.models import Chain, Transaction
 from hub20.apps.core import tasks
 from hub20.apps.core.models import Wallet
 from hub20.apps.ethereum_money.models import EthereumToken
@@ -13,16 +14,21 @@ logger = logging.getLogger(__name__)
 BLOCK_INTERVAL = 10
 
 
-def track_pending_transactions(w3):
-    chain_id = int(w3.net.version)
+def track_pending_transactions():
+    chain = Chain.make()
+    w3 = chain.get_web3()
 
     tx_filter = w3.eth.filter("pending")
 
     while True:
         time.sleep(BLOCK_INTERVAL / 2)
-        wallets = Wallet.objects.filter(paymentordermethod__isnull=False)
+
+        current_block = chain.highest_block
+        wallets = Wallet.objects.filter(
+            blockchainpaymentroute__payment_window__contains=(current_block, current_block)
+        )
         tokens = EthereumToken.ERC20tokens.filter(
-            chain=chain_id, paymentorder__payment_method__isnull=False
+            chain=chain.id, paymentorder__payment_method__isnull=False
         )
 
         # Convert the querysets to lists of addresses
@@ -61,5 +67,4 @@ class Command(BaseCommand):
     help = "Listens to pending transactions looking for payments sent via blockchain"
 
     def handle(self, *args, **options):
-        w3 = make_web3()
-        track_pending_transactions(w3)
+        track_pending_transactions()

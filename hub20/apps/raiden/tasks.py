@@ -4,7 +4,7 @@ from typing import Optional
 
 from celery import shared_task
 
-from hub20.apps.blockchain.models import Block, Transaction, make_web3
+from hub20.apps.blockchain.models import Block, Chain, Transaction
 
 from .models import TokenNetwork, TokenNetworkChannel
 
@@ -51,7 +51,8 @@ def process_events(token_network, event_filter, w3):
 
 @shared_task
 def sync_token_network_events():
-    w3 = make_web3()
+    chain = Chain.make()
+    w3 = chain.get_web3()
     for token_network in TokenNetwork.objects.all():
         token_network_contract = token_network.get_contract(w3=w3)
         event_blocks = Block.objects.filter(

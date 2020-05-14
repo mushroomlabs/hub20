@@ -19,37 +19,8 @@ from .fields import EthereumAddressField, HexField, Uint256Field
 logger = logging.getLogger(__name__)
 
 
-_WEB3 = None
+def database_history_gas_price_strategy(w3: Web3, *args, **kw) -> int:
 
-
-def _build_web3():
-    web3_endpoint = settings.WEB3_PROVIDER_URI
-    provider_class = {
-        "http": HTTPProvider,
-        "https": HTTPProvider,
-        "ws": WebsocketProvider,
-        "wss": WebsocketProvider,
-    }.get(urlparse(web3_endpoint).scheme, IPCProvider)
-
-    w3 = Web3(provider_class(web3_endpoint))
-    w3.middleware_onion.inject(geth_poa_middleware, layer=0)
-    w3.eth.setGasPriceStrategy(database_history_gas_price_strategy)
-
-    chain_id = int(w3.net.version)
-    assert chain_id == CHAIN_ID, f"web3 connected to network {chain_id}, expected {CHAIN_ID}"
-    return w3
-
-
-def make_web3():
-    global _WEB3
-
-    if _WEB3 is None:
-        _WEB3 = _build_web3()
-
-    return _WEB3
-
-
-def database_history_gas_price_strategy(w3: Web3, transaction_params=None) -> int:
     BLOCK_HISTORY_SIZE = 100
     chain_id = int(w3.net.version)
     current_block_number = w3.eth.blockNumber
@@ -61,9 +32,60 @@ def database_history_gas_price_strategy(w3: Web3, transaction_params=None) -> in
     return int(txs.aggregate(avg_price=Avg("gas_price")).get("avg_price")) or default_price
 
 
+class Chain(models.Model):
+    id = models.PositiveIntegerField(
+        primary_key=True, choices=ETHEREUM_CHAINS, default=ETHEREUM_CHAINS.mainnet,
+    )
+    provider_url = models.URLField(unique=True)
+    synced = models.BooleanField()
+    highest_block = models.PositiveIntegerField()
+
+    _WEB3_CLIENTS = {}
+
+    def _make_web3(self) -> Web3:
+        provider_class = {
+            "http": HTTPProvider,
+            "https": HTTPProvider,
+            "ws": WebsocketProvider,
+            "wss": WebsocketProvider,
+        }.get(urlparse(self.provider_url).scheme, IPCProvider)
+
+        w3 = Web3(provider_class(self.provider_url))
+        w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+        w3.eth.setGasPriceStrategy(database_history_gas_price_strategy)
+
+        chain_id = int(w3.net.version)
+        message = f"{self.provider_url} is connected to {chain_id}, expected {self.id}"
+        assert chain_id == self.id, message
+
+        return w3
+
+    def get_web3(self, force_new: bool = False) -> Web3:
+
+        w3 = Chain._WEB3_CLIENTS.get(self.provider_url)
+
+        if w3 is None or force_new:
+            w3 = self._make_web3()
+            Chain._WEB3_CLIENTS[self.provider_url] = w3
+
+        return w3
+
+    @classmethod
+    def make(cls):
+        chain, _ = cls.objects.get_or_create(
+            id=CHAIN_ID,
+            defaults={
+                "synced": False,
+                "highest_block": 0,
+                "provider_url": settings.WEB3_PROVIDER_URI,
+            },
+        )
+        return chain
+
+
 class Block(models.Model):
     hash = HexField(max_length=64, primary_key=True)
-    chain = models.PositiveIntegerField(choices=ETHEREUM_CHAINS, default=ETHEREUM_CHAINS.mainnet)
+    chain = models.ForeignKey(Chain, on_delete=models.CASCADE, related_name="blocks")
     number = models.PositiveIntegerField(db_index=True)
     timestamp = models.DateTimeField()
     parent_hash = HexField(max_length=64)
@@ -71,7 +93,7 @@ class Block(models.Model):
 
     def __str__(self) -> str:
         hash_hex = self.hash if type(self.hash) is str else self.hash.hex()
-        return f"{hash_hex} #{self.number} {self.get_chain_display()}"
+        return f"{hash_hex} #{self.number}"
 
     @property
     def parent(self):
@@ -83,15 +105,13 @@ class Block(models.Model):
 
     @property
     def confirmations(self) -> int:
-        chain_blocks = self.__class__.objects.filter(chain=self.chain)
-        height = chain_blocks.aggregate(height=Max("number")).get("height")
-        return height - self.number
+        return self.chain.highest_block - self.number
 
     @classmethod
-    def make(cls, block_data, chain_id):
+    def make(cls, block_data, chain: Chain):
         block_time = datetime.datetime.fromtimestamp(block_data.timestamp)
         block, _ = cls.objects.update_or_create(
-            chain=chain_id,
+            chain=chain,
             hash=block_data.hash,
             defaults={
                 "number": block_data.number,
@@ -104,12 +124,12 @@ class Block(models.Model):
 
     @classmethod
     @atomic()
-    def make_all(cls, block_number, w3):
+    def make_all(cls, block_number: int, chain: Chain):
         logger.info(f"Saving block {block_number}")
-        chain_id = int(w3.net.version)
+        w3 = chain.get_web3()
         block_data = w3.eth.getBlock(block_number, full_transactions=True)
 
-        block = cls.make(block_data, chain_id)
+        block = cls.make(block_data, chain)
 
         for tx_data in block_data.transactions:
             transaction = Transaction.make(tx_data, block)
@@ -121,17 +141,13 @@ class Block(models.Model):
         return block
 
     @classmethod
-    def fetch_by_hash(cls, block_hash, w3: Web3 = None):
+    def fetch_by_hash(cls, block_hash, chain: Chain):
         try:
-            return cls.objects.get(hash=block_hash)
+            return cls.objects.get(hash=block_hash, chain=chain)
         except cls.DoesNotExist:
-            if w3 is None:
-                w3 = make_web3()
-
-            chain_id = int(w3.net.version)
-
+            w3 = chain.get_web3()
             block_data = w3.eth.getBlock(block_hash, full_transactions=True)
-            return cls.make(block_data, chain_id)
+            return cls.make(block_data, chain)
 
     @classmethod
     def get_latest_block_number(cls, qs):
@@ -142,7 +158,7 @@ class Block(models.Model):
 
 
 class Transaction(models.Model):
-    block = models.ForeignKey(Block, on_delete=models.CASCADE)
+    block = models.ForeignKey(Block, on_delete=models.CASCADE, related_name="transactions")
     hash = HexField(max_length=64, db_index=True)
     from_address = EthereumAddressField(db_index=True)
     to_address = EthereumAddressField(db_index=True, null=True)
@@ -172,17 +188,15 @@ class Transaction(models.Model):
         return tx
 
     @classmethod
-    def fetch_by_hash(cls, transaction_hash: str, w3: Web3 = None):
+    def fetch_by_hash(cls, transaction_hash: str, chain: Chain):
         try:
-            return cls.objects.get(hash=transaction_hash)
+            return cls.objects.get(hash=transaction_hash, block__chain=chain)
         except cls.DoesNotExist:
             pass
 
-        if w3 is None:
-            w3 = make_web3()
-
+        w3 = chain.get_web3()
         tx_data = w3.eth.getTransaction(transaction_hash)
-        block = Block.fetch_by_hash(tx_data.blockHash, w3=w3)
+        block = Block.fetch_by_hash(tx_data.blockHash, chain=chain)
 
         return cls.objects.filter(block=block, hash=transaction_hash).first()
 
@@ -202,7 +216,7 @@ class TransactionLog(models.Model):
         tx_log, _ = cls.objects.get_or_create(
             index=log_data.logIndex,
             transaction=transaction,
-            defaults={"data": log_data.data, "topics": [l.hex() for l in log_data.topics]},
+            defaults={"data": log_data.data, "topics": [topic.hex() for topic in log_data.topics]},
         )
         return tx_log
 
@@ -210,4 +224,4 @@ class TransactionLog(models.Model):
         unique_together = ("transaction", "index")
 
 
-__all__ = ["Block", "Transaction", "TransactionLog"]
+__all__ = ["Block", "Chain", "Transaction", "TransactionLog"]

@@ -125,7 +125,7 @@ class CheckoutViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin, Dest
 
     def destroy(self, request, pk=None):
         obj = self.get_object()
-        obj.payment_order.cancel()
+        obj.cancel()
         return self.retrieve(request, pk=pk)
 
 

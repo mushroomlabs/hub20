@@ -4,7 +4,7 @@ import time
 from django.core.management.base import BaseCommand
 from web3 import Web3
 
-from hub20.apps.blockchain.models import make_web3
+from hub20.apps.blockchain.models import Chain
 from hub20.apps.ethereum_money.models import EthereumToken
 from hub20.apps.raiden import models
 from hub20.apps.raiden.client import RaidenClient, RaidenConnectionError
@@ -47,7 +47,8 @@ class Command(BaseCommand):
     help = "Connects to Raiden via REST API to collect information about new transfers"
 
     def handle(self, *args, **options):
-        w3 = make_web3()
+        chain = Chain.make()
+        w3 = chain.get_web3()
 
         while True:
             for raiden in models.Raiden.objects.all():

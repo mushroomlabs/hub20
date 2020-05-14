@@ -17,6 +17,7 @@ EthereumAccount = get_ethereum_account_model()
 def on_transaction_mined_check_for_deposit(sender, **kw):
     tx = kw["instance"]
     if kw["created"]:
+
         accounts = EthereumAccount.objects.all()
         accounts_by_address = {account.address: account for account in accounts}
 

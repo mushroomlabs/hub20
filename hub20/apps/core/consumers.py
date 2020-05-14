@@ -59,7 +59,7 @@ class CheckoutConsumer(JsonWebsocketConsumer):
     def _refresh(self):
         self.checkout.refresh_from_db()
 
-    def publish_payment_event(self, message):
+    def checkout_event(self, message):
         logger.info(f"Message received: {message}")
         self._refresh()
         message.pop("type", None)

@@ -4,7 +4,8 @@ import factory
 import factory.fuzzy
 from django.utils import timezone
 
-from ..models import Block, Transaction, TransactionLog
+from ..app_settings import START_BLOCK_NUMBER
+from ..models import Block, Chain, Transaction, TransactionLog
 from .providers import EthereumProvider
 
 factory.Faker.add_provider(EthereumProvider)
@@ -22,10 +23,37 @@ def make_parent_hash(block):
     return parent and parent.hash or factory.Faker("hex64").generate()
 
 
+class ChainFactory(factory.django.DjangoModelFactory):
+    id = TEST_CHAIN_ID
+    provider_url = "https://web3.example.com"
+    synced = False
+    highest_block = 0
+
+    @factory.post_generation
+    def blocks(obj, create, extracted, **kw):
+        if not create:
+            return
+
+        if not extracted:
+            BlockFactory(number=obj.highest_block, chain=obj)
+        else:
+            for block in extracted:
+                obj.blocks.add(block)
+
+    class Meta:
+        model = Chain
+        django_get_or_create = ("id",)
+
+
+class SyncedChainFactory(ChainFactory):
+    synced = True
+    highest_block = START_BLOCK_NUMBER
+
+
 class BlockFactory(factory.django.DjangoModelFactory):
-    chain = TEST_CHAIN_ID
+    chain = factory.SubFactory(SyncedChainFactory)
     hash = factory.Faker("hex64")
-    number = factory.Sequence(lambda n: n)
+    number = factory.Sequence(lambda n: n + START_BLOCK_NUMBER)
     timestamp = factory.LazyAttribute(lambda obj: timezone.now())
     parent_hash = factory.LazyAttribute(lambda obj: make_parent_hash(obj))
     uncle_hashes: List = []

@@ -24,12 +24,10 @@ class StoreFactory(factory.django.DjangoModelFactory):
         model = models.Store
 
 
-class CheckoutFactory(factory.django.DjangoModelFactory):
+class CheckoutFactory(Erc20TokenPaymentOrderFactory):
     store = factory.SubFactory(StoreFactory, accepted_currencies=[])
     external_identifier = factory.fuzzy.FuzzyText(length=30, prefix="checkout-")
-    payment_order = factory.SubFactory(
-        Erc20TokenPaymentOrderFactory, user=factory.SelfAttribute("..store.owner"),
-    )
+    user = factory.SelfAttribute(".store.owner")
 
     class Meta:
         model = models.Checkout

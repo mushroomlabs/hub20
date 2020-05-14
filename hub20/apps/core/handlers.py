@@ -1,33 +1,42 @@
-import datetime
 import logging
 
+from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from psycopg2.extras import NumericRange
 
-from hub20.apps.blockchain.models import Block, Transaction
+from hub20.apps.blockchain.models import Block, Chain, Transaction
+from hub20.apps.blockchain.signals import (
+    blockchain_node_connected,
+    blockchain_node_disconnected,
+    blockchain_node_sync_lost,
+    blockchain_node_sync_recovered,
+)
 from hub20.apps.ethereum_money.models import EthereumToken
 from hub20.apps.ethereum_money.signals import account_deposit_received
 from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
 from hub20.apps.raiden.signals import raiden_payment_received
 
 from . import tasks
-from .settings import app_settings
 from .choices import PAYMENT_EVENT_TYPES, PAYMENT_METHODS, TRANSFER_EVENT_TYPES
 from .models import (
     BlockchainPayment,
+    BlockchainPaymentRoute,
     Checkout,
+    CheckoutEvents,
     ExternalTransfer,
     InternalPayment,
     InternalTransfer,
     PaymentOrder,
     PaymentOrderEvent,
-    PaymentOrderMethod,
     RaidenPayment,
+    RaidenPaymentRoute,
     Store,
     StoreRSAKeyPair,
     Transfer,
     Wallet,
 )
+from .settings import app_settings
 from .signals import (
     blockchain_payment_sent,
     order_canceled,
@@ -40,8 +49,27 @@ from .signals import (
     transfer_scheduled,
 )
 
-
 logger = logging.getLogger(__name__)
+
+
+@receiver(blockchain_node_disconnected, sender=Chain)
+@receiver(blockchain_node_sync_lost, sender=Chain)
+def on_blockchain_node_error_send_open_checkout_events(sender, **kw):
+    chain = kw["chain"]
+    for checkout in Checkout.objects.filter(chain=chain).open():
+        tasks.publish_checkout_event(
+            checkout.id, event_data=CheckoutEvents.BLOCKCHAIN_NODE_UNAVAILABLE.value
+        )
+
+
+@receiver(blockchain_node_connected, sender=Chain)
+@receiver(blockchain_node_sync_recovered, sender=Chain)
+def on_blockchain_node_ok_send_open_checkout_events(sender, **kw):
+    chain = kw["chain"]
+    for checkout in Checkout.objects.filter(chain=chain).open():
+        tasks.publish_checkout_event(
+            checkout.id, event_data=CheckoutEvents.BLOCKCHAIN_NODE_OK.value
+        )
 
 
 @receiver(account_deposit_received, sender=Transaction)
@@ -49,13 +77,19 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
     account = kw["account"]
     transaction = kw["transaction"]
     amount = kw["amount"]
-    order = PaymentOrder.objects.filter(payment_method__wallet__account=account).first()
+
+    orders = PaymentOrder.objects.open().with_blockchain_route(transaction.block.number)
+    order = orders.filter(routes__blockchainpaymentroute__wallet__account=account).first()
 
     if not order:
         return
 
+    route = BlockchainPaymentRoute.objects.filter(
+        order=order, payment_window__contains=transaction.block.number
+    ).first()
+
     payment = BlockchainPayment.objects.create(
-        order=order, amount=amount.amount, currency=amount.currency, transaction=transaction
+        route=route, amount=amount.amount, currency=amount.currency, transaction=transaction
     )
     payment_received.send(sender=BlockchainPayment, payment=payment)
 
@@ -65,21 +99,31 @@ def on_blockchain_payment_sent_maybe_publish_checkout(sender, **kw):
     recipient_address = kw["recipient"]
     payment_amount = kw["amount"]
     tx_hash = kw["transaction_hash"]
+    chain = Chain.make()
+    current_block = chain.highest_block
+
+    blockchain_payment_route = BlockchainPaymentRoute.objects.filter(
+        wallet__account__address=recipient_address, payment_window__contains=current_block
+    ).first()
+
+    if not blockchain_payment_route:
+        return
+
     checkout = Checkout.objects.filter(
-        payment_order__payment_method__wallet__account__address=recipient_address
+        routes__blockchainpaymentroute=blockchain_payment_route
     ).first()
 
     if not checkout:
         return
 
-    if not checkout.payment_order.is_finalized:
+    if not checkout.is_finalized:
         tasks.publish_checkout_event.delay(
             checkout.pk,
             event="payment.sent",
             amount=payment_amount.amount,
             token=payment_amount.currency.address,
             identifier=tx_hash,
-            payment_method=PAYMENT_METHODS.blockchain,
+            payment_route=blockchain_payment_route.name,
         )
 
 
@@ -87,15 +131,14 @@ def on_blockchain_payment_sent_maybe_publish_checkout(sender, **kw):
 def on_raiden_payment_received_check_raiden_payments(sender, **kw):
     raiden_payment = kw["payment"]
 
-    order = PaymentOrder.objects.filter(
-        payment_method__identifier=raiden_payment.identifier,
-        payment_method__raiden=raiden_payment.channel.raiden,
+    payment_route = RaidenPaymentRoute.objects.filter(
+        identifier=raiden_payment.identifier, raiden=raiden_payment.channel.raiden,
     ).first()
 
-    if order is not None:
+    if payment_route is not None:
         amount = raiden_payment.as_token_amount
         payment = RaidenPayment.objects.create(
-            order=order,
+            route=payment_route,
             amount=amount.amount,
             currency=raiden_payment.token,
             payment=raiden_payment,
@@ -104,41 +147,56 @@ def on_raiden_payment_received_check_raiden_payments(sender, **kw):
 
 
 @receiver(post_save, sender=PaymentOrder)
-def on_order_created_set_payment_methods(sender, **kw):
+@receiver(post_save, sender=Checkout)
+def on_order_created_set_blockchain_route(sender, **kw):
+
+    if not kw["created"]:
+        return
+
     order = kw["instance"]
-    if kw["created"]:
-        unlocked_wallets = Wallet.objects.filter(paymentordermethod__isnull=True)
-        wallet = unlocked_wallets.order_by("?").first() or Wallet.generate()
+    if order.chain.synced:
+        current_block = order.chain.highest_block
+        expiration_block = current_block + app_settings.Payment.blockchain_route_lifetime
 
-        raiden = Raiden.objects.filter(token_networks__token=order.currency).first()
-        expiration_time = order.created + datetime.timedelta(
-            seconds=PaymentOrderMethod.EXPIRATION_TIME
+        payment_window = (current_block, expiration_block)
+
+        available_wallets = Wallet.objects.exclude(
+            payment_routes__payment_window__overlap=NumericRange(*payment_window)
         )
 
-        PaymentOrderMethod.objects.create(
-            order=order, wallet=wallet, raiden=raiden, expiration_time=expiration_time
+        wallet = available_wallets.order_by("?").first() or Wallet.generate()
+        BlockchainPaymentRoute.objects.create(
+            order=order, wallet=wallet, payment_window=payment_window
         )
+    else:
+        logger.warning("Failed to create blockchain route. Chain data not synced")
 
 
 @receiver(post_save, sender=PaymentOrder)
+@receiver(post_save, sender=Checkout)
+def on_order_created_set_raiden_route(sender, **kw):
+
+    if not kw["created"]:
+        return
+
+    with transaction.atomic():
+        order = kw["instance"]
+        raiden = Raiden.objects.filter(token_networks__token=order.currency).first()
+
+        if raiden:
+            raiden.payment_routes.create(order=order)
+
+
+@receiver(post_save, sender=PaymentOrder)
+@receiver(post_save, sender=Checkout)
 def on_payment_created_set_created_status(sender, **kw):
-    payment = kw["instance"]
-    if payment.created:
-        payment.events.create(status=PAYMENT_EVENT_TYPES.requested)
-
-
-@receiver(post_save, sender=PaymentOrderMethod)
-def on_payment_order_method_created_schedule_expiration_task(sender, **kw):
-    payment_method = kw["instance"]
     if kw["created"]:
-
-        tasks.expire_payment_method.apply_async(
-            args=(payment_method.id,), eta=payment_method.expiration_time
-        )
+        order = kw["instance"]
+        order.events.create(status=PAYMENT_EVENT_TYPES.requested)
 
 
 @receiver(post_save, sender=PaymentOrderEvent)
-def on_payment_event_created_send_order_paid_signal(sender, **kw):
+def on_payment_confirmed_send_order_paid_signal(sender, **kw):
     payment_event = kw["instance"]
     if payment_event.created and payment_event.status == PAYMENT_EVENT_TYPES.confirmed:
         order_paid.send(sender=PaymentOrder, payment_order=payment_event.order)
@@ -167,6 +225,7 @@ def on_block_added_check_confirmed_payments(sender, **kw):
     created = kw["created"]
 
     block_number_to_confirm = block.number - app_settings.Payment.minimum_confirmations
+
     if created and block_number_to_confirm >= 0:
         payments = BlockchainPayment.objects.all()
 
@@ -201,22 +260,21 @@ def on_block_added_check_confirmed_transfers(sender, **kw):
 def on_payment_received_update_status(sender, **kw):
     payment = kw["payment"]
     logger.info(f"Processing payment {payment} received")
-    payment.order.update_status()
-    payment.order.maybe_finalize()
+    payment.route.order.update_status()
+    payment.route.order.maybe_finalize()
 
 
 @receiver(payment_received, sender=BlockchainPayment)
 def on_blockchain_payment_received_maybe_publish_checkout(sender, **kw):
     payment = kw["payment"]
 
-    checkouts = Checkout.objects.filter(payment_order__payment=payment)
-    checkout_id = checkouts.values_list("id", flat=True).first()
+    checkout = Checkout.objects.filter(routes__payment=payment).first()
 
-    if checkout_id is None:
+    if not checkout:
         return
 
     tasks.publish_checkout_event.delay(
-        checkout_id,
+        checkout.id,
         amount=payment.amount,
         token=payment.currency.address,
         identifier=payment.transaction.hash.hex(),
@@ -231,17 +289,17 @@ def on_blockchain_payment_received_maybe_publish_checkout(sender, **kw):
 def on_payment_confirmed_publish_checkout(sender, **kw):
     payment = kw["payment"]
 
-    checkouts = Checkout.objects.filter(payment_order__payment=payment)
+    checkouts = Checkout.objects.filter(routes__payment=payment)
     checkout_id = checkouts.values_list("id", flat=True).first()
+
+    if checkout_id is None:
+        return
 
     payment_method = {
         InternalPayment: PAYMENT_METHODS.internal,
         BlockchainPayment: PAYMENT_METHODS.blockchain,
         RaidenPayment: PAYMENT_METHODS.raiden,
     }.get(sender)
-
-    if checkout_id is None:
-        return
 
     tasks.publish_checkout_event.delay(
         checkout_id,
@@ -257,7 +315,7 @@ def on_payment_confirmed_publish_checkout(sender, **kw):
 def on_payment_confirmed_finalize(sender, **kw):
     payment = kw["payment"]
     logger.info(f"Processing payment {payment} confirmed")
-    payment.order.maybe_finalize()
+    payment.route.order.maybe_finalize()
 
 
 @receiver(order_paid, sender=PaymentOrder)
@@ -265,19 +323,6 @@ def on_order_paid_credit_user(sender, **kw):
     order = kw["payment_order"]
 
     order.user.balance_entries.create(amount=order.amount, currency=order.currency)
-
-
-@receiver(order_paid, sender=PaymentOrder)
-@receiver(order_canceled, sender=PaymentOrder)
-def on_order_finalized_free_payment_channels(sender, **kw):
-    order = kw["payment_order"]
-
-    try:
-        order.payment_method.delete()
-    except PaymentOrder.payment_method.RelatedObjectDoesNotExist:
-        pass
-    except Exception as exc:
-        logger.exception(exc)
 
 
 @receiver(post_save, sender=InternalTransfer)
@@ -335,27 +380,29 @@ def on_store_created_generate_key_pair(sender, **kw):
 
 
 __all__ = [
+    "on_blockchain_node_ok_send_open_checkout_events",
+    "on_blockchain_node_error_send_open_checkout_events",
     "on_account_deposit_check_blockchain_payments",
     "on_blockchain_payment_sent_maybe_publish_checkout",
-    "on_blockchain_payment_received_maybe_publish_checkout",
+    "on_raiden_payment_received_check_raiden_payments",
+    "on_order_created_set_blockchain_route",
+    "on_order_created_set_raiden_route",
+    "on_payment_created_set_created_status",
+    "on_payment_confirmed_send_order_paid_signal",
+    "on_payment_order_canceled_event_send_order_canceled_signal",
+    "on_payment_order_expired_event_maybe_publish_checkout",
     "on_block_added_check_confirmed_payments",
     "on_block_added_check_confirmed_transfers",
-    "on_payment_created_set_created_status",
-    "on_payment_order_method_created_schedule_expiration_task",
-    "on_payment_event_created_send_order_paid_signal",
-    "on_payment_order_expired_event_maybe_publish_checkout",
     "on_payment_received_update_status",
-    "on_payment_confirmed_finalize",
+    "on_blockchain_payment_received_maybe_publish_checkout",
     "on_payment_confirmed_publish_checkout",
-    "on_payment_order_canceled_event_send_order_canceled_signal",
+    "on_payment_confirmed_finalize",
     "on_order_paid_credit_user",
-    "on_order_finalized_free_payment_channels",
-    "on_order_created_set_payment_methods",
     "on_transfer_created_mark_transfer_scheduled",
     "on_transfer_failed_mark_as_failed",
     "on_transfer_confirmed_mark_as_confirmed",
-    "on_internal_transfer_confirmed_move_balances",
     "on_external_transfer_executed_mark_as_executed",
     "on_external_transfer_confirmed_destroy_reserve",
+    "on_internal_transfer_confirmed_move_balances",
     "on_store_created_generate_key_pair",
 ]

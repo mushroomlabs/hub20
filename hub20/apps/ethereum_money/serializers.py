@@ -3,7 +3,6 @@ from rest_framework import serializers
 from hub20.apps.blockchain.app_settings import CHAIN_ID
 
 from . import models
-from .app_settings import TRACKED_TOKENS
 
 
 class TokenValueField(serializers.DecimalField):
@@ -14,7 +13,7 @@ class TokenValueField(serializers.DecimalField):
 
 
 class CurrencyRelatedField(serializers.SlugRelatedField):
-    queryset = models.EthereumToken.objects.filter(chain=CHAIN_ID, address__in=TRACKED_TOKENS)
+    queryset = models.EthereumToken.objects.filter(chain_id=CHAIN_ID)
 
     def __init__(self, *args, **kw):
         kw.setdefault("slug_field", "address")
@@ -22,7 +21,7 @@ class CurrencyRelatedField(serializers.SlugRelatedField):
 
 
 class EthereumTokenSerializer(serializers.ModelSerializer):
-    network_id = serializers.IntegerField(source="chain")
+    network_id = serializers.IntegerField(source="chain_id")
 
     class Meta:
         model = models.EthereumToken

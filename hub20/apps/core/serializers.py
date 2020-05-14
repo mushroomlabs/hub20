@@ -113,16 +113,39 @@ class TransferSerializer(serializers.ModelSerializer):
         read_only_fields = ("recipient", "status", "target")
 
 
-class PaymentOrderMethodSerializer(serializers.ModelSerializer):
-    blockchain = EthereumAddressField(source="wallet.address", read_only=True)
-    raiden = EthereumAddressField(source="raiden.address", read_only=True)
-    identifier = serializers.IntegerField(read_only=True)
-    expiration_time = serializers.DateTimeField(read_only=True)
+class PaymentRouteSerializer(serializers.ModelSerializer):
+    type = serializers.CharField(source="name", read_only=True)
+
+
+class InternalPaymentRouteSerializer(PaymentRouteSerializer):
+    class Meta:
+        model = models.InternalPaymentRoute
+        fields = read_only_fields = ("recipient", "type")
+
+
+class BlockchainPaymentRouteSerializer(PaymentRouteSerializer):
+    address = EthereumAddressField(source="wallet.address", read_only=True)
+    network_id = serializers.IntegerField(source="order.chain_id", read_only=True)
+    start_block = serializers.IntegerField(source="start_block_number", read_only=True)
+    expiration_block = serializers.IntegerField(source="expiration_block_number", read_only=True)
 
     class Meta:
-        model = models.PaymentOrderMethod
-        fields = ("blockchain", "raiden", "identifier", "expiration_time")
-        read_only_fields = ("blockchain", "raiden", "identifier", "expiration_time")
+        model = models.BlockchainPaymentRoute
+        fields = read_only_fields = (
+            "address",
+            "network_id",
+            "start_block",
+            "expiration_block",
+            "type",
+        )
+
+
+class RaidenPaymentRouteSerializer(PaymentRouteSerializer):
+    address = EthereumAddressField(source="raiden.address", read_only=True)
+
+    class Meta:
+        model = models.RaidenPaymentRoute
+        fields = read_only_fields = ("address", "identifier", "expiration_time", "type")
 
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -174,14 +197,25 @@ class RaidenPaymentSerializer(PaymentSerializer):
 
 class PaymentOrderSerializer(serializers.ModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="hub20:payment-order-detail")
-    currency = CurrencyRelatedField()
-    payment_method = PaymentOrderMethodSerializer(read_only=True)
+    amount = TokenValueField()
+    token = CurrencyRelatedField(source="currency")
+    routes = serializers.SerializerMethodField()
     payments = serializers.SerializerMethodField()
 
     def create(self, validated_data: Dict) -> models.PaymentOrder:
         request = self.context["request"]
         with transaction.atomic():
             return models.PaymentOrder.objects.create(user=request.user, **validated_data)
+
+    def get_routes(self, obj):
+        def get_route_serializer(route):
+            return {
+                models.InternalPaymentRoute: InternalPaymentRouteSerializer,
+                models.BlockchainPaymentRoute: BlockchainPaymentRouteSerializer,
+                models.RaidenPaymentRoute: RaidenPaymentRouteSerializer,
+            }.get(type(route), PaymentRouteSerializer)(route, context=self.context)
+
+        return [get_route_serializer(route).data for route in obj.routes.select_subclasses()]
 
     def get_payments(self, obj):
         def get_payment_serializer(payment):
@@ -195,8 +229,8 @@ class PaymentOrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.PaymentOrder
-        fields = ["url", "amount", "currency", "created", "payment_method", "payments", "status"]
-        read_only_fields = ["payment_method", "status", "created"]
+        fields = ("url", "id", "amount", "token", "created", "routes", "payments", "status")
+        read_only_fields = ("status", "created")
 
 
 class PaymentOrderReadSerializer(PaymentOrderSerializer):
@@ -204,39 +238,31 @@ class PaymentOrderReadSerializer(PaymentOrderSerializer):
     currency = EthereumTokenSerializer(read_only=True)
 
 
-class CheckoutSerializer(serializers.ModelSerializer):
+class CheckoutSerializer(PaymentOrderSerializer):
     store = serializers.PrimaryKeyRelatedField(queryset=models.Store.objects.all())
-    token = CurrencyRelatedField(source="payment_order.currency")
-    amount = TokenValueField(source="payment_order.amount")
-    status = serializers.CharField(source="payment_order.status", read_only=True)
-    payment_method = PaymentOrderMethodSerializer(
-        source="payment_order.payment_method", read_only=True
-    )
-    payments = PaymentSerializer(many=True, source="payment_order.payments", read_only=True)
     voucher = serializers.SerializerMethodField()
 
     def validate(self, data):
-        token = data["payment_order"]["currency"]
+        currency = data["currency"]
         store = data["store"]
-        if token not in store.accepted_currencies.all():
-            raise serializers.ValidationError(f"{token.code} is not accepted at {store.name}")
+        if currency not in store.accepted_currencies.all():
+            raise serializers.ValidationError(f"{currency.code} is not accepted at {store.name}")
 
         return data
 
     def create(self, validated_data):
         request = self.context.get("request")
         client_ip, _ = get_client_ip(request)
-        store = validated_data["store"]
-        with transaction.atomic():
-            payment_order = models.PaymentOrder.objects.create(
-                user=store.owner, **validated_data["payment_order"]
-            )
+        store = validated_data.pop("store")
+        currency = validated_data["currency"]
 
+        with transaction.atomic():
             return models.Checkout.objects.create(
                 store=store,
-                external_identifier=validated_data["external_identifier"],
-                payment_order=payment_order,
+                user=store.owner,
                 requester_ip=client_ip,
+                chain=currency.chain,
+                **validated_data,
             )
 
     def get_voucher(self, obj):
@@ -246,17 +272,17 @@ class CheckoutSerializer(serializers.ModelSerializer):
         model = models.Checkout
         fields = (
             "id",
-            "created",
-            "store",
-            "external_identifier",
-            "token",
             "amount",
-            "payment_method",
+            "token",
+            "created",
+            "routes",
             "payments",
             "status",
+            "store",
+            "external_identifier",
             "voucher",
         )
-        read_only_fields = ("id",)
+        read_only_fields = ("id", "created", "status", "voucher")
 
 
 class HttpCheckoutSerializer(CheckoutSerializer):

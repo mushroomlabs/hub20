@@ -3,6 +3,8 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from hub20.apps.core import factories
+from hub20.apps.core.models import Checkout
+from hub20.apps.ethereum_money.factories import Erc20TokenAmountFactory, Erc20TokenFactory
 
 
 class StoreViewTestCase(TestCase):
@@ -20,13 +22,30 @@ class StoreViewTestCase(TestCase):
 
 class CheckoutViewTestCase(TestCase):
     def setUp(self):
-        self.checkout = factories.CheckoutFactory()
+        self.token = Erc20TokenFactory()
+        self.store = factories.StoreFactory(accepted_currencies=[self.token])
+
+    def test_can_create_checkout_via_api(self):
+        amount = Erc20TokenAmountFactory(currency=self.token)
+
+        url = reverse("hub20:checkout-list")
+        post_data = {
+            "amount": amount.amount,
+            "token": amount.currency.address,
+            "store": self.store.id,
+            "external_identifier": "API Test",
+        }
+
+        response = self.client.post(url, post_data)
+        self.assertEqual(response.status_code, 201, response.data)
 
     def test_delete_request_cancels_order(self):
-        url = reverse("hub20:checkout-detail", kwargs={"pk": self.checkout.pk})
+        checkout = factories.CheckoutFactory(store=self.store)
+        url = reverse("hub20:checkout-detail", kwargs={"pk": checkout.pk})
         response = self.client.delete(url)
-        self.checkout.refresh_from_db()
-        self.assertIsNone(response.data["payment_method"])
+        checkout.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], Checkout.STATUS.canceled)
 
 
-__all__ = ["StoreViewTestCase"]
+__all__ = ["StoreViewTestCase", "CheckoutViewTestCase"]

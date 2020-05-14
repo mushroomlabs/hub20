@@ -1,22 +1,33 @@
+import logging
 import random
 import uuid
 
 from django.conf import settings
+from django.contrib.postgres.fields.ranges import IntegerRangeField
 from django.db import models
-from django.db.models import Sum
+from django.db.models import Max, OuterRef, Subquery, Sum
+from model_utils.fields import StatusField
 from model_utils.managers import InheritanceManager
-from model_utils.models import StatusModel, TimeStampedModel
+from model_utils.models import TimeStampedModel
 
-from hub20.apps.blockchain.models import Transaction
+from hub20.apps.blockchain.models import Chain, Transaction
 from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.models import EthereumTokenValueModel
 from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
 
-from ..settings import app_settings
 from ..choices import PAYMENT_EVENT_TYPES
+from ..settings import app_settings
 from .accounting import Wallet
 
 EthereumAccount = get_ethereum_account_model()
+logger = logging.getLogger(__name__)
+
+
+PAYMENT_OPEN_STATES = [
+    PAYMENT_EVENT_TYPES.requested,
+    PAYMENT_EVENT_TYPES.partial,
+    PAYMENT_EVENT_TYPES.received,
+]
 
 
 def generate_payment_order_id():
@@ -25,14 +36,36 @@ def generate_payment_order_id():
     return random.randint(1, 2 ** 53 - 1)
 
 
+def calculate_blockchain_payment_window(chain):
+    if not chain.synced:
+        raise ValueError("Chain is not synced")
+
+    current = chain.highest_block
+    return (current, current + app_settings.Payment.blockchain_route_lifetime)
+
+
+class PaymentOrderQuerySet(models.QuerySet):
+    def open(self):
+        sqs = PaymentOrderEvent.objects.filter(order=OuterRef("pk")).annotate(when=Max("created"))
+        qs = self.annotate(last_event=Subquery(sqs.values("status")))
+        return qs.filter(last_event__in=PAYMENT_OPEN_STATES)
+
+    def with_blockchain_route(self, block_number):
+        return self.filter(routes__blockchainpaymentroute__payment_window__contains=block_number)
+
+
 class PaymentOrder(TimeStampedModel, EthereumTokenValueModel):
 
     STATUS = PAYMENT_EVENT_TYPES
+
+    id = models.UUIDField(default=uuid.uuid4, primary_key=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    chain = models.ForeignKey(Chain, on_delete=models.CASCADE)
+    objects = PaymentOrderQuerySet.as_manager()
 
     @property
     def payments(self):
-        return self.payment_set.filter(currency=self.currency).select_subclasses()
+        return Payment.objects.filter(route__order=self).select_subclasses()
 
     @property
     def total_transferred(self):
@@ -55,12 +88,7 @@ class PaymentOrder(TimeStampedModel, EthereumTokenValueModel):
 
     @property
     def is_finalized(self):
-        return self.status not in [
-            self.STATUS.requested,
-            self.STATUS.partial,
-            self.STATUS.expired,
-            self.STATUS.received,
-        ]
+        return self.status not in PAYMENT_OPEN_STATES
 
     def update_status(self):
         if self.is_finalized:
@@ -80,6 +108,7 @@ class PaymentOrder(TimeStampedModel, EthereumTokenValueModel):
         if self.is_finalized:
             return
 
+        logger.debug(f"Confirmed {self.total_confirmed} / {self.amount}")
         if self.total_confirmed >= self.amount:
             self.events.create(status=self.STATUS.confirmed)
 
@@ -90,45 +119,72 @@ class PaymentOrder(TimeStampedModel, EthereumTokenValueModel):
         self.events.create(status=self.STATUS.canceled)
 
 
-class PaymentOrderMethod(TimeStampedModel):
-    EXPIRATION_TIME = app_settings.Payment.lifetime
-
-    order = models.OneToOneField(
-        PaymentOrder, on_delete=models.CASCADE, related_name="payment_method"
-    )
-    expiration_time = models.DateTimeField()
-    wallet = models.OneToOneField(Wallet, on_delete=models.CASCADE)
-    raiden = models.ForeignKey(Raiden, null=True, on_delete=models.SET_NULL)
-    identifier = models.BigIntegerField(default=generate_payment_order_id, unique=True)
-
-
-class PaymentOrderEvent(TimeStampedModel, StatusModel):
+class PaymentOrderEvent(TimeStampedModel):
     STATUS = PAYMENT_EVENT_TYPES
     order = models.ForeignKey(PaymentOrder, on_delete=models.PROTECT, related_name="events")
+    status = StatusField()
 
     class Meta:
         get_latest_by = "created"
-        unique_together = ("order", "status")
+
+
+class PaymentRoute(TimeStampedModel):
+    NAME = None
+
+    order = models.ForeignKey(PaymentOrder, on_delete=models.CASCADE, related_name="routes")
+    objects = InheritanceManager()
+
+    @property
+    def name(self):
+        return self.get_route_name()
+
+    def get_route_name(self):
+        if not self.NAME:
+            route = PaymentRoute.objects.get_subclass(id=self.id)
+            return route.NAME
+        return self.NAME
+
+
+class InternalPaymentRoute(PaymentRoute):
+    NAME = "internal"
+
+
+class BlockchainPaymentRoute(PaymentRoute):
+    NAME = "blockchain"
+
+    wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name="payment_routes")
+    payment_window = IntegerRangeField(default=calculate_blockchain_payment_window)
+
+    @property
+    def start_block_number(self):
+        return self.payment_window.lower
+
+    @property
+    def expiration_block_number(self):
+        return self.payment_window.upper
+
+
+class RaidenPaymentRoute(PaymentRoute):
+    NAME = "raiden"
+
+    raiden = models.ForeignKey(Raiden, on_delete=models.CASCADE, related_name="payment_routes")
+    identifier = models.BigIntegerField(default=generate_payment_order_id, unique=True)
+
+    class Meta:
+        unique_together = ("raiden", "identifier")
 
 
 class Payment(TimeStampedModel, EthereumTokenValueModel):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4)
-    order = models.ForeignKey(PaymentOrder, on_delete=models.PROTECT)
+    route = models.ForeignKey(PaymentRoute, on_delete=models.PROTECT)
     objects = InheritanceManager()
 
     @property
     def is_confirmed(self):
         return True
 
-    @property
-    def route(self):
-        return self.__class__.ROUTE
-
 
 class InternalPayment(Payment):
-    ROUTE = "internal"
-
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
     memo = models.TextField(null=True, blank=True)
 
     @property
@@ -137,12 +193,11 @@ class InternalPayment(Payment):
 
 
 class BlockchainPayment(Payment):
-    ROUTE = "blockchain"
-
     transaction = models.OneToOneField(Transaction, on_delete=models.CASCADE)
 
     @property
     def is_confirmed(self):
+        logger.debug(f"{self} confirmations: {self.transaction.block.confirmations}")
         return self.transaction.block.confirmations >= app_settings.Payment.minimum_confirmations
 
     @property
@@ -151,9 +206,7 @@ class BlockchainPayment(Payment):
 
 
 class RaidenPayment(Payment):
-    ROUTE = "raiden"
-
-    payment = models.OneToOneField(RaidenPaymentEvent, on_delete=models.PROTECT)
+    payment = models.OneToOneField(RaidenPaymentEvent, on_delete=models.CASCADE)
 
     @property
     def identifier(self):
@@ -162,7 +215,10 @@ class RaidenPayment(Payment):
 
 __all__ = [
     "PaymentOrder",
-    "PaymentOrderMethod",
+    "PaymentRoute",
+    "InternalPaymentRoute",
+    "BlockchainPaymentRoute",
+    "RaidenPaymentRoute",
     "PaymentOrderEvent",
     "Payment",
     "InternalPayment",

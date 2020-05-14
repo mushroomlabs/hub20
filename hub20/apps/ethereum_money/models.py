@@ -16,18 +16,17 @@ from ethtoken.abi import EIP20_ABI
 from model_utils.managers import QueryManager
 from web3 import Web3
 
-from hub20.apps.blockchain.app_settings import CHAIN_ID
-from hub20.apps.blockchain.choices import ETHEREUM_CHAINS
 from hub20.apps.blockchain.fields import EthereumAddressField, HexField
-from hub20.apps.blockchain.models import Transaction, make_web3
+from hub20.apps.blockchain.models import Chain, Transaction
 from hub20.apps.ethereum_money.app_settings import TRANSFER_GAS_LIMIT
 
 logger = logging.getLogger(__name__)
 
 
 def get_max_fee() -> EthereumTokenAmount:
-    w3 = make_web3()
-    ETH = EthereumToken.ETH(chain_id=int(w3.net.version))
+    chain = Chain.make()
+    w3 = chain.get_web3()
+    ETH = EthereumToken.ETH(chain=chain)
 
     gas_price = w3.eth.generateGasPrice()
     return ETH.from_wei(TRANSFER_GAS_LIMIT * gas_price)
@@ -56,7 +55,8 @@ class EthereumAccount(AbstractEthereumAccount):
     private_key = HexField(max_length=64, unique=True)
 
     def send(self, recipient_address, transfer_amount: EthereumTokenAmount, *args, **kw) -> str:
-        w3 = make_web3()
+        chain = Chain.make()
+        w3 = chain.get_web3()
         transaction_data = transfer_amount.currency.build_transfer_transaction(
             w3=w3, sender=self.address, recipient=recipient_address, amount=transfer_amount
         )
@@ -64,7 +64,8 @@ class EthereumAccount(AbstractEthereumAccount):
         return w3.eth.sendRawTransaction(signed_tx.rawTransaction)
 
     def sign_transaction(self, transaction_data, *args, **kw):
-        w3 = kw.get("w3") or make_web3()
+        chain = Chain.make()
+        w3 = chain.get_web3()
         return w3.eth.account.signTransaction(transaction_data, self.private_key)
 
     @classmethod
@@ -77,7 +78,7 @@ class EthereumAccount(AbstractEthereumAccount):
 
 class EthereumToken(models.Model):
     NULL_ADDRESS = "0x0000000000000000000000000000000000000000"
-    chain = models.PositiveIntegerField(choices=ETHEREUM_CHAINS)
+    chain = models.ForeignKey(Chain, on_delete=models.CASCADE, related_name="tokens")
     code = models.CharField(max_length=8)
     name = models.CharField(max_length=500)
     decimals = models.PositiveIntegerField(default=18)
@@ -96,14 +97,14 @@ class EthereumToken(models.Model):
         if self.is_ERC20:
             components.append(self.address)
 
-        components.append(self.get_chain_display())
+        components.append(str(self.chain_id))
         return " - ".join(components)
 
     def build_transfer_transaction(self, w3: Web3, sender, recipient, amount: EthereumTokenAmount):
 
         chain_id = int(w3.net.version)
-        message = f"Web3 client is on network {chain_id}, token {self.code} is on {self.chain}"
-        assert self.chain == chain_id, message
+        message = f"Web3 client is on network {chain_id}, token {self.code} is on {self.chain_id}"
+        assert self.chain_id == chain_id, message
 
         transaction_params = {
             "chainId": chain_id,
@@ -152,27 +153,22 @@ class EthereumToken(models.Model):
         return EthereumTokenAmount(amount=value, currency=self)
 
     @staticmethod
-    def ETH(chain_id: int):
+    def ETH(chain: Chain):
         eth, _ = EthereumToken.objects.get_or_create(
-            chain=chain_id, code="ETH", defaults={"name": "Ethereum"}
+            chain=chain, code="ETH", defaults={"name": "Ethereum"}
         )
         return eth
 
     @classmethod
-    def make(cls, address: str, chain_id: int = CHAIN_ID):
-        if chain_id != CHAIN_ID:
-            raise ValueError(
-                f"Can not make token on chain {chain_id} while connected to {CHAIN_ID}"
-            )
-
+    def make(cls, address: str, chain: Chain):
         if address == EthereumToken.NULL_ADDRESS:
-            return EthereumToken.ETH(chain_id)
+            return EthereumToken.ETH(chain)
 
         proxy = token(address)
 
         obj, _ = cls.objects.update_or_create(
             address=address,
-            chain=chain_id,
+            chain=chain,
             defaults={"name": proxy.name(), "code": proxy.symbol(), "decimals": proxy.decimals()},
         )
         return obj
