@@ -145,7 +145,7 @@ class RaidenPaymentRouteSerializer(PaymentRouteSerializer):
 
     class Meta:
         model = models.RaidenPaymentRoute
-        fields = read_only_fields = ("address", "identifier", "expiration_time", "type")
+        fields = read_only_fields = ("address", "identifier", "type")
 
 
 class PaymentSerializer(serializers.ModelSerializer):

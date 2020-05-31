@@ -13,17 +13,18 @@ from hub20.apps.raiden.contracts import get_token_network_registry_contract
 logger = logging.getLogger(__name__)
 
 
-def sync_token_networks(client: RaidenClient, w3: Web3):
+def sync_token_networks(client: RaidenClient, chain: Chain):
     logger.info("Updating Token Networks")
-    chain_id = int(w3.net.version)
     known_tokens = client.raiden.token_networks.values_list("token__address", flat=True)
+
+    w3: Web3 = chain.get_web3()
 
     for token_address in client.get_token_addresses():
         if token_address in known_tokens:
             continue
 
         logger.info(f"Getting information about token on {token_address}")
-        token = EthereumToken.make(token_address, chain_id)
+        token = EthereumToken.make(token_address, chain)
         token_network_registry_contract = get_token_network_registry_contract(w3)
         token_network = models.TokenNetwork.make(token, token_network_registry_contract)
         client.raiden.token_networks.add(token_network)
@@ -48,13 +49,12 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         chain = Chain.make()
-        w3 = chain.get_web3()
 
         while True:
             for raiden in models.Raiden.objects.all():
                 client = RaidenClient(raiden)
                 try:
-                    sync_token_networks(client, w3)
+                    sync_token_networks(client, chain)
                     sync_channels(client)
                     sync_payments(client)
                 except RaidenConnectionError as exc:

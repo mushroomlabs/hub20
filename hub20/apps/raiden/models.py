@@ -77,7 +77,7 @@ class TokenNetwork(models.Model):
         return token_network
 
     def __str__(self):
-        return f"{self.address} - ({self.token.get_chain_display()} {self.token.code})"
+        return f"{self.address} - ({self.token.code} @ {self.token.chain_id})"
 
 
 class TokenNetworkChannel(models.Model):
