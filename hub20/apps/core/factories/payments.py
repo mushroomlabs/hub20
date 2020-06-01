@@ -1,13 +1,13 @@
 import factory
 from factory import fuzzy
 
-from hub20.apps.blockchain.factories import EthereumProvider, SyncedChainFactory
-from hub20.apps.core import models
-from hub20.apps.ethereum_money.factories import (
-    Erc20TokenFactory,
-    EthereumAccountFactory,
-    ETHFactory,
+from hub20.apps.blockchain.factories import (
+    EthereumProvider,
+    SyncedChainFactory,
+    TransactionFactory,
 )
+from hub20.apps.core import models
+from hub20.apps.ethereum_money.factories import Erc20TokenFactory, ETHFactory
 
 from .base import UserFactory
 
@@ -38,11 +38,16 @@ class Erc20TokenPaymentOrderFactory(PaymentOrderFactory):
         model = models.PaymentOrder
 
 
-class BlockchainPaymentFactory(factory.django.DjangoModelFactory):
+class BlockchainPaymentRouteFactory(factory.django.DjangoModelFactory):
     order = factory.SubFactory(ETHPaymentOrderFactory)
-    account = factory.SubFactory(EthereumAccountFactory)
-    amount = factory.LazyAttribute(lambda obj: obj.order.amount)
-    currency = factory.LazyAttribute(lambda obj: obj.order.currency)
+
+    class Meta:
+        model = models.BlockchainPaymentRoute
+
+
+class BlockchainPaymentFactory(factory.django.DjangoModelFactory):
+    route = factory.SubFactory(BlockchainPaymentRouteFactory)
+    transaction = factory.SubFactory(TransactionFactory)
 
     class Meta:
         model = models.BlockchainPayment

@@ -33,7 +33,7 @@ def check_transaction_for_erc20_transfer(
 
     try:
         tx = w3.eth.getTransaction(tx_hash)
-        tokens = EthereumToken.objects.filter(chain=chain.id, address__in=token_addresses)
+        tokens = EthereumToken.objects.filter(chain=chain, address__in=token_addresses)
         for token in tokens:
             logger.info(f"Processing {token.code} transaction: {tx_hash}")
             contract = w3.eth.contract(abi=EIP20_ABI, address=token.address)

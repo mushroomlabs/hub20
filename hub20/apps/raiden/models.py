@@ -13,6 +13,7 @@ from raiden_contracts.contract_manager import (
     contracts_precompiled_path,
     get_contracts_deployment_info,
 )
+from raiden_contracts.utils.type_aliases import ChainID
 from web3 import Web3
 from web3.contract import Contract
 
@@ -32,7 +33,7 @@ def get_token_network_registry_contract(w3: Web3):
     chain_id = int(w3.net.version)
     manager = ContractManager(contracts_precompiled_path())
 
-    contract_data = get_contracts_deployment_info(chain_id)
+    contract_data = get_contracts_deployment_info(ChainID(chain_id))
     assert contract_data
     address = contract_data["contracts"][CONTRACT_TOKEN_NETWORK_REGISTRY]["address"]
 

@@ -1,5 +1,6 @@
 import datetime
 import logging
+from typing import Dict, Union
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -11,6 +12,7 @@ from django.utils import timezone
 from web3 import Web3
 from web3.middleware import geth_poa_middleware
 from web3.providers import HTTPProvider, IPCProvider, WebsocketProvider
+from web3.types import BlockNumber, TxParams, Wei
 
 from .app_settings import CHAIN_ID, START_BLOCK_NUMBER
 from .choices import ETHEREUM_CHAINS
@@ -19,7 +21,7 @@ from .fields import EthereumAddressField, HexField, Uint256Field
 logger = logging.getLogger(__name__)
 
 
-def database_history_gas_price_strategy(w3: Web3, *args, **kw) -> int:
+def database_history_gas_price_strategy(w3: Web3, params: TxParams = None) -> Wei:
 
     BLOCK_HISTORY_SIZE = 100
     chain_id = int(w3.net.version)
@@ -29,7 +31,7 @@ def database_history_gas_price_strategy(w3: Web3, *args, **kw) -> int:
     txs = Transaction.objects.filter(
         block__chain=chain_id, block__number__gte=current_block_number - BLOCK_HISTORY_SIZE
     )
-    return int(txs.aggregate(avg_price=Avg("gas_price")).get("avg_price")) or default_price
+    return Wei(txs.aggregate(avg_price=Avg("gas_price")).get("avg_price")) or default_price
 
 
 class Chain(models.Model):
@@ -40,7 +42,7 @@ class Chain(models.Model):
     synced = models.BooleanField()
     highest_block = models.PositiveIntegerField()
 
-    _WEB3_CLIENTS = {}
+    _WEB3_CLIENTS: Dict[str, Web3] = {}
 
     def _make_web3(self) -> Web3:
         provider_class = {
@@ -124,10 +126,10 @@ class Block(models.Model):
 
     @classmethod
     @atomic()
-    def make_all(cls, block_number: int, chain: Chain):
+    def make_all(cls, block_number: Union[int, BlockNumber], chain: Chain):
         logger.info(f"Saving block {block_number}")
         w3 = chain.get_web3()
-        block_data = w3.eth.getBlock(block_number, full_transactions=True)
+        block_data = w3.eth.getBlock(BlockNumber(block_number), full_transactions=True)
 
         block = cls.make(block_data, chain)
 
@@ -169,6 +171,10 @@ class Transaction(models.Model):
     value = Uint256Field()
     data = models.TextField()
 
+    @property
+    def hash_hex(self):
+        return self.hash if type(self.hash) is str else self.hash.hex()
+
     @classmethod
     def make(cls, transaction_data, block: Block):
         tx, _ = cls.objects.get_or_create(
@@ -201,8 +207,7 @@ class Transaction(models.Model):
         return cls.objects.filter(block=block, hash=transaction_hash).first()
 
     def __str__(self) -> str:
-        hash_hex = self.hash if type(self.hash) is str else self.hash.hex()
-        return f"Tx {hash_hex}"
+        return f"Tx {self.hash_hex}"
 
 
 class TransactionLog(models.Model):

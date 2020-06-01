@@ -145,7 +145,7 @@ class RaidenPaymentRouteSerializer(PaymentRouteSerializer):
 
     class Meta:
         model = models.RaidenPaymentRoute
-        fields = read_only_fields = ("address", "identifier", "type")
+        fields = read_only_fields = ("address", "expiration_time", "identifier", "type")
 
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -153,19 +153,17 @@ class PaymentSerializer(serializers.ModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="hub20:payments-detail")
     currency = EthereumTokenSerializer()
     identifier = serializers.CharField()
-    confirmed = serializers.BooleanField(source="is_confirmed")
+    confirmed = serializers.BooleanField(source="is_confirmed", read_only=True)
 
     class Meta:
         model = models.Payment
-        fields = ("id", "url", "created", "currency", "amount", "identifier", "route", "confirmed")
-        read_only_fields = (
+        fields = read_only_fields = (
             "id",
             "url",
             "created",
             "currency",
             "amount",
             "identifier",
-            "route",
             "confirmed",
         )
 
@@ -178,12 +176,13 @@ class InternalPaymentSerializer(serializers.ModelSerializer):
 
 
 class BlockchainPaymentSerializer(PaymentSerializer):
-    transaction = HexadecimalField(read_only=True, source="transaction.hash")
+    transaction = HexadecimalField(source="transaction.hash", read_only=True)
+    block = serializers.IntegerField(source="transaction.block.number", read_only=True)
 
     class Meta:
         model = models.BlockchainPayment
-        fields = PaymentSerializer.Meta.fields + ("transaction",)
-        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("transaction",)
+        fields = PaymentSerializer.Meta.fields + ("transaction", "block")
+        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("transaction", "block")
 
 
 class RaidenPaymentSerializer(PaymentSerializer):
@@ -230,7 +229,7 @@ class PaymentOrderSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.PaymentOrder
         fields = ("url", "id", "amount", "token", "created", "routes", "payments", "status")
-        read_only_fields = ("status", "created")
+        read_only_fields = ("id", "created", "status")
 
 
 class PaymentOrderReadSerializer(PaymentOrderSerializer):
@@ -270,19 +269,8 @@ class CheckoutSerializer(PaymentOrderSerializer):
 
     class Meta:
         model = models.Checkout
-        fields = (
-            "id",
-            "amount",
-            "token",
-            "created",
-            "routes",
-            "payments",
-            "status",
-            "store",
-            "external_identifier",
-            "voucher",
-        )
-        read_only_fields = ("id", "created", "status", "voucher")
+        fields = PaymentOrderSerializer.Meta.fields + ("store", "external_identifier", "voucher",)
+        read_only_fields = PaymentOrderSerializer.Meta.read_only_fields + ("voucher",)
 
 
 class HttpCheckoutSerializer(CheckoutSerializer):

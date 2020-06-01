@@ -3,8 +3,8 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from hub20.apps.core import factories
-from hub20.apps.core.models import Checkout
 from hub20.apps.ethereum_money.factories import Erc20TokenAmountFactory, Erc20TokenFactory
+from hub20.apps.ethereum_wallet.tests.base import add_eth_to_wallet
 
 
 class StoreViewTestCase(TestCase):
@@ -39,13 +39,26 @@ class CheckoutViewTestCase(TestCase):
         response = self.client.post(url, post_data)
         self.assertEqual(response.status_code, 201, response.data)
 
-    def test_delete_request_cancels_order(self):
+    def test_can_not_delete_checkout(self):
         checkout = factories.CheckoutFactory(store=self.store)
         url = reverse("hub20:checkout-detail", kwargs={"pk": checkout.pk})
         response = self.client.delete(url)
-        checkout.refresh_from_db()
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["status"], Checkout.STATUS.canceled)
+        self.assertEqual(response.status_code, 405)
+
+    def test_payment_serializer(self):
+        checkout = factories.CheckoutFactory(store=self.store)
+        route = checkout.routes.select_subclasses().first()
+        add_eth_to_wallet(route.wallet, amount=checkout.as_token_amount, chain=checkout.chain)
+
+        url = reverse("hub20:checkout-detail", kwargs={"pk": checkout.pk})
+        response = self.client.get(url)
+
+        self.assertEqual(len(response.data["payments"]), 1)
+
+        payment = response.data["payments"][0]
+
+        self.assertTrue("transaction" in payment)
+        self.assertTrue("block" in payment)
 
 
 __all__ = ["StoreViewTestCase", "CheckoutViewTestCase"]

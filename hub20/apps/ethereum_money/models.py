@@ -18,7 +18,8 @@ from web3 import Web3
 
 from hub20.apps.blockchain.fields import EthereumAddressField, HexField
 from hub20.apps.blockchain.models import Chain, Transaction
-from hub20.apps.ethereum_money.app_settings import TRANSFER_GAS_LIMIT
+
+from .app_settings import TRANSFER_GAS_LIMIT
 
 logger = logging.getLogger(__name__)
 

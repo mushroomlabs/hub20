@@ -7,6 +7,7 @@ from eth_utils import is_0x_prefixed
 from hub20.apps.blockchain.factories import TransactionFactory
 from hub20.apps.core.api import consumer_patterns
 from hub20.apps.core.factories import CheckoutFactory
+from hub20.apps.core.models import CheckoutEvents
 from hub20.apps.core.signals import blockchain_payment_sent
 from hub20.apps.ethereum_money.models import EthereumToken
 
@@ -37,16 +38,25 @@ async def test_checkout_consumer():
         sender=EthereumToken,
         amount=checkout.as_token_amount,
         recipient=wallet_address,
-        transaction_hash=tx.hash,
+        transaction_hash=tx.hash_hex,
     )
 
-    response = await communicator.receive_json_from()
-    assert "event" in response
-    assert "voucher" in response
-    assert "identifier" in response
+    messages = []
+    while not await communicator.receive_nothing():
+        messages.append(await communicator.receive_json_from())
 
-    assert is_0x_prefixed(response["identifier"])
-    assert response["event"] == "payment.sent"
+    assert len(messages) != 0, "we should have received something here"
+    payment_sent_event = CheckoutEvents.BLOCKCHAIN_TRANSFER_BROADCAST.value
+
+    payment_sent_messages = [msg for msg in messages if msg["event"] == payment_sent_event]
+    assert len(payment_sent_messages) == 1, "we should have received one payment received message"
+
+    payment_sent_message = payment_sent_messages[0]
+    assert "event" in payment_sent_message
+    assert "voucher" in payment_sent_message
+    assert "identifier" in payment_sent_message
+
+    assert is_0x_prefixed(payment_sent_message["identifier"])
 
 
 __all__ = ["test_checkout_consumer"]

@@ -42,7 +42,7 @@ def reload_settings(*args, **kw):
     global app_settings
     setting = kw["setting"]
     if setting == "HUB20":
-        app_settings.reload()
+        app_settings.load()
 
 
 setting_changed.connect(reload_settings)

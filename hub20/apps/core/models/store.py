@@ -17,9 +17,11 @@ from .payments import PaymentOrder
 class CheckoutEvents(Enum):
     BLOCKCHAIN_BLOCK_CREATED = "blockchain.block.created"
     BLOCKCHAIN_TRANSFER_BROADCAST = "blockchain.transfer.broadcast"
-    BLOCKCHAIN_TRANSFER_MINED = "blockchain.transfer.mined"
+    BLOCKCHAIN_TRANSFER_RECEIVED = "blockchain.transfer.received"
     BLOCKCHAIN_NODE_UNAVAILABLE = "blockchain.ethereum_node.unavailable"
     BLOCKCHAIN_NODE_OK = "blockchain.ethereum_node.ok"
+    BLOCKCHAIN_ROUTE_EXPIRED = "blockchain.payment_route.expired"
+    RAIDEN_ROUTE_EXPIRED = "raiden.payment_route.expired"
     RAIDEN_TRANSFER_RECEIVED = "raiden.transfer.received"
 
 
@@ -72,7 +74,7 @@ class Checkout(PaymentOrder):
             {
                 "iat": datetime.datetime.utcnow(),
                 "iss": self.external_identifier,
-                "status": self.status,
+                "checkout_id": str(self.id),
                 "token": {"symbol": self.currency.code, "address": self.currency.address},
                 "payments": [
                     {
@@ -86,7 +88,8 @@ class Checkout(PaymentOrder):
                 ],
                 "total_amount": str(self.amount),
                 "total_confirmed": str(self.total_confirmed),
-                "checkout_id": str(self.id),
+                "is_paid": self.is_paid,
+                "is_confirmed": self.is_confirmed,
             }
         )
 

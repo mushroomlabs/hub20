@@ -12,7 +12,7 @@ services:
       POSTGRES_USER: ${HUB20_DATABASE_USER}
       POSTGRES_PASSWORD: ${HUB20_DATABASE_PASSWORD}
 
-  # Redis for cache and session
+  # Redis for cache, session engine, celery and channels transport
   redis:
     image: redis:latest
 

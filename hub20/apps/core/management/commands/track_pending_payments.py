@@ -7,8 +7,7 @@ from django.core.management.base import BaseCommand
 
 from hub20.apps.blockchain.models import Chain, Transaction
 from hub20.apps.core import tasks
-from hub20.apps.core.models import Wallet
-from hub20.apps.ethereum_money.models import EthereumToken
+from hub20.apps.core.models import PaymentOrder
 
 logger = logging.getLogger(__name__)
 BLOCK_INTERVAL = 10
@@ -21,23 +20,26 @@ def track_pending_transactions():
     tx_filter = w3.eth.filter("pending")
 
     while True:
-        time.sleep(BLOCK_INTERVAL / 2)
+        chain.refresh_from_db()
 
-        current_block = chain.highest_block
-        wallets = Wallet.objects.filter(
-            blockchainpaymentroute__payment_window__contains=(current_block, current_block)
-        )
-        tokens = EthereumToken.ERC20tokens.filter(
-            chain=chain.id, paymentorder__payment_method__isnull=False
-        )
-
-        # Convert the querysets to lists of addresses
-        wallet_addresses = wallets.values_list("account__address", flat=True)[::1]
-        token_addresses = tokens.values_list("address", flat=True)[::1]
-
-        if not wallet_addresses:
-            logger.info("No open payment order...")
+        if not chain.synced:
+            logger.info("Chain not synced. Sleeping...")
+            time.sleep(BLOCK_INTERVAL)
             continue
+
+        open_orders = PaymentOrder.objects.unpaid().with_blockchain_route()
+
+        if not open_orders:
+            logger.info("No open payment order...")
+            time.sleep(BLOCK_INTERVAL / 2)
+            continue
+
+        logger.info(f"Looking for pending transactions from {chain.highest_block}")
+        # Convert the querysets to lists of addresses
+        wallet_addresses = open_orders.values_list(
+            "routes__blockchainpaymentroute__wallet__account__address", flat=True
+        ).distinct()[::1]
+        token_addresses = open_orders.values_list("currency__address", flat=True).distinct()[::1]
 
         try:
             expiration_time = datetime.datetime.now() + datetime.timedelta(seconds=BLOCK_INTERVAL)
@@ -61,6 +63,8 @@ def track_pending_transactions():
                     )
         except TimeoutError:
             logger.warn("Timeout error when getting new entries")
+
+        time.sleep(BLOCK_INTERVAL / 2)
 
 
 class Command(BaseCommand):

@@ -4,7 +4,7 @@ from django.db.models.query import QuerySet
 from django.http import Http404
 from django.shortcuts import get_object_or_404
 from rest_framework import generics
-from rest_framework.mixins import CreateModelMixin, DestroyModelMixin, RetrieveModelMixin
+from rest_framework.mixins import CreateModelMixin, RetrieveModelMixin
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.serializers import Serializer
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
@@ -67,11 +67,6 @@ class PaymentOrderView(BasePaymentOrderView, generics.RetrieveDestroyAPIView):
             models.PaymentOrder, pk=self.kwargs.get("pk"), user=self.request.user
         )
 
-    def destroy(self, request, *args, **kw):
-        obj = self.get_object()
-        obj.cancel()
-        return self.retrieve(request, *args, **kw)
-
 
 class TransferListView(generics.ListCreateAPIView):
     permission_classes = (IsAuthenticated,)
@@ -112,7 +107,7 @@ class TokenBalanceView(generics.RetrieveAPIView):
         return user_account.get_balance(token)
 
 
-class CheckoutViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin, DestroyModelMixin):
+class CheckoutViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
     permission_classes = (AllowAny,)
     serializer_class = serializers.HttpCheckoutSerializer
     lookup_value_regex = "[0-9a-f-]{36}"
@@ -122,11 +117,6 @@ class CheckoutViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin, Dest
 
     def get_object(self):
         return get_object_or_404(models.Checkout, id=self.kwargs["pk"])
-
-    def destroy(self, request, pk=None):
-        obj = self.get_object()
-        obj.cancel()
-        return self.retrieve(request, pk=pk)
 
 
 class PaymentViewSet(GenericViewSet, RetrieveModelMixin):

@@ -1,23 +1,15 @@
 import factory
 
 from hub20.apps.blockchain.factories import EthereumProvider
-from hub20.apps.ethereum_money.factories import (
-    EthereumTokenValueModelFactory,
-    Erc20TokenValueModelFactory,
-    EthereumAccountFactory,
-)
 from hub20.apps.core import models
+from hub20.apps.ethereum_money.factories import (
+    Erc20TokenValueModelFactory,
+    EthereumTokenValueModelFactory,
+)
+
 from .base import UserFactory
 
-
 factory.Faker.add_provider(EthereumProvider)
-
-
-class WalletFactory(factory.django.DjangoModelFactory):
-    account = factory.SubFactory(EthereumAccountFactory)
-
-    class Meta:
-        model = models.Wallet
 
 
 class EthereumUserBalanceEntryFactory(EthereumTokenValueModelFactory):
@@ -45,5 +37,4 @@ __all__ = [
     "EthereumUserBalanceEntryFactory",
     "Erc20TokenUserBalanceEntryFactory",
     "UserAccountFactory",
-    "WalletFactory",
 ]
