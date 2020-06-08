@@ -108,7 +108,7 @@ services:
       /bin/bash -c "
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
         while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
-        django-admin sync_blockchain
+        django-admin run_blockchain_indexers
       "
 
     image: mushroomlabs/hub20

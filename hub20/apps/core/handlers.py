@@ -12,7 +12,7 @@ from hub20.apps.blockchain.signals import (
     blockchain_node_sync_recovered,
 )
 from hub20.apps.ethereum_money.models import EthereumToken
-from hub20.apps.ethereum_money.signals import account_deposit_received
+from hub20.apps.ethereum_money.signals import account_deposit_received, blockchain_payment_sent
 from hub20.apps.ethereum_wallet.models import Wallet
 from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
 from hub20.apps.raiden.signals import raiden_payment_received
@@ -37,7 +37,6 @@ from .models import (
 )
 from .settings import app_settings
 from .signals import (
-    blockchain_payment_sent,
     payment_confirmed,
     payment_received,
     transfer_confirmed,

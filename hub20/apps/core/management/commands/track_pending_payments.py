@@ -39,7 +39,6 @@ def track_pending_transactions():
         wallet_addresses = open_orders.values_list(
             "routes__blockchainpaymentroute__wallet__account__address", flat=True
         ).distinct()[::1]
-        token_addresses = open_orders.values_list("currency__address", flat=True).distinct()[::1]
 
         try:
             expiration_time = datetime.datetime.now() + datetime.timedelta(seconds=BLOCK_INTERVAL)
@@ -50,17 +49,14 @@ def track_pending_transactions():
             )[::1]
             for tx_hash in set(pending_entries) - set(recorded_tx_hashes):
                 address_list = ", ".join([str(a) for a in wallet_addresses])
+
                 logger.info(f"Checking {tx_hash} for blockchain transfers at {address_list}")
                 tasks.check_transaction_for_eth_transfer.apply_async(
                     args=(tx_hash, wallet_addresses), expires=expiration_time, priority=prio
                 )
-
-                if token_addresses:
-                    tasks.check_transaction_for_erc20_transfer.apply_async(
-                        args=(tx_hash, wallet_addresses, token_addresses),
-                        expires=expiration_time,
-                        priority=prio,
-                    )
+                tasks.check_transaction_for_erc20_transfer.apply_async(
+                    args=(tx_hash, wallet_addresses), expires=expiration_time, priority=prio,
+                )
         except TimeoutError:
             logger.warn("Timeout error when getting new entries")
 

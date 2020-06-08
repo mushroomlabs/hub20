@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os
 from decimal import Decimal
-from typing import Any, Tuple, Union
+from typing import Any, Optional, Tuple, Union
 
 import ethereum
 from django.conf import settings
@@ -15,6 +15,7 @@ from ethtoken import token
 from ethtoken.abi import EIP20_ABI
 from model_utils.managers import QueryManager
 from web3 import Web3
+from web3.contract import Contract
 
 from hub20.apps.blockchain.fields import EthereumAddressField, HexField
 from hub20.apps.blockchain.models import Chain, Transaction
@@ -101,6 +102,21 @@ class EthereumToken(models.Model):
         components.append(str(self.chain_id))
         return " - ".join(components)
 
+    def get_contract(self, w3: Web3) -> Contract:
+        if not self.is_ERC20:
+            raise ValueError("Not an ERC20 token")
+
+        return w3.eth.contract(abi=EIP20_ABI, address=self.address)
+
+    def get_web3_filter(self, w3: Web3):
+        if not self.is_ERC20:
+            raise ValueError("Not an ERC20 token")
+
+        contract = self.get_contract(w3)
+        block_number = Transaction.objects.last_block_with(self.chain, self.address)
+        logger.info(f"Creating filter for {self.address} since block #{block_number}")
+        return contract.events.Transfer.createFilter(fromBlock=block_number)
+
     def build_transfer_transaction(self, w3: Web3, sender, recipient, amount: EthereumTokenAmount):
 
         chain_id = int(w3.net.version)
@@ -123,7 +139,26 @@ class EthereumToken(models.Model):
             transaction_params.update({"to": recipient, "value": amount.as_wei})
         return transaction_params
 
-    def _decode_token_transfer_input(self, transaction: Transaction) -> Tuple:
+    def _decode_transaction_data(self, tx_data, contract: Optional[Contract]) -> Tuple:
+        if not self.is_ERC20:
+            return tx_data.to, self.from_wei(tx_data.value)
+
+        try:
+            assert tx_data["to"] == self.address, f"Not a {self.code} transaction"
+            assert type(contract) is Contract, "No {self.code} contract to decode transaction"
+
+            fn, args = contract.decode_function_input(tx_data.input)
+
+            # TODO: is this really the best way to identify the transaction as a value transfer?
+            transfer_idenfifier = contract.functions.transfer.function_identifier
+            assert transfer_idenfifier == fn.function_identifier, "No transfer transaction"
+
+            return args["_to"], self.from_wei(args["_value"])
+        except AssertionError as exc:
+            logger.warning(exc)
+            return None, None
+
+    def _decode_transaction(self, transaction: Transaction) -> Tuple:
         # A transfer transaction input is 'function,address,uint256'
         # i.e, 16 bytes + 20 bytes + 32 bytes = hex string of length 136
         try:

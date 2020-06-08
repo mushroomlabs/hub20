@@ -17,6 +17,7 @@ from web3.types import BlockNumber, TxParams, Wei
 from .app_settings import CHAIN_ID, START_BLOCK_NUMBER
 from .choices import ETHEREUM_CHAINS
 from .fields import EthereumAddressField, HexField, Uint256Field
+from .managers import TransactionManager
 
 logger = logging.getLogger(__name__)
 
@@ -45,19 +46,21 @@ class Chain(models.Model):
     _WEB3_CLIENTS: Dict[str, Web3] = {}
 
     def _make_web3(self) -> Web3:
+        endpoint = urlparse(self.provider_url)
+        logger.info(f"Instantiating new Web3 for {endpoint.hostname}")
         provider_class = {
             "http": HTTPProvider,
             "https": HTTPProvider,
             "ws": WebsocketProvider,
             "wss": WebsocketProvider,
-        }.get(urlparse(self.provider_url).scheme, IPCProvider)
+        }.get(endpoint.scheme, IPCProvider)
 
         w3 = Web3(provider_class(self.provider_url))
         w3.middleware_onion.inject(geth_poa_middleware, layer=0)
         w3.eth.setGasPriceStrategy(database_history_gas_price_strategy)
 
         chain_id = int(w3.net.version)
-        message = f"{self.provider_url} is connected to {chain_id}, expected {self.id}"
+        message = f"{endpoint.hostname} connected to {chain_id}, expected {self.id}"
         assert chain_id == self.id, message
 
         return w3
@@ -148,7 +151,7 @@ class Block(models.Model):
             return cls.objects.get(hash=block_hash, chain=chain)
         except cls.DoesNotExist:
             w3 = chain.get_web3()
-            block_data = w3.eth.getBlock(block_hash, full_transactions=True)
+            block_data = w3.eth.getBlock(block_hash)
             return cls.make(block_data, chain)
 
     @classmethod
@@ -170,6 +173,8 @@ class Transaction(models.Model):
     index = Uint256Field()
     value = Uint256Field()
     data = models.TextField()
+
+    objects = TransactionManager()
 
     @property
     def hash_hex(self):
@@ -203,8 +208,7 @@ class Transaction(models.Model):
         w3 = chain.get_web3()
         tx_data = w3.eth.getTransaction(transaction_hash)
         block = Block.fetch_by_hash(tx_data.blockHash, chain=chain)
-
-        return cls.objects.filter(block=block, hash=transaction_hash).first()
+        return cls.make(tx_data, block)
 
     def __str__(self) -> str:
         return f"Tx {self.hash_hex}"

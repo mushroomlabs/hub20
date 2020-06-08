@@ -8,8 +8,8 @@ from hub20.apps.blockchain.factories import TransactionFactory
 from hub20.apps.core.api import consumer_patterns
 from hub20.apps.core.factories import CheckoutFactory
 from hub20.apps.core.models import CheckoutEvents
-from hub20.apps.core.signals import blockchain_payment_sent
 from hub20.apps.ethereum_money.models import EthereumToken
+from hub20.apps.ethereum_money.signals import blockchain_payment_sent
 
 application = URLRouter(consumer_patterns)
 
@@ -42,7 +42,7 @@ async def test_checkout_consumer():
     )
 
     messages = []
-    while not await communicator.receive_nothing():
+    while not await communicator.receive_nothing(timeout=0.25):
         messages.append(await communicator.receive_json_from())
 
     assert len(messages) != 0, "we should have received something here"
