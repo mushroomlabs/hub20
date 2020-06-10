@@ -28,11 +28,12 @@ def _get_channel_from_event(token_network, event) -> Optional[TokenNetworkChanne
     return None
 
 
-def process_events(token_network, event_filter, w3):
+def process_events(token_network: TokenNetwork, event_filter):
+    chain = token_network.token.chain
     try:
         for event in event_filter.get_all_entries():
             logger.info(f"Processing event {event.event} at {event.transactionHash.hex()}")
-            tx = Transaction.fetch_by_hash(event.transactionHash, w3=w3)
+            tx = Transaction.fetch_by_hash(event.transactionHash, chain=chain)
             if not tx:
                 logger.warning(f"Transaction {event.transactionHash} could not be synced")
 
@@ -69,5 +70,5 @@ def sync_token_network_events():
             fromBlock=from_block
         )
 
-        process_events(token_network, channel_open_filter, w3)
-        process_events(token_network, channel_closed_filter, w3)
+        process_events(token_network, channel_open_filter)
+        process_events(token_network, channel_closed_filter)
