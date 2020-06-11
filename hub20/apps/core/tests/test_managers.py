@@ -1,7 +1,7 @@
 import pytest
 from django.test import TestCase
 
-from hub20.apps.ethereum_wallet.tests.base import add_token_to_wallet
+from hub20.apps.ethereum_money.tests.base import add_token_to_account
 from hub20.apps.raiden.factories import ChannelFactory, TokenNetworkFactory
 
 from ..factories import Erc20TokenPaymentOrderFactory
@@ -35,7 +35,7 @@ class PaymentOrderManagerTestCase(BaseTestCase):
 
     def test_order_with_payment_is_not_open(self):
         route = BlockchainPaymentRoute.objects.filter(order=self.order).first()
-        add_token_to_wallet(route.wallet, self.order.as_token_amount, self.order.chain)
+        add_token_to_account(route.account, self.order.as_token_amount, self.order.chain)
         self.assertTrue(PaymentOrder.objects.paid().filter(id=self.order.id).exists())
         self.assertFalse(PaymentOrder.objects.unpaid().filter(id=self.order.id).exists())
 

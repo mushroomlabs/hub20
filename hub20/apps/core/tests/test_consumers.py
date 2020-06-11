@@ -25,19 +25,17 @@ async def test_checkout_consumer():
 
     assert ok, "Failed to connect"
 
-    wallet_address = await sync_to_async(
-        checkout.routes.values_list(
-            "blockchainpaymentroute__wallet__account__address", flat=True
-        ).first
+    account_address = await sync_to_async(
+        checkout.routes.values_list("blockchainpaymentroute__account__address", flat=True).first
     )()
 
-    assert wallet_address is not None, "No wallet found"
+    assert account_address is not None, "No account found"
 
     tx = await sync_to_async(TransactionFactory)()
     await sync_to_async(blockchain_payment_sent.send)(
         sender=EthereumToken,
         amount=checkout.as_token_amount,
-        recipient=wallet_address,
+        recipient=account_address,
         transaction_hash=tx.hash_hex,
     )
 

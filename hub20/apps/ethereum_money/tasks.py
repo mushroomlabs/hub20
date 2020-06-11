@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 @shared_task
-def check_transaction_for_erc20_transfer(tx_hash: str, wallet_addresses: List[str]):
+def check_transaction_for_erc20_transfer(tx_hash: str, account_addresses: List[str]):
     chain = Chain.make()
     w3 = chain.get_web3()
 
@@ -28,7 +28,7 @@ def check_transaction_for_erc20_transfer(tx_hash: str, wallet_addresses: List[st
 
             recipient, value = token._decode_transaction_data(tx, contract)
             valid_transaction = all(
-                [recipient is not None, value is not None, recipient in wallet_addresses]
+                [recipient is not None, value is not None, recipient in account_addresses]
             )
 
             if valid_transaction:
@@ -49,14 +49,14 @@ def check_transaction_for_erc20_transfer(tx_hash: str, wallet_addresses: List[st
 
 
 @shared_task
-def check_transaction_for_eth_transfer(tx_hash: str, wallet_addresses: List[str]):
+def check_transaction_for_eth_transfer(tx_hash: str, account_addresses: List[str]):
     chain = Chain.make()
     w3 = chain.get_web3()
 
     try:
         tx = w3.eth.getTransaction(tx_hash)
 
-        if tx.to in wallet_addresses:
+        if tx.to in account_addresses:
             ETH = EthereumToken.ETH(chain)
             blockchain_payment_sent.send(
                 sender=EthereumToken,

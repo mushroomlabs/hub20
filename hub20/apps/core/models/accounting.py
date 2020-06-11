@@ -6,13 +6,15 @@ from django.contrib.sites.models import Site
 from django.db import models
 from model_utils.models import TimeStampedModel
 
+from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.models import (
     EthereumToken,
     EthereumTokenAmount,
     EthereumTokenValueModel,
 )
-from hub20.apps.ethereum_wallet.models import Wallet
 from hub20.apps.raiden.models import Channel
+
+EthereumAccount = get_ethereum_account_model()
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +46,11 @@ class UserAccount:
 
 class HubSite(Site):
     def get_funds(self, currency: EthereumToken) -> Union[int, EthereumTokenAmount]:
-        wallet_funds = sum([wallet.get_balance(currency) for wallet in Wallet.objects.all()])
+        account_funds = sum(
+            [account.get_balance(currency) for account in EthereumAccount.objects.all()]
+        )
         channel_funds = sum([c.balance_amount for c in Channel.objects.filter(currency=currency)])
-        return wallet_funds + channel_funds
+        return account_funds + channel_funds
 
     class Meta:
         proxy = True

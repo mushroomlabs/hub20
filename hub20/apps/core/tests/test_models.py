@@ -6,11 +6,13 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from hub20.apps.blockchain.factories import BlockFactory, TransactionFactory
-from hub20.apps.ethereum_money.factories import ETHFactory
-from hub20.apps.ethereum_money.models import EthereumTokenAmount, encode_transfer_data
-from hub20.apps.ethereum_wallet.factories import WalletFactory
-from hub20.apps.ethereum_wallet.models import Wallet
-from hub20.apps.ethereum_wallet.tests.base import add_eth_to_wallet, add_token_to_wallet
+from hub20.apps.ethereum_money.factories import EthereumAccountFactory, ETHFactory
+from hub20.apps.ethereum_money.models import (
+    EthereumAccount,
+    EthereumTokenAmount,
+    encode_transfer_data,
+)
+from hub20.apps.ethereum_money.tests.base import add_eth_to_account, add_token_to_account
 from hub20.apps.raiden.factories import ChannelFactory, PaymentEventFactory, TokenNetworkFactory
 
 from ..choices import TRANSFER_EVENT_TYPES
@@ -38,21 +40,21 @@ class BlockchainPaymentTestCase(BaseTestCase):
         self.blockchain_route = BlockchainPaymentRoute.objects.filter(order=self.order).first()
 
     def test_transaction_sets_payment_as_received(self):
-        add_token_to_wallet(
-            self.blockchain_route.wallet, self.order.as_token_amount, self.order.chain
+        add_token_to_account(
+            self.blockchain_route.account, self.order.as_token_amount, self.order.chain
         )
         self.assertTrue(self.order.is_paid)
         self.assertFalse(self.order.is_confirmed)
 
     def test_transaction_creates_blockchain_payment(self):
-        add_token_to_wallet(
-            self.blockchain_route.wallet, self.order.as_token_amount, self.order.chain
+        add_token_to_account(
+            self.blockchain_route.account, self.order.as_token_amount, self.order.chain
         )
         self.assertEqual(self.order.payments.count(), 1)
 
     def test_user_balance_is_updated_on_completed_payment(self):
-        tx = add_token_to_wallet(
-            self.blockchain_route.wallet, self.order.as_token_amount, self.order.chain
+        tx = add_token_to_account(
+            self.blockchain_route.account, self.order.as_token_amount, self.order.chain
         )
         self.order.chain.highest_block = (
             tx.block.number + app_settings.Payment.minimum_confirmations
@@ -170,25 +172,25 @@ class InternalTransferTestCase(TransferTestCase):
         self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.failed)
 
 
-@patch("hub20.apps.core.models.transfers.Wallet.select_for_transfer")
+@patch("hub20.apps.ethereum_money.models.EthereumAccount.select_for_transfer")
 class ExternalTransferTestCase(TransferTestCase):
     def setUp(self):
         super().setUp()
         self.ETH = ETHFactory()
         self.fee_amount = EthereumTokenAmount(amount=Decimal("0.001"), currency=self.ETH)
 
-    def _build_transfer(self, wallet: Wallet) -> ExternalTransfer:
+    def _build_transfer(self, account: EthereumAccount) -> ExternalTransfer:
         transfer = ExternalTransferFactory.build(
             sender=self.sender, currency=self.credit.currency, amount=self.credit.amount
         )
 
         out_tx = TransactionFactory(
-            from_address=wallet.address,
+            from_address=account.address,
             to_address=self.credit.currency.address,
             data=encode_transfer_data(transfer.recipient_address, self.credit.as_token_amount),
         )
 
-        with patch.object(wallet.account, "send", return_value=out_tx.hash):
+        with patch.object(account, "send", return_value=out_tx.hash):
             transfer.save()
 
         return transfer
@@ -203,26 +205,26 @@ class ExternalTransferTestCase(TransferTestCase):
         self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.failed)
 
     def test_transfers_can_be_executed_with_enough_balance(self, select_for_transfer):
-        wallet = WalletFactory()
-        add_token_to_wallet(wallet, self.credit.as_token_amount, self.ETH.chain)
-        add_eth_to_wallet(wallet, self.fee_amount, self.ETH.chain)
+        account = EthereumAccountFactory()
+        add_token_to_account(account, self.credit.as_token_amount, self.ETH.chain)
+        add_eth_to_account(account, self.fee_amount, self.ETH.chain)
 
-        select_for_transfer.return_value = wallet
+        select_for_transfer.return_value = account
 
-        transfer = self._build_transfer(wallet)
+        transfer = self._build_transfer(account)
 
         self.assertIsNotNone(transfer.status)
         self.assertFalse(transfer.is_finalized)
         self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.executed)
 
     def test_transfers_are_confirmed_after_block_confirmation(self, select_for_transfer):
-        wallet = WalletFactory()
+        account = EthereumAccountFactory()
 
-        add_eth_to_wallet(wallet, self.fee_amount, self.ETH.chain)
-        add_token_to_wallet(wallet, self.credit.as_token_amount, self.ETH.chain)
-        select_for_transfer.return_value = wallet
+        add_eth_to_account(account, self.fee_amount, self.ETH.chain)
+        add_token_to_account(account, self.credit.as_token_amount, self.ETH.chain)
+        select_for_transfer.return_value = account
 
-        transfer = self._build_transfer(wallet)
+        transfer = self._build_transfer(account)
 
         self.assertIsNotNone(transfer.status)
         self.assertFalse(transfer.is_finalized)

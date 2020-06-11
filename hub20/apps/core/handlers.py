@@ -11,9 +11,9 @@ from hub20.apps.blockchain.signals import (
     ethereum_node_sync_lost,
     ethereum_node_sync_recovered,
 )
+from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.models import EthereumToken
 from hub20.apps.ethereum_money.signals import account_deposit_received, blockchain_payment_sent
-from hub20.apps.ethereum_wallet.models import Wallet
 from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
 from hub20.apps.raiden.signals import raiden_payment_received
 
@@ -46,6 +46,7 @@ from .signals import (
 )
 
 logger = logging.getLogger(__name__)
+EthereumAccount = get_ethereum_account_model()
 
 
 @receiver(ethereum_node_disconnected, sender=Chain)
@@ -73,7 +74,7 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
     amount = kw["amount"]
 
     orders = PaymentOrder.objects.with_blockchain_route(transaction.block.number)
-    order = orders.filter(routes__blockchainpaymentroute__wallet__account=account).first()
+    order = orders.filter(routes__blockchainpaymentroute__account=account).first()
 
     if not order:
         return
@@ -97,7 +98,7 @@ def on_blockchain_payment_sent_maybe_publish_checkout(sender, **kw):
     current_block = chain.highest_block
 
     blockchain_payment_route = BlockchainPaymentRoute.objects.filter(
-        wallet__account__address=recipient_address, payment_window__contains=current_block
+        account__address=recipient_address, payment_window__contains=current_block
     ).first()
 
     if not blockchain_payment_route:
@@ -153,13 +154,13 @@ def on_order_created_set_blockchain_route(sender, **kw):
 
         payment_window = (current_block, expiration_block)
 
-        available_wallets = Wallet.objects.exclude(
+        available_accounts = EthereumAccount.objects.exclude(
             payment_routes__payment_window__overlap=NumericRange(*payment_window)
         )
 
-        wallet = available_wallets.order_by("?").first() or Wallet.generate()
+        account = available_accounts.order_by("?").first() or EthereumAccount.generate()
         BlockchainPaymentRoute.objects.create(
-            order=order, wallet=wallet, payment_window=payment_window
+            order=order, account=account, payment_window=payment_window
         )
     else:
         logger.warning("Failed to create blockchain route. Chain data not synced")
@@ -219,7 +220,7 @@ def on_block_added_publish_expired_blockchain_routes(sender, **kw):
         tasks.publish_checkout_event.delay(
             route.order_id,
             event=CheckoutEvents.BLOCKCHAIN_ROUTE_EXPIRED.value,
-            route=route.wallet.address,
+            route=route.account.address,
         )
 
 

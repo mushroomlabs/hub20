@@ -124,7 +124,7 @@ class InternalPaymentRouteSerializer(PaymentRouteSerializer):
 
 
 class BlockchainPaymentRouteSerializer(PaymentRouteSerializer):
-    address = EthereumAddressField(source="wallet.address", read_only=True)
+    address = EthereumAddressField(source="account.address", read_only=True)
     network_id = serializers.IntegerField(source="order.chain_id", read_only=True)
     start_block = serializers.IntegerField(source="start_block_number", read_only=True)
     expiration_block = serializers.IntegerField(source="expiration_block_number", read_only=True)

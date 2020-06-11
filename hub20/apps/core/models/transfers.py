@@ -1,22 +1,26 @@
-from typing import Optional
 import logging
+from typing import Optional
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
-from django.db import transaction
+from django.db import models, transaction
 from model_utils.managers import InheritanceManager
-from model_utils.models import TimeStampedModel, StatusModel
+from model_utils.models import StatusModel, TimeStampedModel
 
 from hub20.apps.blockchain.fields import EthereumAddressField, HexField
 from hub20.apps.blockchain.models import Transaction
+from hub20.apps.core.choices import TRANSFER_EVENT_TYPES
+from hub20.apps.core.signals import transfer_confirmed, transfer_executed, transfer_failed
+from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.models import EthereumTokenValueModel
 from hub20.apps.raiden.models import Channel, Payment
-from hub20.apps.core.choices import TRANSFER_EVENT_TYPES
-from hub20.apps.core.signals import transfer_executed, transfer_failed, transfer_confirmed
-from .accounting import UserAccount, Wallet, UserReserve
+
+from .accounting import UserAccount, UserReserve
 
 logger = logging.getLogger(__name__)
+
+
+EthereumAccount = get_ethereum_account_model()
 
 
 class TransferError(Exception):
@@ -118,10 +122,10 @@ class ExternalTransfer(Transfer):
                 transfer=self, channel=channel, payment_identifier=payment_id
             )
         else:
-            wallet = Wallet.select_for_transfer(transfer_amount)
-            if wallet is None:
-                raise TransferError("No channel nor wallet with funds to make transfer found")
-            tx_hash = wallet.account.send(self.recipient_address, transfer_amount)
+            account = EthereumAccount.select_for_transfer(transfer_amount)
+            if account is None:
+                raise TransferError("No channel nor account with funds to make transfer found")
+            tx_hash = account.send(self.recipient_address, transfer_amount)
             BlockchainTransaction.objects.create(transfer=self, transaction_hash=tx_hash)
         transfer_executed.send_robust(sender=ExternalTransfer, transfer=self)
 
