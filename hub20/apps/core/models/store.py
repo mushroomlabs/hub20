@@ -18,9 +18,9 @@ class CheckoutEvents(Enum):
     BLOCKCHAIN_BLOCK_CREATED = "blockchain.block.created"
     BLOCKCHAIN_TRANSFER_BROADCAST = "blockchain.transfer.broadcast"
     BLOCKCHAIN_TRANSFER_RECEIVED = "blockchain.transfer.received"
-    BLOCKCHAIN_NODE_UNAVAILABLE = "blockchain.ethereum_node.unavailable"
-    BLOCKCHAIN_NODE_OK = "blockchain.ethereum_node.ok"
     BLOCKCHAIN_ROUTE_EXPIRED = "blockchain.payment_route.expired"
+    ETHEREUM_NODE_UNAVAILABLE = "ethereum_node.unavailable"
+    ETHEREUM_NODE_OK = "ethereum_node.ok"
     RAIDEN_ROUTE_EXPIRED = "raiden.payment_route.expired"
     RAIDEN_TRANSFER_RECEIVED = "raiden.transfer.received"
 

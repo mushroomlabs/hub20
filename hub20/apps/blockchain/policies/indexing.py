@@ -3,10 +3,10 @@ import time
 
 from ..models import Chain
 from ..signals import (
-    blockchain_node_connected,
-    blockchain_node_disconnected,
-    blockchain_node_sync_lost,
-    blockchain_node_sync_recovered,
+    ethereum_node_connected,
+    ethereum_node_disconnected,
+    ethereum_node_sync_lost,
+    ethereum_node_sync_recovered,
 )
 from ..tasks import fetch_block
 
@@ -55,13 +55,13 @@ def _ensure_connected(chain):
 
     while not w3.isConnected():
         connection_lost = True
-        blockchain_node_disconnected(sender=Chain, chain=chain)
+        ethereum_node_disconnected(sender=Chain, chain=chain)
         logger.critical("ETH node is disconnected")
         time.sleep(WAITING_INTERVAL)
         w3 = chain.get_web3(force_new=True)
 
     if connection_lost:
-        blockchain_node_connected(sender=Chain, chain=chain)
+        ethereum_node_connected(sender=Chain, chain=chain)
     return w3
 
 
@@ -75,11 +75,11 @@ def _ensure_synced(chain):
             f"ETH node is syncing: {syncing['currentBlock']}/{syncing['highestBlock']}"
         )
         out_of_sync = True
-        blockchain_node_sync_lost.send(sender=Chain, chain=chain)
+        ethereum_node_sync_lost.send(sender=Chain, chain=chain)
         time.sleep(WAITING_INTERVAL)
 
     if out_of_sync:
-        blockchain_node_sync_recovered(sender=Chain, chain=chain)
+        ethereum_node_sync_recovered(sender=Chain, chain=chain)
 
 
 def _run_backfill_policy(starting_block=0, background=False):

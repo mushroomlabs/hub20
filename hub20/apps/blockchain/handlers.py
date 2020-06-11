@@ -7,14 +7,14 @@ from . import models, signals
 logger = logging.getLogger(__name__)
 
 
-@receiver(signals.blockchain_node_sync_lost, sender=models.Chain)
+@receiver(signals.ethereum_node_sync_lost, sender=models.Chain)
 def on_sync_lost_update_chain(sender, **kw):
     chain = kw["chain"]
     chain.synced = False
     chain.save()
 
 
-@receiver(signals.blockchain_node_sync_recovered, sender=models.Chain)
+@receiver(signals.ethereum_node_sync_recovered, sender=models.Chain)
 def on_sync_recovered_update_chain(sender, **kw):
     chain = kw["chain"]
     chain.synced = True

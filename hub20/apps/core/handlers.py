@@ -6,10 +6,10 @@ from psycopg2.extras import NumericRange
 
 from hub20.apps.blockchain.models import Block, Chain, Transaction
 from hub20.apps.blockchain.signals import (
-    blockchain_node_connected,
-    blockchain_node_disconnected,
-    blockchain_node_sync_lost,
-    blockchain_node_sync_recovered,
+    ethereum_node_connected,
+    ethereum_node_disconnected,
+    ethereum_node_sync_lost,
+    ethereum_node_sync_recovered,
 )
 from hub20.apps.ethereum_money.models import EthereumToken
 from hub20.apps.ethereum_money.signals import account_deposit_received, blockchain_payment_sent
@@ -48,24 +48,22 @@ from .signals import (
 logger = logging.getLogger(__name__)
 
 
-@receiver(blockchain_node_disconnected, sender=Chain)
-@receiver(blockchain_node_sync_lost, sender=Chain)
-def on_blockchain_node_error_send_open_checkout_events(sender, **kw):
+@receiver(ethereum_node_disconnected, sender=Chain)
+@receiver(ethereum_node_sync_lost, sender=Chain)
+def on_ethereum_node_error_send_open_checkout_events(sender, **kw):
     chain = kw["chain"]
     for checkout in Checkout.objects.filter(chain=chain).unpaid().with_blockchain_route():
         tasks.publish_checkout_event(
-            checkout.id, event_data=CheckoutEvents.BLOCKCHAIN_NODE_UNAVAILABLE.value
+            checkout.id, event_data=CheckoutEvents.ETHEREUM_NODE_UNAVAILABLE.value
         )
 
 
-@receiver(blockchain_node_connected, sender=Chain)
-@receiver(blockchain_node_sync_recovered, sender=Chain)
-def on_blockchain_node_ok_send_open_checkout_events(sender, **kw):
+@receiver(ethereum_node_connected, sender=Chain)
+@receiver(ethereum_node_sync_recovered, sender=Chain)
+def on_ethereum_node_ok_send_open_checkout_events(sender, **kw):
     chain = kw["chain"]
     for checkout in Checkout.objects.filter(chain=chain).unpaid().with_blockchain_route():
-        tasks.publish_checkout_event(
-            checkout.id, event_data=CheckoutEvents.BLOCKCHAIN_NODE_OK.value
-        )
+        tasks.publish_checkout_event(checkout.id, event_data=CheckoutEvents.ETHEREUM_NODE_OK.value)
 
 
 @receiver(account_deposit_received, sender=Transaction)
@@ -360,8 +358,8 @@ def on_store_created_generate_key_pair(sender, **kw):
 
 
 __all__ = [
-    "on_blockchain_node_ok_send_open_checkout_events",
-    "on_blockchain_node_error_send_open_checkout_events",
+    "on_ethereum_node_ok_send_open_checkout_events",
+    "on_ethereum_node_error_send_open_checkout_events",
     "on_account_deposit_check_blockchain_payments",
     "on_blockchain_payment_sent_maybe_publish_checkout",
     "on_raiden_payment_received_check_raiden_payments",
