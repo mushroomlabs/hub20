@@ -108,15 +108,6 @@ class EthereumToken(models.Model):
 
         return w3.eth.contract(abi=EIP20_ABI, address=self.address)
 
-    def get_web3_filter(self, w3: Web3):
-        if not self.is_ERC20:
-            raise ValueError("Not an ERC20 token")
-
-        contract = self.get_contract(w3)
-        block_number = Transaction.objects.last_block_with(self.chain, self.address)
-        logger.info(f"Creating filter for {self.address} since block #{block_number}")
-        return contract.events.Transfer.createFilter(fromBlock=block_number)
-
     def build_transfer_transaction(self, w3: Web3, sender, recipient, amount: EthereumTokenAmount):
 
         chain_id = int(w3.net.version)
@@ -139,13 +130,13 @@ class EthereumToken(models.Model):
             transaction_params.update({"to": recipient, "value": amount.as_wei})
         return transaction_params
 
-    def _decode_transaction_data(self, tx_data, contract: Optional[Contract]) -> Tuple:
+    def _decode_transaction_data(self, tx_data, contract: Optional[Contract] = None) -> Tuple:
         if not self.is_ERC20:
             return tx_data.to, self.from_wei(tx_data.value)
 
         try:
             assert tx_data["to"] == self.address, f"Not a {self.code} transaction"
-            assert type(contract) is Contract, "No {self.code} contract to decode transaction"
+            assert contract is not None, f"{self.code} contract interface required to decode tx"
 
             fn, args = contract.decode_function_input(tx_data.input)
 
@@ -155,6 +146,9 @@ class EthereumToken(models.Model):
 
             return args["_to"], self.from_wei(args["_value"])
         except AssertionError as exc:
+            logger.warning(exc)
+            return None, None
+        except Exception as exc:
             logger.warning(exc)
             return None, None
 

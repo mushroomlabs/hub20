@@ -137,12 +137,7 @@ class Block(models.Model):
         block = cls.make(block_data, chain)
 
         for tx_data in block_data.transactions:
-            transaction = Transaction.make(tx_data, block)
-            tx_receipt = w3.eth.waitForTransactionReceipt(transaction.hash)
-
-            for log_data in tx_receipt.logs:
-                TransactionLog.make(log_data, transaction)
-
+            Transaction.make(tx_data, block)
         return block
 
     @classmethod
@@ -196,6 +191,13 @@ class Transaction(models.Model):
                 "data": transaction_data.input,
             },
         )
+
+        w3 = block.chain.get_web3()
+        tx_receipt = w3.eth.waitForTransactionReceipt(transaction_data.hash)
+
+        for log_data in tx_receipt.logs:
+            TransactionLog.make(log_data, tx)
+
         return tx
 
     @classmethod
