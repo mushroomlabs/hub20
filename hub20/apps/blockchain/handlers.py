@@ -22,10 +22,10 @@ def on_sync_recovered_update_chain(sender, **kw):
     chain.save()
 
 
-@receiver(signals.blockchain_reorganization_detected, sender=models.Chain)
+@receiver(signals.chain_reorganization_detected, sender=models.Chain)
 def on_chain_reorganization_clear_blocks(sender, **kw):
     chain = kw["chain"]
-    block_number = kw["block_height"]
+    block_number = kw["new_block_height"]
 
     chain.blocks.filter(number__gte=block_number).delete()
 
