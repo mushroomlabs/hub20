@@ -16,11 +16,7 @@ class AppSettings:
         raiden_route_lifetime = 15 * 60  # In seconds
 
     class Web3:
-        indexers = [
-            "hub20.apps.blockchain.policies.indexing.ChainStatusWeb3Indexer",
-            "hub20.apps.ethereum_money.policies.indexing.AccountTransferStreamingWeb3Indexer",
-            "hub20.apps.ethereum_money.policies.indexing.Erc20TokenTransferStreamingWeb3Indexer",
-        ]
+        event_listeners = []
 
     def __init__(self):
         self.load()
@@ -30,7 +26,7 @@ class AppSettings:
             "TRANSFER_MININUM_CONFIRMATIONS": (self.Transfer, "minimum_confirmations"),
             "PAYMENT_MININUM_CONFIRMATIONS": (self.Payment, "minimum_confirmations"),
             "PAYMENT_BLOCKCHAIN_ROUTE_LIFETIME": (self.Payment, "blockchain_route_lifetime"),
-            "WEB3_INDEXERS": (self.Web3, "indexers"),
+            "WEB3_EVENT_LISTENERS": (self.Web3, "event_listeners"),
         }
         user_settings = getattr(settings, "HUB20", {})
 

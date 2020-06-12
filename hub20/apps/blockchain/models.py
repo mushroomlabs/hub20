@@ -1,18 +1,17 @@
 import datetime
 import logging
-from typing import Dict, Union
+from typing import Dict
 from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import Avg, Max
-from django.db.transaction import atomic
 from django.utils import timezone
 from web3 import Web3
 from web3.middleware import geth_poa_middleware
 from web3.providers import HTTPProvider, IPCProvider, WebsocketProvider
-from web3.types import BlockNumber, TxParams, Wei
+from web3.types import TxParams, Wei
 
 from .app_settings import CHAIN_ID, START_BLOCK_NUMBER
 from .choices import ETHEREUM_CHAINS
@@ -44,6 +43,11 @@ class Chain(models.Model):
     highest_block = models.PositiveIntegerField()
 
     _WEB3_CLIENTS: Dict[str, Web3] = {}
+
+    @property
+    def provider_hostname(self):
+        endpoint = urlparse(self.provider_url)
+        return endpoint.hostname
 
     def _make_web3(self) -> Web3:
         endpoint = urlparse(self.provider_url)
@@ -125,19 +129,6 @@ class Block(models.Model):
                 "uncle_hashes": block_data.uncles,
             },
         )
-        return block
-
-    @classmethod
-    @atomic()
-    def make_all(cls, block_number: Union[int, BlockNumber], chain: Chain):
-        logger.info(f"Saving block {block_number}")
-        w3 = chain.get_web3()
-        block_data = w3.eth.getBlock(BlockNumber(block_number), full_transactions=True)
-
-        block = cls.make(block_data, chain)
-
-        for tx_data in block_data.transactions:
-            Transaction.make(tx_data, block)
         return block
 
     @classmethod
