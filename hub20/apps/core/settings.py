@@ -16,7 +16,10 @@ class AppSettings:
         raiden_route_lifetime = 15 * 60  # In seconds
 
     class Web3:
-        event_listeners = []
+        event_listeners = [
+            "hub20.apps.ethereum_money.client.sync_erc20_transfers",
+            "hub20.apps.ethereum_money.client.sync_ethereum_transfers",
+        ]
 
     def __init__(self):
         self.load()

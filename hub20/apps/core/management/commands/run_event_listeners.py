@@ -5,7 +5,7 @@ from signal import SIGINT, SIGTERM
 from django.core.management.base import BaseCommand
 from django.utils.module_loading import import_string
 
-from hub20.apps.blockchain.client import sync_chain
+from hub20.apps.blockchain.client import make_web3, sync_chain
 from hub20.apps.blockchain.models import Chain
 from hub20.apps.core.settings import app_settings
 
@@ -27,7 +27,6 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         loop = asyncio.get_event_loop()
         chain = Chain.make()
-        w3 = chain.get_web3()
 
         for signal in (SIGINT, SIGTERM):
             loop.add_signal_handler(signal, lambda: asyncio.create_task(shutdown(signal, loop)))
@@ -37,11 +36,12 @@ class Command(BaseCommand):
 
             for listener_dotted_name in app_settings.Web3.event_listeners:
                 listener = import_string(listener_dotted_name)
-                tasks.append(listener(w3))
+
+                tasks.append(listener(make_web3(chain)))
 
             # No matter the user settings, we always want to run the routing to
             # update the chain status
-            tasks.append(sync_chain(w3))
+            tasks.append(sync_chain(make_web3(chain)))
 
             asyncio.gather(*tasks)
             loop.run_forever()
