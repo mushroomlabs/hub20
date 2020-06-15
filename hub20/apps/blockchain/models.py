@@ -132,15 +132,6 @@ class Block(models.Model):
         return block
 
     @classmethod
-    def fetch_by_hash(cls, block_hash, chain: Chain):
-        try:
-            return cls.objects.get(hash=block_hash, chain=chain)
-        except cls.DoesNotExist:
-            w3 = chain.get_web3()
-            block_data = w3.eth.getBlock(block_hash)
-            return cls.make(block_data, chain)
-
-    @classmethod
     def get_latest_block_number(cls, qs):
         return qs.aggregate(latest=Max("number")).get("latest") or START_BLOCK_NUMBER
 
@@ -190,18 +181,6 @@ class Transaction(models.Model):
             TransactionLog.make(log_data, tx)
 
         return tx
-
-    @classmethod
-    def fetch_by_hash(cls, transaction_hash: str, chain: Chain):
-        try:
-            return cls.objects.get(hash=transaction_hash, block__chain=chain)
-        except cls.DoesNotExist:
-            pass
-
-        w3 = chain.get_web3()
-        tx_data = w3.eth.getTransaction(transaction_hash)
-        block = Block.fetch_by_hash(tx_data.blockHash, chain=chain)
-        return cls.make(tx_data, block)
 
     def __str__(self) -> str:
         return f"Tx {self.hash_hex}"

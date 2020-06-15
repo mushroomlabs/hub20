@@ -1,10 +1,13 @@
 import asyncio
 import logging
+from typing import Optional
 from urllib.parse import urlparse
 
 from asgiref.sync import sync_to_async
 from django.db.models import Avg
+from hexbytes import HexBytes
 from web3 import Web3
+from web3.exceptions import TransactionNotFound
 from web3.middleware import geth_poa_middleware
 from web3.providers import HTTPProvider, IPCProvider, WebsocketProvider
 from web3.types import TxParams, Wei
@@ -49,6 +52,24 @@ def make_web3(chain) -> Web3:
     assert chain_id == chain.id, message
 
     return w3
+
+
+def get_block_by_hash(w3: Web3, block_hash: HexBytes) -> Optional[Block]:
+    try:
+        chain = Chain.objects.get(id=int(w3.net.version))
+        block_data = w3.eth.getBlock(block_hash)
+        return Block.make(block_data, chain)
+    except (AttributeError, Chain.DoesNotExist):
+        return None
+
+
+def get_transaction_by_hash(w3: Web3, transaction_hash: HexBytes) -> Optional[Transaction]:
+    try:
+        tx_data = w3.eth.getTransaction(transaction_hash)
+        block = get_block_by_hash(w3, tx_data.blockHash)
+        return Transaction.make(tx_data, block)
+    except TransactionNotFound:
+        return None
 
 
 async def listen_new_blocks(w3: Web3):
