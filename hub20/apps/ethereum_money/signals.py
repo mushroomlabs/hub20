@@ -1,13 +1,9 @@
 from django.dispatch import Signal
 
 incoming_transfer_broadcast = Signal(providing_args=["account", "chain_id", "transaction_data"])
-incoming_transfer_mined = Signal(
-    providing_args=["account", "chain_id", "transaction_receipt", "block_data"]
-)
+incoming_transfer_mined = Signal(providing_args=["account", "chain_id", "transaction"])
 outgoing_transfer_broadcast = Signal(providing_args=["account", "chain_id", "transaction_data"])
-outgoing_transfer_mined = Signal(
-    providing_args=["account", "chain_id", "transaction_receipt", "block_data"]
-)
+outgoing_transfer_mined = Signal(providing_args=["account", "chain_id", "transaction"])
 
 
 account_deposit_received = Signal(providing_args=["account", "transaction", "amount"])

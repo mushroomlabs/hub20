@@ -1,6 +1,6 @@
 import datetime
 import logging
-from typing import Dict
+from typing import Dict, Optional
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -80,9 +80,9 @@ class Chain(models.Model):
         return w3
 
     @classmethod
-    def make(cls):
+    def make(cls, chain_id: Optional[int] = CHAIN_ID):
         chain, _ = cls.objects.get_or_create(
-            id=CHAIN_ID,
+            id=chain_id,
             defaults={
                 "synced": False,
                 "highest_block": 0,

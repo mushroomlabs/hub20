@@ -63,10 +63,12 @@ def get_block_by_hash(w3: Web3, block_hash: HexBytes) -> Optional[Block]:
         return None
 
 
-def get_transaction_by_hash(w3: Web3, transaction_hash: HexBytes) -> Optional[Transaction]:
+def get_transaction_by_hash(
+    w3: Web3, transaction_hash: HexBytes, block: Block
+) -> Optional[Transaction]:
     try:
         tx_data = w3.eth.getTransaction(transaction_hash)
-        block = get_block_by_hash(w3, tx_data.blockHash)
+        assert block.hash == tx_data.blockHash, "Block hash data differ"
         return Transaction.make(tx_data, block)
     except TransactionNotFound:
         return None
@@ -74,23 +76,20 @@ def get_transaction_by_hash(w3: Web3, transaction_hash: HexBytes) -> Optional[Tr
 
 async def listen_new_blocks(w3: Web3):
     block_filter = w3.eth.filter("latest")
-    chain_id = int(w3.net.version)
     while True:
         await asyncio.sleep(BLOCK_CREATION_INTERVAL)
         for event in block_filter.get_new_entries():
             block_hash = event.hex()
             block_data = w3.eth.getBlock(block_hash, full_transactions=True)
-            await sync_to_async(signals.block_sealed.send)(
-                sender=Block,
-                chain_id=chain_id,
-                block_data=block_data,
-                transactions=block_data.transactions,
-            )
+            block = await sync_to_async(get_block_by_hash)(w3, block_hash)
+
+            for tx_hash in block_data.transactions:
+                await sync_to_async(get_transaction_by_hash)(w3, tx_hash, block)
+            await sync_to_async(signals.block_sealed.send)(sender=Block, block=block)
 
 
 async def sync_chain(w3: Web3):
     while True:
-
         await sync_to_async(signals.chain_status_synced.send)(
             sender=Chain,
             chain_id=int(w3.net.version),

@@ -3,8 +3,8 @@ import logging
 from django.db import transaction
 from django.dispatch import receiver
 
-from . import signals, tasks
-from .models import Block, Chain, Transaction
+from . import signals
+from .models import Chain
 
 logger = logging.getLogger(__name__)
 
@@ -79,29 +79,9 @@ def on_sync_recovered_update_chain(sender, **kw):
     chain.save()
 
 
-@receiver(signals.block_sealed, sender=Block)
-def on_block_sealed_save_on_database(sender, **kw):
-    chain_id = kw["chain_id"]
-    block_data = kw["block_data"]
-    transactions = kw.get("transactions") or []
-
-    tasks.make_block(chain_id, block_data, transactions)
-
-
-@receiver(signals.transaction_mined, sender=Transaction)
-def on_transaction_mined_save_on_database(sender, **kw):
-    chain_id = kw["chain_id"]
-    transaction_receipt = kw["transaction_receipt"]
-    block_data = kw["block_data"]
-
-    tasks.make_block(chain_id, block_data, [transaction_receipt])
-
-
 __all__ = [
     "on_sync_lost_update_chain",
     "on_sync_recovered_update_chain",
     "on_chain_status_synced_update_database",
     "on_chain_reorganization_clear_blocks",
-    "on_block_sealed_save_on_database",
-    "on_transaction_mined_save_on_database",
 ]

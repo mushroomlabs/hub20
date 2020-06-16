@@ -4,7 +4,7 @@ from typing import Optional
 
 from celery import shared_task
 
-from hub20.apps.blockchain.client import get_transaction_by_hash
+from hub20.apps.blockchain.client import get_block_by_hash, get_transaction_by_hash
 from hub20.apps.blockchain.models import Block, Chain
 
 from .models import TokenNetwork, TokenNetworkChannel
@@ -36,7 +36,8 @@ def process_events(token_network: TokenNetwork, event_filter):
         for event in event_filter.get_all_entries():
             logger.info(f"Processing event {event.event} at {event.transactionHash.hex()}")
 
-            tx = get_transaction_by_hash(w3, event.transactionHash)
+            block = get_block_by_hash(w3, event.blockHash)
+            tx = get_transaction_by_hash(w3, event.transactionHash, block)
             if not tx:
                 logger.warning(f"Transaction {event.transactionHash} could not be synced")
 

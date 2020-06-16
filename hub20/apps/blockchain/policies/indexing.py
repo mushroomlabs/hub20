@@ -131,26 +131,8 @@ class FullArchiveStreamingWeb3Indexer:
                 index(chain, highest_block, current)
 
 
-class ChainStatusWeb3Indexer:
-    def __call__(self):
-        chain = Chain.make()
-
-        while True:
-            chain.refresh_from_db()
-            w3 = _ensure_connected(chain)
-
-            _ensure_synced(chain)
-
-            chain.highest_block = w3.eth.blockNumber
-            chain.synced = True
-            chain.save()
-
-            time.sleep(WAITING_INTERVAL)
-
-
 __all__ = [
     "BackfillWeb3Indexer",
     "BackfillCeleryWeb3Indexer",
     "FullArchiveStreamingWeb3Indexer",
-    "ChainStatusWeb3Indexer",
 ]

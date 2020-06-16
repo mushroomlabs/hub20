@@ -17,8 +17,7 @@ class AppSettings:
 
     class Web3:
         event_listeners = [
-            "hub20.apps.ethereum_money.client.sync_erc20_transfers",
-            "hub20.apps.ethereum_money.client.sync_ethereum_transfers",
+            "hub20.apps.ethereum_money.client.listen_transfers",
         ]
 
     def __init__(self):
