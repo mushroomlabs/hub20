@@ -4,6 +4,7 @@ from typing import Optional
 from urllib.parse import urlparse
 
 from asgiref.sync import sync_to_async
+from django.db import transaction
 from django.db.models import Avg
 from hexbytes import HexBytes
 from web3 import Web3
@@ -13,6 +14,7 @@ from web3.providers import HTTPProvider, IPCProvider, WebsocketProvider
 from web3.types import TxParams, Wei
 
 from . import signals
+from .app_settings import BLOCK_SCAN_RANGE, FETCH_BLOCK_TASK_PRIORITY
 from .models import Block, Chain, Transaction
 
 BLOCK_CREATION_INTERVAL = 10  # In seconds
@@ -72,6 +74,44 @@ def get_transaction_by_hash(
         return Transaction.make(tx_data, block)
     except TransactionNotFound:
         return None
+
+
+def get_block_by_number(w3: Web3, block_number: int) -> Optional[Block]:
+    chain_id = int(w3.net.version)
+    try:
+        block_data = w3.eth.getBlock(block_number, full_transactions=True)
+    except AttributeError:
+        return None
+
+    logger.info(f"Making block #{block_number} with {len(block_data.transactions)} transactions")
+    with transaction.atomic():
+        block = Block.make(block_data, chain_id=chain_id)
+        for tx_data in block_data.transactions:
+            Transaction.make(tx_data, block)
+        return block
+
+
+def run_backfill(w3: Web3, start: int, end: int):
+    chain_id = int(w3.net.version)
+    block_range = (start, end)
+    chain_blocks = Block.objects.filter(chain_id=chain_id, number__range=block_range)
+    recorded_block_set = set(chain_blocks.values_list("number", flat=True))
+    range_set = set(range(*block_range))
+    missing_blocks = list(range_set.difference(recorded_block_set))[::]
+
+    for block_number in missing_blocks:
+        get_block_by_number(w3=w3, block_number=block_number)
+
+
+async def download_all_chain(w3: Web3):
+    start = 0
+    highest = w3.eth.blockNumber
+    while start < highest:
+        await asyncio.sleep(BLOCK_CREATION_INTERVAL)
+        end = min(start + BLOCK_SCAN_RANGE, highest)
+        logger.info(f"Syncing blocks between {start} and {end}")
+        await sync_to_async(run_backfill)(w3=w3, start=start, end=end)
+        start = end
 
 
 async def listen_new_blocks(w3: Web3):

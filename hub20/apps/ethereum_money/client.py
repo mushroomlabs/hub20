@@ -8,7 +8,7 @@ from web3 import Web3
 from web3.exceptions import TransactionNotFound
 
 from hub20.apps.blockchain.client import BLOCK_CREATION_INTERVAL
-from hub20.apps.blockchain.models import Block, Chain, Transaction
+from hub20.apps.blockchain.models import Block, Transaction
 from hub20.apps.ethereum_money import get_ethereum_account_model, signals
 from hub20.apps.ethereum_money.models import EthereumToken
 
@@ -31,8 +31,7 @@ def process_transaction_data(
         return
 
     chain_id = int(w3.net.version)
-    chain = Chain.make(chain_id=chain_id)
-    block = Block.make(block_data, chain=chain)
+    block = Block.make(block_data, chain_id=chain_id)
 
     tx = Transaction.make(tx_data, block=block)
 

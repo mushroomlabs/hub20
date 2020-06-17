@@ -117,10 +117,10 @@ class Block(models.Model):
         return self.chain.highest_block - self.number
 
     @classmethod
-    def make(cls, block_data, chain: Chain):
+    def make(cls, block_data, chain_id: int):
         block_time = datetime.datetime.fromtimestamp(block_data.timestamp)
         block, _ = cls.objects.update_or_create(
-            chain=chain,
+            chain_id=chain_id,
             hash=block_data.hash,
             defaults={
                 "number": block_data.number,
