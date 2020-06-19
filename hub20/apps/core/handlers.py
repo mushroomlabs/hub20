@@ -13,7 +13,7 @@ from hub20.apps.blockchain.signals import (
 )
 from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.models import EthereumToken
-from hub20.apps.ethereum_money.signals import account_deposit_received, blockchain_payment_sent
+from hub20.apps.ethereum_money.signals import account_deposit_received, incoming_transfer_broadcast
 from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
 from hub20.apps.raiden.signals import raiden_payment_received
 
@@ -70,8 +70,8 @@ def on_ethereum_node_ok_send_open_checkout_events(sender, **kw):
 @receiver(account_deposit_received, sender=Transaction)
 def on_account_deposit_check_blockchain_payments(sender, **kw):
     account = kw["account"]
-    transaction = kw["transaction"]
     amount = kw["amount"]
+    transaction = kw["transaction"]
 
     orders = PaymentOrder.objects.with_blockchain_route(transaction.block.number)
     order = orders.filter(routes__blockchainpaymentroute__account=account).first()
@@ -89,24 +89,18 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
     payment_received.send(sender=BlockchainPayment, payment=payment)
 
 
-@receiver(blockchain_payment_sent, sender=EthereumToken)
-def on_blockchain_payment_sent_maybe_publish_checkout(sender, **kw):
-    recipient_address = kw["recipient"]
+@receiver(incoming_transfer_broadcast, sender=EthereumToken)
+def on_incoming_transfer_broadcast_sent_maybe_publish_checkout(sender, **kw):
+    recipient = kw["account"]
     payment_amount = kw["amount"]
     tx_hash = kw["transaction_hash"]
-    chain = Chain.make()
-    current_block = chain.highest_block
 
-    blockchain_payment_route = BlockchainPaymentRoute.objects.filter(
-        account__address=recipient_address, payment_window__contains=current_block
-    ).first()
+    route = BlockchainPaymentRoute.objects.available().filter(account=recipient).first()
 
-    if not blockchain_payment_route:
+    if not route:
         return
 
-    checkout = Checkout.objects.filter(
-        routes__blockchainpaymentroute=blockchain_payment_route
-    ).first()
+    checkout = Checkout.objects.unpaid().with_blockchain_route().filter(routes=route).first()
 
     if not checkout:
         return
@@ -117,7 +111,7 @@ def on_blockchain_payment_sent_maybe_publish_checkout(sender, **kw):
         amount=payment_amount.amount,
         token=payment_amount.currency.address,
         identifier=tx_hash,
-        payment_route=blockchain_payment_route.name,
+        payment_route=route.name,
     )
 
 
@@ -362,7 +356,7 @@ __all__ = [
     "on_ethereum_node_ok_send_open_checkout_events",
     "on_ethereum_node_error_send_open_checkout_events",
     "on_account_deposit_check_blockchain_payments",
-    "on_blockchain_payment_sent_maybe_publish_checkout",
+    "on_incoming_transfer_broadcast_sent_maybe_publish_checkout",
     "on_raiden_payment_received_check_raiden_payments",
     "on_order_created_set_blockchain_route",
     "on_order_created_set_raiden_route",

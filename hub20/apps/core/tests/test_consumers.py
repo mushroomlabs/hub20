@@ -9,7 +9,7 @@ from hub20.apps.core.api import consumer_patterns
 from hub20.apps.core.factories import CheckoutFactory
 from hub20.apps.core.models import CheckoutEvents
 from hub20.apps.ethereum_money.models import EthereumToken
-from hub20.apps.ethereum_money.signals import blockchain_payment_sent
+from hub20.apps.ethereum_money.signals import incoming_transfer_broadcast
 
 application = URLRouter(consumer_patterns)
 
@@ -25,17 +25,17 @@ async def test_checkout_consumer():
 
     assert ok, "Failed to connect"
 
-    account_address = await sync_to_async(
-        checkout.routes.values_list("blockchainpaymentroute__account__address", flat=True).first
+    account = await sync_to_async(
+        checkout.routes.values_list("blockchainpaymentroute__account", flat=True).first
     )()
 
-    assert account_address is not None, "No account found"
+    assert account is not None, "No account found"
 
     tx = await sync_to_async(TransactionFactory)()
-    await sync_to_async(blockchain_payment_sent.send)(
+    await sync_to_async(incoming_transfer_broadcast.send)(
         sender=EthereumToken,
         amount=checkout.as_token_amount,
-        recipient=account_address,
+        account=account,
         transaction_hash=tx.hash_hex,
     )
 
