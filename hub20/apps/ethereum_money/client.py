@@ -51,11 +51,11 @@ def get_transfer_recipient_by_receipt(w3: Web3, token: EthereumToken, tx_receipt
     return tx_logs[0].args._to
 
 
-def get_pending_transfers(w3: Web3, chain: Chain, tx_filter):
+def process_pending_transfers(w3: Web3, chain: Chain, tx_filter):
     chain.refresh_from_db()
 
     # Convert the querysets to lists of addresses
-    accounts_by_addresses = EthereumAccount.objects.values("address", flat=True)
+    accounts_by_addresses = EthereumAccount.objects.values_list("address", flat=True)
     tokens_by_address = {
         token.address: token for token in EthereumToken.ERC20tokens.filter(chain=chain)
     }
@@ -66,6 +66,7 @@ def get_pending_transfers(w3: Web3, chain: Chain, tx_filter):
         Transaction.objects.filter(hash__in=pending_txs).values_list("hash", flat=True)
     )
     for tx_hash in set(pending_txs) - set(recorded_txs):
+        logger.info(f"Processing pending Tx {tx_hash}")
         try:
             tx_data = w3.eth.getTransaction(tx_hash)
             token = tokens_by_address.get(tx_data.to)
@@ -96,63 +97,63 @@ def get_pending_transfers(w3: Web3, chain: Chain, tx_filter):
             logger.exception(exc)
 
 
-async def listen_transfers(w3: Web3):
+def process_latest_transfers(w3: Web3, chain: Chain, block_filter):
+    chain.refresh_from_db()
+
+    accounts_by_address = {a.address: a for a in EthereumAccount.objects.all()}
+    tokens = EthereumToken.ERC20tokens.filter(chain=chain).select_related("chain")
+    tokens_by_address = {token.address: token for token in tokens}
+
+    for block_hash in block_filter.get_new_entries():
+        block_data = w3.eth.getBlock(block_hash.hex(), full_transactions=True)
+
+        logger.info(f"Checking block {block_hash.hex()} for relevant transfers")
+        for tx_data in block_data.transactions:
+            tx_hash = tx_data.hash
+            logger.info(f"Checking Tx {tx_hash.hex()}")
+            sender_address = tx_data["from"]
+
+            token = tokens_by_address.get(tx_data.to)
+            if token:
+                # Possible ERC20 token transfer
+                try:
+                    tx_receipt = w3.eth.getTransactionReceipt(tx_data.hash)
+                    recipient_address = get_transfer_recipient_by_receipt(w3, token, tx_receipt)
+                except TransactionNotFound:
+                    logger.warning(f"Could not get tx {tx_hash.hex()}")
+                    recipient_address = None
+                except AssertionError as exc:
+                    logger.warning(exc)
+                    recipient_address = None
+                except Exception as exc:
+                    logger.exception(exc)
+                    recipient_address = None
+            else:
+                recipient_address = tx_data.to
+
+            sender_account = accounts_by_address.get(sender_address)
+            recipient_account = accounts_by_address.get(recipient_address)
+
+            if sender_account or recipient_account:
+                block = Block.make(block_data, chain_id=chain.id)
+                Transaction.make(tx_data, block=block)
+
+
+async def listen_latest_transfers(w3: Web3):
     block_filter = w3.eth.filter("latest")
     chain_id = int(w3.net.version)
 
-    chain = await sync_to_async(Chain.make)(chain_id=chain_id)
-
     while True:
-        await asyncio.sleep(BLOCK_CREATION_INTERVAL / 2)
-        accounts_by_address = await sync_to_async(
-            lambda: {a.address: a for a in EthereumAccount.objects.all()}
-        )()
-        token_qs = EthereumToken.ERC20tokens.filter(chain=chain).select_related("chain")
-        tokens = await sync_to_async(tuple)(token_qs)
-        tokens_by_address = {token.address: token for token in tokens}
-
-        for block_hash in block_filter.get_new_entries():
-            block_data = w3.eth.getBlock(block_hash.hex(), full_transactions=True)
-
-            logger.info(f"Checking block {block_hash.hex()} for relevant transfers")
-            for tx_data in block_data.transactions:
-                tx_hash = tx_data.hash
-                logger.info(f"Checking Tx {tx_hash.hex()}")
-                sender_address = tx_data["from"]
-
-                token = tokens_by_address.get(tx_data.to)
-                if token:
-                    # Possible ERC20 token transfer
-                    try:
-                        tx_receipt = w3.eth.getTransactionReceipt(tx_data.hash)
-                        recipient_address = get_transfer_recipient_by_receipt(
-                            w3, token, tx_receipt
-                        )
-                    except TransactionNotFound:
-                        logger.warning(f"Could not get tx {tx_hash.hex()}")
-                        recipient_address = None
-                    except AssertionError as exc:
-                        logger.warning(exc)
-                        recipient_address = None
-                    except Exception as exc:
-                        logger.exception(exc)
-                        recipient_address = None
-                else:
-                    recipient_address = tx_data.to
-
-                sender_account = accounts_by_address.get(sender_address)
-                recipient_account = accounts_by_address.get(recipient_address)
-
-                if sender_account or recipient_account:
-                    block = Block.make(block_data, chain_id=chain_id)
-                    Transaction.make(tx_data, block=block)
+        chain = await sync_to_async(Chain.make)(chain_id=chain_id)
+        await asyncio.sleep(BLOCK_CREATION_INTERVAL)
+        await sync_to_async(process_latest_transfers)(w3, chain, block_filter)
 
 
 async def listen_pending_transfers(w3: Web3):
     tx_filter = w3.eth.filter("pending")
-
     chain_id = int(w3.net.version)
+
     while True:
         chain = await sync_to_async(Chain.make)(chain_id=chain_id)
         await asyncio.sleep(BLOCK_CREATION_INTERVAL / 2)
-        await sync_to_async(get_pending_transfers)(w3, chain, tx_filter)
+        await sync_to_async(process_pending_transfers)(w3, chain, tx_filter)
