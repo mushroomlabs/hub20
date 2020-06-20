@@ -42,7 +42,7 @@ def on_transaction_event_check_for_token_transfer(sender, **kw):
         token = EthereumToken.ERC20tokens.filter(address=tx.to_address).first()
 
         if token is not None:
-            recipient_address, transfer_amount = token._decode_token_transfer_input(tx)
+            recipient_address, transfer_amount = token._decode_transaction(tx)
             is_token_transfer = recipient_address is not None and transfer_amount is not None
 
             account = EthereumAccount.objects.filter(address=recipient_address).first()

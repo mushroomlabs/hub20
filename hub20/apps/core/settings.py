@@ -15,6 +15,12 @@ class AppSettings:
         blockchain_route_lifetime = 100  # In blocks
         raiden_route_lifetime = 15 * 60  # In seconds
 
+    class Web3:
+        event_listeners = [
+            "hub20.apps.ethereum_money.client.listen_latest_transfers",
+            "hub20.apps.ethereum_money.client.listen_pending_transfers",
+        ]
+
     def __init__(self):
         self.load()
 
@@ -23,6 +29,7 @@ class AppSettings:
             "TRANSFER_MININUM_CONFIRMATIONS": (self.Transfer, "minimum_confirmations"),
             "PAYMENT_MININUM_CONFIRMATIONS": (self.Payment, "minimum_confirmations"),
             "PAYMENT_BLOCKCHAIN_ROUTE_LIFETIME": (self.Payment, "blockchain_route_lifetime"),
+            "WEB3_EVENT_LISTENERS": (self.Web3, "event_listeners"),
         }
         user_settings = getattr(settings, "HUB20", {})
 

@@ -14,7 +14,6 @@ from model_utils.models import TimeStampedModel
 
 from hub20.apps.blockchain.models import Chain, Transaction
 from hub20.apps.ethereum_money.models import EthereumTokenValueModel
-from hub20.apps.ethereum_wallet.models import Wallet
 from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
 
 from ..choices import PAYMENT_ORDER_STATUS
@@ -158,7 +157,9 @@ class InternalPaymentRoute(PaymentRoute):
 class BlockchainPaymentRoute(PaymentRoute):
     NAME = "blockchain"
 
-    wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name="payment_routes")
+    account = models.ForeignKey(
+        settings.ETHEREUM_ACCOUNT_MODEL, on_delete=models.CASCADE, related_name="payment_routes"
+    )
     payment_window = IntegerRangeField(default=calculate_blockchain_payment_window)
 
     objects = BlockchainRouteManager()

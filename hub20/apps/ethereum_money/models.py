@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 from decimal import Decimal
-from typing import Any, Tuple, Union
+from typing import Any, List, Optional, Tuple, Union
 
 import ethereum
 from django.conf import settings
@@ -15,11 +16,13 @@ from ethtoken import token
 from ethtoken.abi import EIP20_ABI
 from model_utils.managers import QueryManager
 from web3 import Web3
+from web3.contract import Contract
 
 from hub20.apps.blockchain.fields import EthereumAddressField, HexField
 from hub20.apps.blockchain.models import Chain, Transaction
 
 from .app_settings import TRANSFER_GAS_LIMIT
+from .typing import EthereumAccount_T
 
 logger = logging.getLogger(__name__)
 
@@ -37,44 +40,6 @@ def encode_transfer_data(recipient_address, amount: EthereumTokenAmount):
     translator = ContractTranslator(EIP20_ABI)
     encoded_data = translator.encode_function_call("transfer", (recipient_address, amount.as_wei))
     return f"0x{encoded_data.hex()}"
-
-
-class AbstractEthereumAccount(models.Model):
-    address = EthereumAddressField(unique=True, db_index=True)
-
-    def send(self, recipient_address, transfer_amount: EthereumTokenAmount) -> str:
-        raise NotImplementedError()
-
-    def sign_transaction(self, transaction_data, **kw):
-        raise NotImplementedError()
-
-    class Meta:
-        abstract = True
-
-
-class EthereumAccount(AbstractEthereumAccount):
-    private_key = HexField(max_length=64, unique=True)
-
-    def send(self, recipient_address, transfer_amount: EthereumTokenAmount, *args, **kw) -> str:
-        chain = Chain.make()
-        w3 = chain.get_web3()
-        transaction_data = transfer_amount.currency.build_transfer_transaction(
-            w3=w3, sender=self.address, recipient=recipient_address, amount=transfer_amount
-        )
-        signed_tx = self.sign_transaction(transaction_data=transaction_data, w3=w3)
-        return w3.eth.sendRawTransaction(signed_tx.rawTransaction)
-
-    def sign_transaction(self, transaction_data, *args, **kw):
-        chain = Chain.make()
-        w3 = chain.get_web3()
-        return w3.eth.account.signTransaction(transaction_data, self.private_key)
-
-    @classmethod
-    def generate(cls):
-        private_key = os.urandom(32)
-        address = ethereum.utils.privtoaddr(private_key)
-        checksum_address = ethereum.utils.checksum_encode(address.hex())
-        return cls.objects.create(address=checksum_address, private_key=private_key.hex())
 
 
 class EthereumToken(models.Model):
@@ -101,6 +66,12 @@ class EthereumToken(models.Model):
         components.append(str(self.chain_id))
         return " - ".join(components)
 
+    def get_contract(self, w3: Web3) -> Contract:
+        if not self.is_ERC20:
+            raise ValueError("Not an ERC20 token")
+
+        return w3.eth.contract(abi=EIP20_ABI, address=self.address)
+
     def build_transfer_transaction(self, w3: Web3, sender, recipient, amount: EthereumTokenAmount):
 
         chain_id = int(w3.net.version)
@@ -123,7 +94,29 @@ class EthereumToken(models.Model):
             transaction_params.update({"to": recipient, "value": amount.as_wei})
         return transaction_params
 
-    def _decode_token_transfer_input(self, transaction: Transaction) -> Tuple:
+    def _decode_transaction_data(self, tx_data, contract: Optional[Contract] = None) -> Tuple:
+        if not self.is_ERC20:
+            return tx_data.to, self.from_wei(tx_data.value)
+
+        try:
+            assert tx_data["to"] == self.address, f"Not a {self.code} transaction"
+            assert contract is not None, f"{self.code} contract interface required to decode tx"
+
+            fn, args = contract.decode_function_input(tx_data.input)
+
+            # TODO: is this really the best way to identify the transaction as a value transfer?
+            transfer_idenfifier = contract.functions.transfer.function_identifier
+            assert transfer_idenfifier == fn.function_identifier, "No transfer transaction"
+
+            return args["_to"], self.from_wei(args["_value"])
+        except AssertionError as exc:
+            logger.warning(exc)
+            return None, None
+        except Exception as exc:
+            logger.warning(exc)
+            return None, None
+
+    def _decode_transaction(self, transaction: Transaction) -> Tuple:
         # A transfer transaction input is 'function,address,uint256'
         # i.e, 16 bytes + 20 bytes + 32 bytes = hex string of length 136
         try:
@@ -200,6 +193,79 @@ class EthereumTokenValueModel(models.Model):
 
     class Meta:
         abstract = True
+
+
+class AbstractEthereumAccount(models.Model):
+    address = EthereumAddressField(unique=True, db_index=True)
+
+    def send(self, recipient_address, transfer_amount: EthereumTokenAmount) -> str:
+        raise NotImplementedError()
+
+    def sign_transaction(self, transaction_data, **kw):
+        raise NotImplementedError()
+
+    def get_balance(self, currency: EthereumToken) -> EthereumTokenAmount:
+        return EthereumTokenAmount.aggregated(self.balance_entries.all(), currency=currency)
+
+    def get_balances(self, chain: Chain) -> List[EthereumTokenAmount]:
+        return [self.get_balance(token) for token in EthereumToken.objects.filter(chain=chain)]
+
+    @classmethod
+    def select_for_transfer(cls, amount: EthereumTokenAmount) -> Optional[EthereumAccount_T]:
+        max_fee_amount: EthereumTokenAmount = get_max_fee()
+        assert max_fee_amount.is_ETH
+
+        ETH = max_fee_amount.currency
+
+        eth_required = max_fee_amount
+        token_required = EthereumTokenAmount(amount=amount.amount, currency=amount.currency)
+        accounts = cls.objects.all()
+
+        if amount.is_ETH:
+            token_required += eth_required
+            funded_accounts = [
+                account for account in accounts if account.get_balance(ETH) >= token_required
+            ]
+        else:
+            funded_accounts = [
+                account
+                for account in accounts
+                if account.get_balance(token_required.currency) >= token_required
+                and account.get_balance(ETH) >= eth_required
+            ]
+
+        try:
+            return random.choice(funded_accounts)
+        except IndexError:
+            return None
+
+    class Meta:
+        abstract = True
+
+
+class EthereumAccount(AbstractEthereumAccount):
+    private_key = HexField(max_length=64, unique=True)
+
+    def send(self, recipient_address, transfer_amount: EthereumTokenAmount, *args, **kw) -> str:
+        chain = Chain.make()
+        w3 = chain.get_web3()
+        transaction_data = transfer_amount.currency.build_transfer_transaction(
+            w3=w3, sender=self.address, recipient=recipient_address, amount=transfer_amount
+        )
+        signed_tx = self.sign_transaction(transaction_data=transaction_data, w3=w3)
+        return w3.eth.sendRawTransaction(signed_tx.rawTransaction)
+
+    def sign_transaction(self, transaction_data, *args, **kw):
+        chain = Chain.make()
+        w3 = chain.get_web3()
+        return w3.eth.account.signTransaction(transaction_data, self.private_key)
+
+    @classmethod
+    def generate(cls):
+        private_key = os.urandom(32)
+        address = ethereum.utils.privtoaddr(private_key)
+        checksum_address = ethereum.utils.checksum_encode(address.hex())
+        return cls.objects.create(address=checksum_address, private_key=private_key.hex())
 
 
 class AccountBalanceEntry(EthereumTokenValueModel):

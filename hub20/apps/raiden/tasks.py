@@ -4,7 +4,8 @@ from typing import Optional
 
 from celery import shared_task
 
-from hub20.apps.blockchain.models import Block, Chain, Transaction
+from hub20.apps.blockchain.client import get_block_by_hash, get_transaction_by_hash
+from hub20.apps.blockchain.models import Block, Chain
 
 from .models import TokenNetwork, TokenNetworkChannel
 
@@ -28,11 +29,15 @@ def _get_channel_from_event(token_network, event) -> Optional[TokenNetworkChanne
     return None
 
 
-def process_events(token_network, event_filter, w3):
+def process_events(token_network: TokenNetwork, event_filter):
+    chain = token_network.token.chain
+    w3 = chain.get_web3()
     try:
         for event in event_filter.get_all_entries():
             logger.info(f"Processing event {event.event} at {event.transactionHash.hex()}")
-            tx = Transaction.fetch_by_hash(event.transactionHash, w3=w3)
+
+            block = get_block_by_hash(w3, event.blockHash)
+            tx = get_transaction_by_hash(w3, event.transactionHash, block)
             if not tx:
                 logger.warning(f"Transaction {event.transactionHash} could not be synced")
 
@@ -69,5 +74,5 @@ def sync_token_network_events():
             fromBlock=from_block
         )
 
-        process_events(token_network, channel_open_filter, w3)
-        process_events(token_network, channel_closed_filter, w3)
+        process_events(token_network, channel_open_filter)
+        process_events(token_network, channel_closed_filter)

@@ -4,7 +4,7 @@ from rest_framework.test import APIClient
 
 from hub20.apps.core import factories
 from hub20.apps.ethereum_money.factories import Erc20TokenAmountFactory, Erc20TokenFactory
-from hub20.apps.ethereum_wallet.tests.base import add_eth_to_wallet
+from hub20.apps.ethereum_money.tests.base import add_eth_to_account
 
 
 class StoreViewTestCase(TestCase):
@@ -48,7 +48,7 @@ class CheckoutViewTestCase(TestCase):
     def test_payment_serializer(self):
         checkout = factories.CheckoutFactory(store=self.store)
         route = checkout.routes.select_subclasses().first()
-        add_eth_to_wallet(route.wallet, amount=checkout.as_token_amount, chain=checkout.chain)
+        add_eth_to_account(route.account, amount=checkout.as_token_amount, chain=checkout.chain)
 
         url = reverse("hub20:checkout-detail", kwargs={"pk": checkout.pk})
         response = self.client.get(url)

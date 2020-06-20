@@ -99,8 +99,8 @@ services:
     env_file:
       - ./.env
 
-  # Background command to synchonize blockchain
-  job_sync_blockchain:
+  # Background command to listen to blockchain and raiden events
+  job_listen_events:
     stdin_open: true
     tty: true
     restart: always
@@ -108,7 +108,7 @@ services:
       /bin/bash -c "
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
         while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
-        django-admin sync_blockchain
+        django-admin run_event_listeners
       "
 
     image: mushroomlabs/hub20
@@ -122,28 +122,6 @@ services:
     env_file:
       - ./.env
 
-  # Background command to synchonize raiden
-  job_sync_raiden:
-    stdin_open: true
-    tty: true
-    restart: always
-    command: >
-      /bin/bash -c "
-        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
-        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
-        django-admin sync_raiden
-      "
-
-    image: mushroomlabs/hub20
-    build: .
-    volumes:
-      - .:/app
-    depends_on:
-      - db
-      - redis
-
-    env_file:
-      - ./.env
 
   # Background command to track payments
   job_track_payments:

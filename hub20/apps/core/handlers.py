@@ -6,14 +6,14 @@ from psycopg2.extras import NumericRange
 
 from hub20.apps.blockchain.models import Block, Chain, Transaction
 from hub20.apps.blockchain.signals import (
-    blockchain_node_connected,
-    blockchain_node_disconnected,
-    blockchain_node_sync_lost,
-    blockchain_node_sync_recovered,
+    ethereum_node_connected,
+    ethereum_node_disconnected,
+    ethereum_node_sync_lost,
+    ethereum_node_sync_recovered,
 )
+from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.models import EthereumToken
-from hub20.apps.ethereum_money.signals import account_deposit_received
-from hub20.apps.ethereum_wallet.models import Wallet
+from hub20.apps.ethereum_money.signals import account_deposit_received, incoming_transfer_broadcast
 from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
 from hub20.apps.raiden.signals import raiden_payment_received
 
@@ -37,7 +37,6 @@ from .models import (
 )
 from .settings import app_settings
 from .signals import (
-    blockchain_payment_sent,
     payment_confirmed,
     payment_received,
     transfer_confirmed,
@@ -47,36 +46,35 @@ from .signals import (
 )
 
 logger = logging.getLogger(__name__)
+EthereumAccount = get_ethereum_account_model()
 
 
-@receiver(blockchain_node_disconnected, sender=Chain)
-@receiver(blockchain_node_sync_lost, sender=Chain)
-def on_blockchain_node_error_send_open_checkout_events(sender, **kw):
+@receiver(ethereum_node_disconnected, sender=Chain)
+@receiver(ethereum_node_sync_lost, sender=Chain)
+def on_ethereum_node_error_send_open_checkout_events(sender, **kw):
     chain = kw["chain"]
     for checkout in Checkout.objects.filter(chain=chain).unpaid().with_blockchain_route():
         tasks.publish_checkout_event(
-            checkout.id, event_data=CheckoutEvents.BLOCKCHAIN_NODE_UNAVAILABLE.value
+            checkout.id, event_data=CheckoutEvents.ETHEREUM_NODE_UNAVAILABLE.value
         )
 
 
-@receiver(blockchain_node_connected, sender=Chain)
-@receiver(blockchain_node_sync_recovered, sender=Chain)
-def on_blockchain_node_ok_send_open_checkout_events(sender, **kw):
+@receiver(ethereum_node_connected, sender=Chain)
+@receiver(ethereum_node_sync_recovered, sender=Chain)
+def on_ethereum_node_ok_send_open_checkout_events(sender, **kw):
     chain = kw["chain"]
     for checkout in Checkout.objects.filter(chain=chain).unpaid().with_blockchain_route():
-        tasks.publish_checkout_event(
-            checkout.id, event_data=CheckoutEvents.BLOCKCHAIN_NODE_OK.value
-        )
+        tasks.publish_checkout_event(checkout.id, event_data=CheckoutEvents.ETHEREUM_NODE_OK.value)
 
 
 @receiver(account_deposit_received, sender=Transaction)
 def on_account_deposit_check_blockchain_payments(sender, **kw):
     account = kw["account"]
-    transaction = kw["transaction"]
     amount = kw["amount"]
+    transaction = kw["transaction"]
 
     orders = PaymentOrder.objects.with_blockchain_route(transaction.block.number)
-    order = orders.filter(routes__blockchainpaymentroute__wallet__account=account).first()
+    order = orders.filter(routes__blockchainpaymentroute__account=account).first()
 
     if not order:
         return
@@ -91,24 +89,18 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
     payment_received.send(sender=BlockchainPayment, payment=payment)
 
 
-@receiver(blockchain_payment_sent, sender=EthereumToken)
-def on_blockchain_payment_sent_maybe_publish_checkout(sender, **kw):
-    recipient_address = kw["recipient"]
+@receiver(incoming_transfer_broadcast, sender=EthereumToken)
+def on_incoming_transfer_broadcast_sent_maybe_publish_checkout(sender, **kw):
+    recipient = kw["account"]
     payment_amount = kw["amount"]
     tx_hash = kw["transaction_hash"]
-    chain = Chain.make()
-    current_block = chain.highest_block
 
-    blockchain_payment_route = BlockchainPaymentRoute.objects.filter(
-        wallet__account__address=recipient_address, payment_window__contains=current_block
-    ).first()
+    route = BlockchainPaymentRoute.objects.available().filter(account=recipient).first()
 
-    if not blockchain_payment_route:
+    if not route:
         return
 
-    checkout = Checkout.objects.filter(
-        routes__blockchainpaymentroute=blockchain_payment_route
-    ).first()
+    checkout = Checkout.objects.unpaid().with_blockchain_route().filter(routes=route).first()
 
     if not checkout:
         return
@@ -119,7 +111,7 @@ def on_blockchain_payment_sent_maybe_publish_checkout(sender, **kw):
         amount=payment_amount.amount,
         token=payment_amount.currency.address,
         identifier=tx_hash,
-        payment_route=blockchain_payment_route.name,
+        payment_route=route.name,
     )
 
 
@@ -156,13 +148,13 @@ def on_order_created_set_blockchain_route(sender, **kw):
 
         payment_window = (current_block, expiration_block)
 
-        available_wallets = Wallet.objects.exclude(
+        available_accounts = EthereumAccount.objects.exclude(
             payment_routes__payment_window__overlap=NumericRange(*payment_window)
         )
 
-        wallet = available_wallets.order_by("?").first() or Wallet.generate()
+        account = available_accounts.order_by("?").first() or EthereumAccount.generate()
         BlockchainPaymentRoute.objects.create(
-            order=order, wallet=wallet, payment_window=payment_window
+            order=order, account=account, payment_window=payment_window
         )
     else:
         logger.warning("Failed to create blockchain route. Chain data not synced")
@@ -222,7 +214,7 @@ def on_block_added_publish_expired_blockchain_routes(sender, **kw):
         tasks.publish_checkout_event.delay(
             route.order_id,
             event=CheckoutEvents.BLOCKCHAIN_ROUTE_EXPIRED.value,
-            route=route.wallet.address,
+            route=route.account.address,
         )
 
 
@@ -361,10 +353,10 @@ def on_store_created_generate_key_pair(sender, **kw):
 
 
 __all__ = [
-    "on_blockchain_node_ok_send_open_checkout_events",
-    "on_blockchain_node_error_send_open_checkout_events",
+    "on_ethereum_node_ok_send_open_checkout_events",
+    "on_ethereum_node_error_send_open_checkout_events",
     "on_account_deposit_check_blockchain_payments",
-    "on_blockchain_payment_sent_maybe_publish_checkout",
+    "on_incoming_transfer_broadcast_sent_maybe_publish_checkout",
     "on_raiden_payment_received_check_raiden_payments",
     "on_order_created_set_blockchain_route",
     "on_order_created_set_raiden_route",

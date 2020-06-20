@@ -37,7 +37,6 @@ THIRD_PARTY_APPS = [
 PROJECT_APPS = [
     "hub20.apps.blockchain",
     "hub20.apps.ethereum_money",
-    "hub20.apps.ethereum_wallet",
     "hub20.apps.raiden",
     "hub20.apps.core",
 ]
