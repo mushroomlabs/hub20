@@ -6,12 +6,9 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from hub20.apps.blockchain.factories import BlockFactory, TransactionFactory
+from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.factories import EthereumAccountFactory, ETHFactory
-from hub20.apps.ethereum_money.models import (
-    EthereumAccount,
-    EthereumTokenAmount,
-    encode_transfer_data,
-)
+from hub20.apps.ethereum_money.models import EthereumTokenAmount, encode_transfer_data
 from hub20.apps.ethereum_money.tests.base import add_eth_to_account, add_token_to_account
 from hub20.apps.raiden.factories import ChannelFactory, PaymentEventFactory, TokenNetworkFactory
 
@@ -27,6 +24,8 @@ from ..factories import (
 )
 from ..models import BlockchainPaymentRoute, ExternalTransfer, RaidenPaymentRoute, UserAccount
 from ..settings import app_settings
+
+EthereumAccount = get_ethereum_account_model()
 
 
 @pytest.mark.django_db(transaction=True)
@@ -172,7 +171,7 @@ class InternalTransferTestCase(TransferTestCase):
         self.assertEqual(transfer.status, TRANSFER_EVENT_TYPES.failed)
 
 
-@patch("hub20.apps.ethereum_money.models.EthereumAccount.select_for_transfer")
+@patch(f"{EthereumAccount.__module__}.{EthereumAccount.__name__}.select_for_transfer")
 class ExternalTransferTestCase(TransferTestCase):
     def setUp(self):
         super().setUp()

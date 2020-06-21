@@ -5,9 +5,12 @@ import pytest
 from django.test import TestCase
 from eth_utils import is_checksum_address
 
+from .. import get_ethereum_account_model
 from ..factories import Erc20TokenFactory, EthereumAccountFactory, ETHFactory
-from ..models import EthereumAccount, EthereumTokenAmount
+from ..models import EthereumTokenAmount
 from .base import add_eth_to_account, add_token_to_account
+
+EthereumAccount = get_ethereum_account_model()
 
 
 @pytest.mark.django_db(transaction=True)

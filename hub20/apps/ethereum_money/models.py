@@ -9,8 +9,9 @@ from typing import Any, List, Optional, Tuple, Union
 import ethereum
 from django.conf import settings
 from django.db import models
-from django.db.models import Q, Sum
+from django.db.models import Max, Q, Sum
 from eth_utils import to_checksum_address
+from eth_wallet import Wallet
 from ethereum.abi import ContractTranslator
 from ethtoken import token
 from ethtoken.abi import EIP20_ABI
@@ -21,7 +22,7 @@ from web3.contract import Contract
 from hub20.apps.blockchain.fields import EthereumAddressField, HexField
 from hub20.apps.blockchain.models import Chain, Transaction
 
-from .app_settings import TRANSFER_GAS_LIMIT
+from .app_settings import HD_WALLET_MNEMONIC, HD_WALLET_ROOT_KEY, TRANSFER_GAS_LIMIT
 from .typing import EthereumAccount_T
 
 logger = logging.getLogger(__name__)
@@ -198,11 +199,22 @@ class EthereumTokenValueModel(models.Model):
 class AbstractEthereumAccount(models.Model):
     address = EthereumAddressField(unique=True, db_index=True)
 
-    def send(self, recipient_address, transfer_amount: EthereumTokenAmount) -> str:
-        raise NotImplementedError()
+    def send(self, recipient_address, transfer_amount: EthereumTokenAmount, *args, **kw) -> str:
+        chain = Chain.make()
+        w3 = chain.get_web3()
+        transaction_data = transfer_amount.currency.build_transfer_transaction(
+            w3=w3, sender=self.address, recipient=recipient_address, amount=transfer_amount
+        )
+        signed_tx = self.sign_transaction(transaction_data=transaction_data, w3=w3)
+        return w3.eth.sendRawTransaction(signed_tx.rawTransaction)
 
-    def sign_transaction(self, transaction_data, **kw):
-        raise NotImplementedError()
+    def sign_transaction(self, transaction_data, *args, **kw):
+        if not hasattr(self, "private_key"):
+            raise NotImplementedError("Can not sign transaction without the private key")
+
+        chain = Chain.make()
+        w3 = chain.get_web3()
+        return w3.eth.account.signTransaction(transaction_data, self.private_key)
 
     def get_balance(self, currency: EthereumToken) -> EthereumTokenAmount:
         return EthereumTokenAmount.aggregated(self.balance_entries.all(), currency=currency)
@@ -243,22 +255,8 @@ class AbstractEthereumAccount(models.Model):
         abstract = True
 
 
-class EthereumAccount(AbstractEthereumAccount):
+class KeystoreAccount(AbstractEthereumAccount):
     private_key = HexField(max_length=64, unique=True)
-
-    def send(self, recipient_address, transfer_amount: EthereumTokenAmount, *args, **kw) -> str:
-        chain = Chain.make()
-        w3 = chain.get_web3()
-        transaction_data = transfer_amount.currency.build_transfer_transaction(
-            w3=w3, sender=self.address, recipient=recipient_address, amount=transfer_amount
-        )
-        signed_tx = self.sign_transaction(transaction_data=transaction_data, w3=w3)
-        return w3.eth.sendRawTransaction(signed_tx.rawTransaction)
-
-    def sign_transaction(self, transaction_data, *args, **kw):
-        chain = Chain.make()
-        w3 = chain.get_web3()
-        return w3.eth.account.signTransaction(transaction_data, self.private_key)
 
     @classmethod
     def generate(cls):
@@ -266,6 +264,38 @@ class EthereumAccount(AbstractEthereumAccount):
         address = ethereum.utils.privtoaddr(private_key)
         checksum_address = ethereum.utils.checksum_encode(address.hex())
         return cls.objects.create(address=checksum_address, private_key=private_key.hex())
+
+
+class HierarchicalDeterministicWallet(AbstractEthereumAccount):
+    BASE_PATH_FORMAT = "m/44'/60'/0'/0/{index}"
+
+    index = models.PositiveIntegerField(unique=True)
+
+    @property
+    def private_key(self):
+        wallet = self.__class__.get_wallet(index=self.index)
+        return wallet.private_key()
+
+    @classmethod
+    def get_wallet(cls, index: int) -> Wallet:
+        wallet = Wallet()
+
+        if HD_WALLET_MNEMONIC:
+            wallet.from_mnemonic(mnemonic=HD_WALLET_MNEMONIC)
+        elif HD_WALLET_ROOT_KEY:
+            wallet.from_root_private_key(root_private_key=HD_WALLET_ROOT_KEY)
+        else:
+            raise ValueError("Can not generate new addresses for HD Wallets. No seed available")
+
+        wallet.from_path(cls.BASE_PATH_FORMAT.format(index=index))
+        return wallet
+
+    @classmethod
+    def generate(cls):
+
+        index = cls.objects.aggregate(generation=Max("index")).get("generation") or 0
+        wallet = HierarchicalDeterministicWallet.get_wallet(index)
+        return cls.objects.create(index=index, address=wallet.address())
 
 
 class AccountBalanceEntry(EthereumTokenValueModel):
@@ -349,7 +379,8 @@ __all__ = [
     "EthereumToken",
     "EthereumTokenAmount",
     "EthereumTokenValueModel",
-    "EthereumAccount",
+    "KeystoreAccount",
+    "HierarchicalDeterministicWallet",
     "AccountBalanceEntry",
     "get_max_fee",
     "encode_transfer_data",

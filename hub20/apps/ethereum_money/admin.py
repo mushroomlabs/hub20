@@ -20,16 +20,16 @@ class EthereumAccountAdmin(admin.ModelAdmin):
     list_display = ["address"]
 
     def has_add_permission(
-        self, request: HttpRequest, obj: Optional[models.EthereumAccount] = None
+        self, request: HttpRequest, obj: Optional[EthereumAccount] = None
     ) -> bool:
         return False
 
     def has_change_permission(
-        self, request: HttpRequest, obj: Optional[models.EthereumAccount] = None
+        self, request: HttpRequest, obj: Optional[EthereumAccount] = None
     ) -> bool:
         return False
 
     def has_delete_permission(
-        self, request: HttpRequest, obj: Optional[models.EthereumAccount] = None
+        self, request: HttpRequest, obj: Optional[EthereumAccount] = None
     ) -> bool:
         return False
