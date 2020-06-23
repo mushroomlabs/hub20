@@ -4,20 +4,23 @@ from typing import Optional
 from urllib.parse import urlparse
 
 from asgiref.sync import sync_to_async
+from django.conf import settings
 from django.db import transaction
 from django.db.models import Avg
 from hexbytes import HexBytes
 from web3 import Web3
-from web3.exceptions import TransactionNotFound
+from web3.exceptions import TimeExhausted, TransactionNotFound
 from web3.middleware import geth_poa_middleware
 from web3.providers import HTTPProvider, IPCProvider, WebsocketProvider
 from web3.types import TxParams, Wei
 
 from . import signals
-from .app_settings import BLOCK_SCAN_RANGE, FETCH_BLOCK_TASK_PRIORITY
+from .app_settings import BLOCK_SCAN_RANGE, DEFAULT_GAS_PRICE_GWEI
 from .models import Block, Chain, Transaction
 
 BLOCK_CREATION_INTERVAL = 10  # In seconds
+DEFAULT_PRICE = Web3.toWei(DEFAULT_GAS_PRICE_GWEI, "gwei")
+WEB3_CLIENTS = {}
 
 logger = logging.getLogger(__name__)
 
@@ -27,16 +30,34 @@ def database_history_gas_price_strategy(w3: Web3, params: TxParams = None) -> We
     BLOCK_HISTORY_SIZE = 100
     chain_id = int(w3.net.version)
     current_block_number = w3.eth.blockNumber
-    default_price = Web3.toWei(1.2, "gwei")
 
     txs = Transaction.objects.filter(
         block__chain=chain_id, block__number__gte=current_block_number - BLOCK_HISTORY_SIZE
     )
-    return Wei(txs.aggregate(avg_price=Avg("gas_price")).get("avg_price")) or default_price
+    return Wei(txs.aggregate(avg_price=Avg("gas_price")).get("avg_price")) or DEFAULT_PRICE
 
 
-def make_web3(chain) -> Web3:
-    endpoint = urlparse(chain.provider_url)
+def send_transaction(
+    w3: Web3, contract_function, account_address, account_private_key, gas, *args, **kw
+):
+    transaction_params = {
+        "chainId": int(w3.net.version),
+        "nonce": w3.eth.getTransactionCount(account_address),
+        "gasPrice": kw.pop("gas_price", DEFAULT_PRICE),
+        "gas": gas,
+    }
+
+    transaction_params.update(**kw)
+
+    result = contract_function(*args)
+    transaction_data = result.buildTransaction(transaction_params)
+    signed = w3.eth.account.signTransaction(transaction_data, account_private_key)
+    tx_hash = w3.eth.sendRawTransaction(signed.rawTransaction)
+    return w3.eth.waitForTransactionReceipt(tx_hash)
+
+
+def make_web3(provider_url: str) -> Web3:
+    endpoint = urlparse(provider_url)
     logger.info(f"Instantiating new Web3 for {endpoint.hostname}")
     provider_class = {
         "http": HTTPProvider,
@@ -45,13 +66,20 @@ def make_web3(chain) -> Web3:
         "wss": WebsocketProvider,
     }.get(endpoint.scheme, IPCProvider)
 
-    w3 = Web3(provider_class(chain.provider_url))
+    w3 = Web3(provider_class(provider_url))
     w3.middleware_onion.inject(geth_poa_middleware, layer=0)
     w3.eth.setGasPriceStrategy(database_history_gas_price_strategy)
 
-    chain_id = int(w3.net.version)
-    message = f"{endpoint.hostname} connected to {chain_id}, expected {chain.id}"
-    assert chain_id == chain.id, message
+    return w3
+
+
+def get_web3(provider_url: Optional[str] = None, force_new: bool = False) -> Web3:
+    provider_url = provider_url or settings.WEB3_PROVIDER_URI
+    w3 = WEB3_CLIENTS.get(provider_url)
+
+    if w3 is None or force_new:
+        w3 = make_web3(provider_url)
+        WEB3_CLIENTS[provider_url] = w3
 
     return w3
 
@@ -69,9 +97,11 @@ def get_transaction_by_hash(
     w3: Web3, transaction_hash: HexBytes, block: Block
 ) -> Optional[Transaction]:
     try:
-        tx_data = w3.eth.getTransaction(transaction_hash)
-        assert block.hash == tx_data.blockHash, "Block hash data differ"
-        return Transaction.make(tx_data, block)
+        return Transaction.make(
+            tx_data=w3.eth.getTransaction(transaction_hash),
+            tx_receipt=w3.eth.getTransactionReceipt(transaction_hash),
+            block=block,
+        )
     except TransactionNotFound:
         return None
 
@@ -87,7 +117,15 @@ def get_block_by_number(w3: Web3, block_number: int) -> Optional[Block]:
     with transaction.atomic():
         block = Block.make(block_data, chain_id=chain_id)
         for tx_data in block_data.transactions:
-            Transaction.make(tx_data, block)
+            try:
+                tx_hash = tx_data.hash.hex()
+                Transaction.make(
+                    tx_data=tx_data,
+                    tx_receipt=w3.eth.waitForTransactionReceipt(tx_hash),
+                    block=block,
+                )
+            except TimeExhausted:
+                logger.warning(f"Timeout when trying to get transaction {tx_hash}")
         return block
 
 

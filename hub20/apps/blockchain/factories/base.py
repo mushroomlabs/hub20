@@ -67,7 +67,7 @@ class TransactionFactory(factory.django.DjangoModelFactory):
     hash = factory.Faker("hex64")
     from_address = factory.Faker("ethereum_address")
     to_address = factory.Faker("ethereum_address")
-    gas = 21000
+    gas_used = 21000
     gas_price = factory.fuzzy.FuzzyInteger(1e10, 2e12)
     nonce = factory.Sequence(lambda n: n)
     index = factory.Faker("uint256")

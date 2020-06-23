@@ -13,7 +13,6 @@ from django.db.models import Max, Q, Sum
 from eth_utils import to_checksum_address
 from eth_wallet import Wallet
 from ethereum.abi import ContractTranslator
-from ethtoken import token
 from ethtoken.abi import EIP20_ABI
 from model_utils.managers import QueryManager
 from web3 import Web3
@@ -28,8 +27,7 @@ from .typing import EthereumAccount_T
 logger = logging.getLogger(__name__)
 
 
-def get_max_fee() -> EthereumTokenAmount:
-    chain = Chain.make()
+def get_max_fee(chain: Chain) -> EthereumTokenAmount:
     w3 = chain.get_web3()
     ETH = EthereumToken.ETH(chain=chain)
 
@@ -155,17 +153,11 @@ class EthereumToken(models.Model):
         return eth
 
     @classmethod
-    def make(cls, address: str, chain: Chain):
+    def make(cls, address: str, chain: Chain, **defaults):
         if address == EthereumToken.NULL_ADDRESS:
             return EthereumToken.ETH(chain)
 
-        proxy = token(address)
-
-        obj, _ = cls.objects.update_or_create(
-            address=address,
-            chain=chain,
-            defaults={"name": proxy.name(), "code": proxy.symbol(), "decimals": proxy.decimals()},
-        )
+        obj, _ = cls.objects.update_or_create(address=address, chain=chain, defaults=defaults)
         return obj
 
     class Meta:
@@ -200,20 +192,17 @@ class AbstractEthereumAccount(models.Model):
     address = EthereumAddressField(unique=True, db_index=True)
 
     def send(self, recipient_address, transfer_amount: EthereumTokenAmount, *args, **kw) -> str:
-        chain = Chain.make()
+        chain = transfer_amount.currency.chain
         w3 = chain.get_web3()
         transaction_data = transfer_amount.currency.build_transfer_transaction(
             w3=w3, sender=self.address, recipient=recipient_address, amount=transfer_amount
         )
-        signed_tx = self.sign_transaction(transaction_data=transaction_data, w3=w3)
+        signed_tx = self.sign_transaction(w3=w3, transaction_data=transaction_data)
         return w3.eth.sendRawTransaction(signed_tx.rawTransaction)
 
-    def sign_transaction(self, transaction_data, *args, **kw):
+    def sign_transaction(self, w3: Web3, transaction_data, *args, **kw):
         if not hasattr(self, "private_key"):
             raise NotImplementedError("Can not sign transaction without the private key")
-
-        chain = Chain.make()
-        w3 = chain.get_web3()
         return w3.eth.account.signTransaction(transaction_data, self.private_key)
 
     def get_balance(self, currency: EthereumToken) -> EthereumTokenAmount:
@@ -224,7 +213,7 @@ class AbstractEthereumAccount(models.Model):
 
     @classmethod
     def select_for_transfer(cls, amount: EthereumTokenAmount) -> Optional[EthereumAccount_T]:
-        max_fee_amount: EthereumTokenAmount = get_max_fee()
+        max_fee_amount: EthereumTokenAmount = get_max_fee(chain=amount.currency.chain)
         assert max_fee_amount.is_ETH
 
         ETH = max_fee_amount.currency

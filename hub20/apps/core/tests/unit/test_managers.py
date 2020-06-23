@@ -1,11 +1,10 @@
 import pytest
 from django.test import TestCase
 
+from hub20.apps.core.factories import Erc20TokenPaymentOrderFactory
+from hub20.apps.core.models import BlockchainPaymentRoute, PaymentOrder, RaidenPaymentRoute
 from hub20.apps.ethereum_money.tests.base import add_token_to_account
 from hub20.apps.raiden.factories import ChannelFactory, TokenNetworkFactory
-
-from ..factories import Erc20TokenPaymentOrderFactory
-from ..models import BlockchainPaymentRoute, PaymentOrder, RaidenPaymentRoute
 
 
 @pytest.mark.django_db(transaction=True)

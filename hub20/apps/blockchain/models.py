@@ -1,6 +1,5 @@
 import datetime
 import logging
-from typing import Dict, Optional
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -9,11 +8,9 @@ from django.db import models
 from django.db.models import Avg, Max
 from django.utils import timezone
 from web3 import Web3
-from web3.middleware import geth_poa_middleware
-from web3.providers import HTTPProvider, IPCProvider, WebsocketProvider
 from web3.types import TxParams, Wei
 
-from .app_settings import CHAIN_ID, START_BLOCK_NUMBER
+from .app_settings import START_BLOCK_NUMBER
 from .choices import ETHEREUM_CHAINS
 from .fields import EthereumAddressField, HexField, Uint256Field
 from .managers import TransactionManager
@@ -42,45 +39,13 @@ class Chain(models.Model):
     synced = models.BooleanField()
     highest_block = models.PositiveIntegerField()
 
-    _WEB3_CLIENTS: Dict[str, Web3] = {}
-
     @property
     def provider_hostname(self):
         endpoint = urlparse(self.provider_url)
         return endpoint.hostname
 
-    def _make_web3(self) -> Web3:
-        endpoint = urlparse(self.provider_url)
-        logger.info(f"Instantiating new Web3 for {endpoint.hostname}")
-        provider_class = {
-            "http": HTTPProvider,
-            "https": HTTPProvider,
-            "ws": WebsocketProvider,
-            "wss": WebsocketProvider,
-        }.get(endpoint.scheme, IPCProvider)
-
-        w3 = Web3(provider_class(self.provider_url))
-        w3.middleware_onion.inject(geth_poa_middleware, layer=0)
-        w3.eth.setGasPriceStrategy(database_history_gas_price_strategy)
-
-        chain_id = int(w3.net.version)
-        message = f"{endpoint.hostname} connected to {chain_id}, expected {self.id}"
-        assert chain_id == self.id, message
-
-        return w3
-
-    def get_web3(self, force_new: bool = False) -> Web3:
-
-        w3 = Chain._WEB3_CLIENTS.get(self.provider_url)
-
-        if w3 is None or force_new:
-            w3 = self._make_web3()
-            Chain._WEB3_CLIENTS[self.provider_url] = w3
-
-        return w3
-
     @classmethod
-    def make(cls, chain_id: Optional[int] = CHAIN_ID):
+    def make(cls, chain_id):
         chain, _ = cls.objects.get_or_create(
             id=chain_id,
             defaults={
@@ -143,8 +108,8 @@ class Transaction(models.Model):
     block = models.ForeignKey(Block, on_delete=models.CASCADE, related_name="transactions")
     hash = HexField(max_length=64, db_index=True)
     from_address = EthereumAddressField(db_index=True)
-    to_address = EthereumAddressField(db_index=True, null=True)
-    gas = Uint256Field()
+    to_address = EthereumAddressField(db_index=True)
+    gas_used = Uint256Field()
     gas_price = Uint256Field()
     nonce = Uint256Field()
     index = Uint256Field()
@@ -158,24 +123,33 @@ class Transaction(models.Model):
         return self.hash if type(self.hash) is str else self.hash.hex()
 
     @classmethod
-    def make(cls, transaction_data, block: Block):
+    def make(cls, tx_data, tx_receipt, block: Block):
+        try:
+            assert tx_data.blockHash == tx_receipt.blockHash, "tx data/receipt block hash mismatch"
+            assert tx_data.blockHash == block.hash, "Block hash mismatch"
+            assert tx_data.hash == tx_receipt.transactionHash, "Tx hash mismatch"
+            assert tx_data["from"] == tx_receipt["from"], "Sender address mismatch"
+            assert tx_data["to"] == tx_receipt["to"], "Recipient address mismatch"
+            assert tx_data.transactionIndex == tx_receipt.transactionIndex, "Tx index mismatch"
+            assert tx_receipt.status != 0, "Receipt indicates tx was reverted"
+        except AssertionError as exc:
+            logger.warning(f"Transaction will not be recorded: {exc}")
+            return None
+
         tx, _ = cls.objects.get_or_create(
-            hash=transaction_data.hash,
+            hash=tx_receipt.transactionHash,
             block=block,
             defaults={
-                "from_address": transaction_data["from"],
-                "to_address": transaction_data.to,
-                "gas": transaction_data.gas,
-                "gas_price": transaction_data.gasPrice,
-                "nonce": transaction_data.nonce,
-                "index": transaction_data.transactionIndex,
-                "value": transaction_data.value,
-                "data": transaction_data.input,
+                "from_address": tx_receipt["from"],
+                "to_address": tx_receipt.to,
+                "index": tx_receipt.transactionIndex,
+                "gas_used": tx_receipt.gasUsed,
+                "gas_price": tx_data.gasPrice,
+                "nonce": tx_data.nonce,
+                "value": tx_data.value,
+                "data": tx_data.input,
             },
         )
-
-        w3 = block.chain.get_web3()
-        tx_receipt = w3.eth.waitForTransactionReceipt(transaction_data.hash)
 
         for log_data in tx_receipt.logs:
             TransactionLog.make(log_data, tx)

@@ -6,14 +6,8 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from hub20.apps.blockchain.factories import BlockFactory, TransactionFactory
-from hub20.apps.ethereum_money import get_ethereum_account_model
-from hub20.apps.ethereum_money.factories import EthereumAccountFactory, ETHFactory
-from hub20.apps.ethereum_money.models import EthereumTokenAmount, encode_transfer_data
-from hub20.apps.ethereum_money.tests.base import add_eth_to_account, add_token_to_account
-from hub20.apps.raiden.factories import ChannelFactory, PaymentEventFactory, TokenNetworkFactory
-
-from ..choices import TRANSFER_EVENT_TYPES
-from ..factories import (
+from hub20.apps.core.choices import TRANSFER_EVENT_TYPES
+from hub20.apps.core.factories import (
     CheckoutFactory,
     Erc20TokenPaymentOrderFactory,
     Erc20TokenUserBalanceEntryFactory,
@@ -22,8 +16,18 @@ from ..factories import (
     StoreFactory,
     UserAccountFactory,
 )
-from ..models import BlockchainPaymentRoute, ExternalTransfer, RaidenPaymentRoute, UserAccount
-from ..settings import app_settings
+from hub20.apps.core.models import (
+    BlockchainPaymentRoute,
+    ExternalTransfer,
+    RaidenPaymentRoute,
+    UserAccount,
+)
+from hub20.apps.core.settings import app_settings
+from hub20.apps.ethereum_money import get_ethereum_account_model
+from hub20.apps.ethereum_money.factories import EthereumAccountFactory, ETHFactory
+from hub20.apps.ethereum_money.models import EthereumTokenAmount, encode_transfer_data
+from hub20.apps.ethereum_money.tests.base import add_eth_to_account, add_token_to_account
+from hub20.apps.raiden.factories import ChannelFactory, PaymentEventFactory, TokenNetworkFactory
 
 EthereumAccount = get_ethereum_account_model()
 

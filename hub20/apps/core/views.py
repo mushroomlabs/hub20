@@ -9,7 +9,6 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.serializers import Serializer
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-from hub20.apps.blockchain.app_settings import CHAIN_ID
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
 
 from . import models, serializers
@@ -94,7 +93,7 @@ class TokenBalanceListView(generics.ListAPIView):
     serializer_class = serializers.TokenBalanceSerializer
 
     def get_queryset(self) -> List[EthereumTokenAmount]:
-        return models.UserAccount(self.request.user).get_balances(chain_id=CHAIN_ID)
+        return models.UserAccount(self.request.user).get_balances()
 
 
 class TokenBalanceView(generics.RetrieveAPIView):
@@ -103,7 +102,7 @@ class TokenBalanceView(generics.RetrieveAPIView):
 
     def get_object(self) -> EthereumTokenAmount:
         user_account = models.UserAccount(self.request.user)
-        token = get_object_or_404(EthereumToken, code=self.kwargs["code"], chain=CHAIN_ID)
+        token = get_object_or_404(EthereumToken, code=self.kwargs["code"])
         return user_account.get_balance(token)
 
 

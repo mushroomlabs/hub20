@@ -73,7 +73,7 @@ def on_sync_lost_update_chain(sender, **kw):
 @receiver(signals.ethereum_node_sync_recovered, sender=Chain)
 def on_sync_recovered_update_chain(sender, **kw):
     chain = kw["chain"]
-    logger.warning(f"Client {chain.provider_url} back in sync")
+    logger.warning(f"Client {chain.provider_hostname} back in sync")
     chain.synced = True
     chain.highest_block = kw["block_height"]
     chain.save()

@@ -249,7 +249,7 @@ def on_blockchain_payment_received_maybe_publish_checkout(sender, **kw):
         checkout.id,
         amount=payment.amount,
         token=payment.currency.address,
-        identifier=payment.transaction.hash.hex(),
+        identifier=payment.transaction.hash_hex,
         payment_method=PAYMENT_METHODS.blockchain,
         event="payment.received",
     )

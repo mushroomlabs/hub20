@@ -26,7 +26,6 @@ services:
 
   raiden:
     image: raidennetwork/raiden:latest
-    restart: always
     volumes:
       - ./docker/volumes/raiden/config:/root/.raiden/
       - ./docker/volumes/raiden/keystore:/root/.ethereum/keystore
