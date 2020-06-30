@@ -27,7 +27,8 @@ raiden_contracts
 uvicorn
 web3<6.0.0,>=5.4.0
 
-# Testing / Document Generation
+# Testing / CI / Document Generation
+bump2version
 mkdocs
 mkdocs-material
 pytest-asyncio
