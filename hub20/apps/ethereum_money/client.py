@@ -20,16 +20,18 @@ EthereumAccount = get_ethereum_account_model()
 
 
 def _decode_transfer_arguments(w3: Web3, token: EthereumToken, tx_data):
-    contract = w3.eth.contract(abi=EIP20_ABI, address=token.address)
+    try:
+        contract = w3.eth.contract(abi=EIP20_ABI, address=token.address)
+        fn, args = contract.decode_function_input(tx_data.input)
 
-    fn, args = contract.decode_function_input(tx_data.input)
+        # TODO: is this really the best way to identify the transaction as a value transfer?
+        transfer_idenfifier = contract.functions.transfer.function_identifier
+        if not transfer_idenfifier == fn.function_identifier:
+            return None
 
-    # TODO: is this really the best way to identify the transaction as a value transfer?
-    transfer_idenfifier = contract.functions.transfer.function_identifier
-    if not transfer_idenfifier == fn.function_identifier:
-        return None
-
-    return args
+        return args
+    except Exception as exc:
+        logger.exception(exc)
 
 
 def encode_transfer_data(recipient_address, amount: EthereumTokenAmount):
@@ -115,7 +117,6 @@ def process_pending_transfers(w3: Web3, chain: Chain, tx_filter):
         Transaction.objects.filter(hash__in=pending_txs).values_list("hash", flat=True)
     )
     for tx_hash in set(pending_txs) - set(recorded_txs):
-        logger.info(f"Processing pending Tx {tx_hash}")
         try:
             tx_data = w3.eth.getTransaction(tx_hash)
             token = tokens_by_address.get(tx_data.to)
@@ -130,6 +131,7 @@ def process_pending_transfers(w3: Web3, chain: Chain, tx_filter):
 
             recipient = accounts_by_addresses.get(recipient_address)
             if recipient is not None and amount is not None:
+                logger.info(f"Processing pending Tx {tx_hash}")
                 signals.incoming_transfer_broadcast.send(
                     sender=EthereumToken,
                     account=recipient,
@@ -159,7 +161,6 @@ def process_latest_transfers(w3: Web3, chain: Chain, block_filter):
         logger.info(f"Checking block {block_hash.hex()} for relevant transfers")
         for tx_data in block_data.transactions:
             tx_hash = tx_data.hash
-            logger.info(f"Processing mined Tx {tx_hash.hex()}")
 
             token = tokens_by_address.get(tx_data.to)
             sender = tx_data["from"]
