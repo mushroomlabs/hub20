@@ -9,7 +9,7 @@ from ethtoken.abi import EIP20_ABI
 from web3 import Web3
 from web3.exceptions import TimeExhausted, TransactionNotFound
 
-from hub20.apps.blockchain.client import BLOCK_CREATION_INTERVAL
+from hub20.apps.blockchain.client import BLOCK_CREATION_INTERVAL, BLOCK_SCAN_RANGE
 from hub20.apps.blockchain.models import Block, Chain, Transaction
 from hub20.apps.ethereum_money import get_ethereum_account_model, signals
 from hub20.apps.ethereum_money.app_settings import TRANSFER_GAS_LIMIT
@@ -100,6 +100,40 @@ def get_token_information(w3: Web3, address):
         "code": contract.functions.symbol().call(),
         "decimals": contract.functions.decimals().call(),
     }
+
+
+def sync_token_transfers(w3: Web3, token: EthereumToken, starting_block: int, end_block: int):
+    chain_id = int(w3.net.version)
+    chain = Chain.make(chain_id=chain_id)
+    accounts_by_address = {a.address: a for a in EthereumAccount.objects.all()}
+
+    contract = w3.eth.contract(abi=EIP20_ABI, address=token.address)
+    tx_filter = contract.events.Transfer.createFilter(fromBlock=starting_block, toBlock=end_block)
+
+    pending_txs = [entry.transactionHash.hex() for entry in tx_filter.get_all_entries()]
+    recorded_txs = tuple(
+        Transaction.objects.filter(hash__in=pending_txs).values_list("hash", flat=True)
+    )
+    for tx_hash in set(pending_txs) - set(recorded_txs):
+        try:
+            tx_data = w3.eth.getTransaction(tx_hash)
+            recipient_address = get_transfer_recipient_by_tx_data(w3, token, tx_data)
+            recipient = accounts_by_address.get(recipient_address)
+            sender = accounts_by_address.get(tx_data["from"])
+
+            if recipient is not None or sender is not None:
+                block_data = w3.eth.getBlock(tx_data.blockHash)
+                block = Block.make(block_data, chain=chain)
+                tx_receipt = w3.eth.getTransactionReceipt(tx_hash)
+                Transaction.make(tx_data, tx_receipt, block)
+        except TimeoutError:
+            logger.error(f"Failed request to get or check {tx_hash}")
+        except TransactionNotFound:
+            logger.info(f"Tx {tx_hash} has not yet been mined")
+        except ValueError as exc:
+            logger.exception(exc)
+        except Exception as exc:
+            logger.exception(exc)
 
 
 def process_pending_transfers(w3: Web3, chain: Chain, tx_filter):
@@ -201,3 +235,23 @@ async def listen_pending_transfers(w3: Web3):
         chain = await sync_to_async(Chain.make)(chain_id=chain_id)
         await asyncio.sleep(BLOCK_CREATION_INTERVAL / 2)
         await sync_to_async(process_pending_transfers)(w3, chain, tx_filter)
+
+
+async def download_all_token_transfers(w3: Web3):
+    chain_id = int(w3.net.version)
+    chain = await sync_to_async(Chain.make)(chain_id=chain_id)
+
+    tokens = await sync_to_async(list)(EthereumToken.ERC20tokens.filter(chain=chain))
+
+    for token in tokens:
+        current_block = await sync_to_async(Transaction.objects.last_block_with)(
+            chain=chain, address=token.address
+        )
+        while current_block < chain.highest_block:
+            start, end = current_block, current_block + BLOCK_SCAN_RANGE
+            logger.info(f"Checking {token.code} transfers between {start} and {end}")
+            await sync_to_async(sync_token_transfers)(
+                w3=w3, token=token, starting_block=start, end_block=end
+            )
+            await asyncio.sleep(BLOCK_CREATION_INTERVAL)
+            current_block += BLOCK_SCAN_RANGE
