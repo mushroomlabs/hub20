@@ -7,6 +7,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import Avg, Max
 from django.utils import timezone
+from hexbytes import HexBytes
 from web3 import Web3
 from web3.types import TxParams, Wei
 
@@ -126,7 +127,7 @@ class Transaction(models.Model):
     def make(cls, tx_data, tx_receipt, block: Block):
         try:
             assert tx_data.blockHash == tx_receipt.blockHash, "tx data/receipt block hash mismatch"
-            assert tx_data.blockHash == block.hash, "Block hash mismatch"
+            assert tx_data.blockHash == HexBytes(block.hash), "Block hash mismatch"
             assert tx_data.hash == tx_receipt.transactionHash, "Tx hash mismatch"
             assert tx_data["from"] == tx_receipt["from"], "Sender address mismatch"
             assert tx_data["to"] == tx_receipt["to"], "Recipient address mismatch"
