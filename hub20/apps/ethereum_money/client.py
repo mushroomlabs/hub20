@@ -30,6 +30,8 @@ def _decode_transfer_arguments(w3: Web3, token: EthereumToken, tx_data):
             return None
 
         return args
+    except ValueError:
+        return None
     except Exception as exc:
         logger.exception(exc)
 
@@ -134,6 +136,31 @@ def sync_token_transfers(w3: Web3, token: EthereumToken, starting_block: int, en
             logger.exception(exc)
         except Exception as exc:
             logger.exception(exc)
+
+
+def sync_account_transactions(
+    w3: Web3, account: EthereumAccount, starting_block: int, end_block: int
+):
+    chain_id = int(w3.net.version)
+
+    txs = {}
+    blocks = {}
+    for block_number in range(starting_block, end_block):
+        block_data = w3.eth.getBlock(block_number, full_transactions=True)
+        blocks[block_data.hash] = block_data
+        for tx in block_data.transactions:
+            if account.address in (tx.to, tx["from"]):
+                txs.append({tx.hash.hex(): tx})
+
+    recorded_txs = Transaction.objects.filter(hash__in=txs.keys())
+    recorded_hashes = recorded_txs.values_list("hash", flat=True)
+
+    for tx_hash in set(txs.keys()) - set(recorded_hashes):
+        tx_data = txs[tx_hash]
+        block = Block.make(tx_data.blockHash, chain_id=chain_id)
+        tx_receipt = w3.eth.getTransactionReceipt(tx_hash)
+
+        Transaction.make(tx_data, tx_receipt, block)
 
 
 def process_pending_transfers(w3: Web3, chain: Chain, tx_filter):
@@ -253,5 +280,23 @@ async def download_all_token_transfers(w3: Web3):
             await sync_to_async(sync_token_transfers)(
                 w3=w3, token=token, starting_block=start, end_block=end
             )
-            await asyncio.sleep(BLOCK_CREATION_INTERVAL)
+            current_block += BLOCK_SCAN_RANGE
+
+
+async def download_all_account_transactions(w3: Web3):
+    chain_id = int(w3.net.version)
+    chain = await sync_to_async(Chain.make)(chain_id=chain_id)
+
+    accounts = await sync_to_async(list)(EthereumAccount.objects.all())
+
+    for account in accounts:
+        current_block = await sync_to_async(Transaction.objects.last_block_with)(
+            chain=chain, address=account.address
+        )
+        while current_block < chain.highest_block:
+            start, end = current_block, current_block + BLOCK_SCAN_RANGE
+            logger.info(f"Checking {account.address} txs between {start} and {end}")
+            await sync_to_async(sync_account_transactions)(
+                w3=w3, account=account, starting_block=start, end_block=end
+            )
             current_block += BLOCK_SCAN_RANGE
