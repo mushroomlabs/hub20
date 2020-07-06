@@ -19,6 +19,7 @@ class AppSettings:
         event_listeners = [
             "hub20.apps.ethereum_money.client.listen_latest_transfers",
             "hub20.apps.ethereum_money.client.listen_pending_transfers",
+            "hub20.apps.ethereum_money.client.download_all_token_transfers",
         ]
 
     def __init__(self):
