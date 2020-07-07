@@ -1,0 +1,15 @@
+image: python:3.8-buster
+
+before_script:
+  - pip install mkdocs
+  - pip install mkdocs-material
+
+pages:
+  script:
+  - mkdocs build
+  - mv site public
+  artifacts:
+    paths:
+    - public
+  only:
+  - develop

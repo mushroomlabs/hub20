@@ -1,12 +1,41 @@
+copyright: © MushroomLabs 2020
+
 site_name: Hub20
+markdown_extensions:
+  - admonition
 theme:
+  custom_dir: docs/overrides
   name: material
-  palette:
-    primary: indigo
-    accent: indigo
+  features:
+    - tabs
   font:
     text: Ubuntu
     code: Ubuntu Mono
   language: en
+  palette:
+    primary: indigo
+    accent: indigo
+  plugins:
+    - search
+
+nav:
+   - Home: index.md
+   - Architecture: architecture.md
+   - Features: features.md
+   - Use Cases: use_cases.md
+   - Developers:
+       - Getting Started: developers/getting_started.md
+   - Hub Operators:
+       - Home: operators.md
+       - Installation: operators/install.md
+   - Users:
+       - Home: users.md
+       - Registration: users/signup.md
+       - Manage Balances: users/balances.md
+       - Sending/Receiving Money: users/transfers.md
+       - Payment Gateway:
+          - Stores: users/payment_gateway/stores.md
+          - Checkout20: users/payment_gateway/checkout20.md
+
 repo_name: mushroomlabs/hub20
 repo_url: https://github.com/mushroomlabs/hub20
