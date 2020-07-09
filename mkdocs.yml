@@ -1,23 +1,7 @@
 copyright: © MushroomLabs 2020
 
-site_name: Hub20
 markdown_extensions:
   - admonition
-theme:
-  custom_dir: docs/overrides
-  name: material
-  features:
-    - tabs
-  font:
-    text: Ubuntu
-    code: Ubuntu Mono
-  language: en
-  palette:
-    primary: indigo
-    accent: indigo
-  plugins:
-    - search
-
 nav:
    - Home: index.md
    - Architecture: architecture.md
@@ -39,3 +23,19 @@ nav:
 
 repo_name: mushroomlabs/hub20
 repo_url: https://github.com/mushroomlabs/hub20
+
+site_name: Hub20
+theme:
+  custom_dir: docs/overrides
+  name: material
+  features:
+    - tabs
+  font:
+    text: Ubuntu
+    code: Ubuntu Mono
+  language: en
+  palette:
+    primary: indigo
+    accent: indigo
+  plugins:
+    - search
