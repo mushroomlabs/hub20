@@ -1,12 +1,14 @@
-version: '2.2'
+version: '3.4'
 
 services:
   db:
     image: postgres
-    environment:
-      POSTGRES_DB: ${HUB20_DATABASE_NAME}
-      POSTGRES_USER: ${HUB20_DATABASE_USER}
-      POSTGRES_PASSWORD: ${HUB20_DATABASE_PASSWORD}
+    env_file:
+      - ./docker/environments/base.env
+
+  # nginx
+  nginx:
+    image: nginx:latest
 
   # Redis for cache, session engine, celery and channels transport
   redis:
@@ -15,48 +17,39 @@ services:
   raiden:
     image: raidennetwork/raiden:latest
     entrypoint: /opt/venv/bin/raiden --accept-disclaimer
-    env_file:
-      - ./.env
 
   # Web API
   web:
+    build: .
     command: >
       /bin/bash -c "
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
         while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
         django-admin migrate;
         django-admin collectstatic --noinput
-        uvicorn hub20.api.routing:application --port 80 --host 0.0.0.0 --reload
+        uvicorn hub20.api.routing:application --port 8000 --host 0.0.0.0 --reload
       "
-
-    image: mushroomlabs/hub20
-    build: .
-    volumes:
-      - .:/app
     depends_on:
       - db
       - redis
     env_file:
-      - ./.env
+      - ./docker/environments/base.env
 
   # Celery app
   celery:
-    command: celery worker -A hub20.api -l info
-
-    image: mushroomlabs/hub20
     build: .
-    volumes:
-      - .:/app
+    command: celery worker -A hub20.api -l info
     depends_on:
       - db
       - redis
     environment:
       COLUMNS: 80
     env_file:
-      - ./.env
+      - ./docker/environments/base.env
 
   # Celery beat (periodic tasks)
   celery_beat:
+    build: .
     command: >
       /bin/bash -c "
         mkdir -p ${HUB20_DATA_FOLDER}/celery;
@@ -65,32 +58,23 @@ services:
         celery beat -A hub20.api -l info -s ${HUB20_DATA_FOLDER}/celery/celerybeat-schedule.db --pidfile=${HUB20_DATA_FOLDER}/celery/celerybeat.pid
       "
 
-    image: mushroomlabs/hub20
-    build: .
-    volumes:
-      - .:/app
-
     depends_on:
       - db
       - redis
     env_file:
-      - ./.env
+      - ./docker/environments/base.env
 
   # Background command to listen to blockchain and raiden events
   job_listen_events:
+    build: .
     command: >
       /bin/bash -c "
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
         while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
         django-admin run_event_listeners
       "
-
-    image: mushroomlabs/hub20
-    build: .
-    volumes:
-      - .:/app
     depends_on:
       - db
       - redis
     env_file:
-      - ./.env
+      - ./docker/environments/base.env

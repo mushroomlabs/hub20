@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 import pytest
 from django.test import TestCase
@@ -20,7 +20,8 @@ class PaymentTransferTestCase(BaseTestCase):
         self.checkout = CheckoutFactory()
         self.token = self.checkout.currency
         self.w3 = get_web3()
-        self.block_filter = self.w3.eth.filter("latest")
+        
+        self.block_filter = Mock()
 
     def test_can_detect_erc20_transfers(self):
 
