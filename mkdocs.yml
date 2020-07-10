@@ -8,6 +8,7 @@ nav:
    - Features: features.md
    - Use Cases: use_cases.md
    - Developers:
+       - Overview: developers/overview.md
        - Getting Started: developers/getting_started.md
    - Hub Operators:
        - Home: operators.md
