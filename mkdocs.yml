@@ -25,6 +25,7 @@ nav:
 repo_name: mushroomlabs/hub20
 repo_url: https://github.com/mushroomlabs/hub20
 
+site_url: https://docs.hub20.io
 site_name: Hub20
 theme:
   custom_dir: docs/overrides
