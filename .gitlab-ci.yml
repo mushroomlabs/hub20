@@ -22,7 +22,7 @@ test:
 
   only:
     - develop
-    - feature/*
+    - branches
 
 pages:
   stage: release
