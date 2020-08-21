@@ -7,13 +7,9 @@ services:
   web:
     volumes:
       - .:/app
-      
-    env_file:
-      - ./docker/environments/base.env
-      - ./docker/environments/ci.env
 
-  raiden: *disabled_service      
+  ethereum: *disabled_service
+  raiden: *disabled_service
   celery: *disabled_service
   celery_beat: *disabled_service
   job_listen_events: *disabled_service
-      

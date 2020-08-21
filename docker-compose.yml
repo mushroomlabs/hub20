@@ -3,12 +3,15 @@ version: '3.4'
 services:
   db:
     image: postgres
-    env_file:
-      - ./docker/environments/base.env
+    environment:
+      POSTGRES_DB: "${HUB20_DATABASE_NAME}"
+      POSTGRES_USER: "${HUB20_DATABASE_USER}"
+      POSTGRES_PASSWORD: "${HUB20_DATABASE_PASSWORD}"
 
-  # nginx
-  nginx:
-    image: nginx:latest
+  ethereum:
+    image: ethereum/client-go:stable
+    stop_signal: SIGINT
+    stop_grace_period: 1m
 
   # Redis for cache, session engine, celery and channels transport
   redis:
@@ -27,13 +30,13 @@ services:
         while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
         django-admin migrate;
         django-admin collectstatic --noinput
-        uvicorn hub20.api.routing:application --port 8000 --host 0.0.0.0 --reload
+        uvicorn hub20.api.routing:application --port 80 --host 0.0.0.0 --reload --reload-dir /app/hub20
       "
     depends_on:
       - db
       - redis
     env_file:
-      - ./docker/environments/base.env
+      - ./.env
 
   # Celery app
   celery:
@@ -45,7 +48,7 @@ services:
     environment:
       COLUMNS: 80
     env_file:
-      - ./docker/environments/base.env
+      - ./.env
 
   # Celery beat (periodic tasks)
   celery_beat:
@@ -62,7 +65,7 @@ services:
       - db
       - redis
     env_file:
-      - ./docker/environments/base.env
+      - ./.env
 
   # Background command to listen to blockchain and raiden events
   job_listen_events:
@@ -77,4 +80,4 @@ services:
       - db
       - redis
     env_file:
-      - ./docker/environments/base.env
+      - ./.env
