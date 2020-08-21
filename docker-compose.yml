@@ -3,8 +3,10 @@ version: '3.4'
 services:
   db:
     image: postgres
-    env_file:
-      - ./.env
+    environment:
+      POSTGRES_DB: "${HUB20_DATABASE_NAME}"
+      POSTGRES_USER: "${HUB20_DATABASE_USER}"
+      POSTGRES_PASSWORD: "${HUB20_DATABASE_PASSWORD}"
 
   ethereum:
     image: ethereum/client-go:stable
