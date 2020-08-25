@@ -149,13 +149,11 @@ def on_order_created_set_blockchain_route(sender, **kw):
         payment_window = (current_block, expiration_block)
 
         available_accounts = EthereumAccount.objects.exclude(
-            payment_routes__payment_window__overlap=NumericRange(*payment_window)
+            blockchain_routes__payment_window__overlap=NumericRange(*payment_window)
         )
 
         account = available_accounts.order_by("?").first() or EthereumAccount.generate()
-        BlockchainPaymentRoute.objects.create(
-            order=order, account=account, payment_window=payment_window
-        )
+        account.blockchain_routes.create(order=order, payment_window=payment_window)
     else:
         logger.warning("Failed to create blockchain route. Chain data not synced")
 

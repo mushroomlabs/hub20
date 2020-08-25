@@ -20,10 +20,10 @@ from web3.contract import Contract
 from hub20.apps.blockchain.fields import EthereumAddressField
 from hub20.apps.blockchain.models import Transaction
 from hub20.apps.ethereum_money.models import (
-    AbstractEthereumAccount,
     EthereumToken,
     EthereumTokenAmount,
     EthereumTokenAmountField,
+    KeystoreAccount,
 )
 
 CHANNEL_STATUSES = Choices("open", "settling", "settled", "unusable", "closed", "closing")
@@ -122,7 +122,7 @@ class TokenNetworkChannelEvent(models.Model):
         unique_together = ("channel", "transaction")
 
 
-class Raiden(AbstractEthereumAccount):
+class Raiden(KeystoreAccount):
     url = models.URLField(help_text="Root URL of server (without api/v1)")
     token_networks = models.ManyToManyField(TokenNetwork, blank=True)
 

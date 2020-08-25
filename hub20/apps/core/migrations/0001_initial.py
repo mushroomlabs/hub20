@@ -668,7 +668,7 @@ class Migration(migrations.Migration):
                     "account",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
-                        related_name="payment_routes",
+                        related_name="blockchain_routes",
                         to=settings.ETHEREUM_ACCOUNT_MODEL,
                     ),
                 ),
