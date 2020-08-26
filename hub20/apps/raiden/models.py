@@ -2,6 +2,7 @@ import datetime
 import random
 from typing import Optional
 
+from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from model_utils.choices import Choices
@@ -39,10 +40,6 @@ def get_token_network_registry_contract(w3: Web3):
 
     abi = manager.get_contract_abi(CONTRACT_TOKEN_NETWORK_REGISTRY)
     return w3.eth.contract(abi=abi, address=address)
-
-
-class RaidenOperationError(Exception):
-    pass
 
 
 class TokenNetwork(models.Model):
@@ -123,7 +120,9 @@ class TokenNetworkChannelEvent(models.Model):
 
 
 class Raiden(KeystoreAccount):
-    url = models.URLField(help_text="Root URL of server (without api/v1)")
+    url = models.URLField(
+        default=settings.HUB20_RAIDEN_URL, help_text="Root URL of server (without api/v1)"
+    )
     token_networks = models.ManyToManyField(TokenNetwork, blank=True)
 
     @property

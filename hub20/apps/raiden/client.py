@@ -2,8 +2,8 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
 import requests
-from attributedict.collections import AttributeDict
 from django.utils.timezone import make_aware
+from web3.datastructures import AttributeDict
 
 from . import models
 

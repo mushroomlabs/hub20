@@ -247,6 +247,10 @@ class AbstractEthereumAccount(models.Model):
 class KeystoreAccount(AbstractEthereumAccount):
     private_key = HexField(max_length=64, unique=True)
 
+    @property
+    def private_key_bytes(self) -> bytes:
+        return bytearray.fromhex(self.private_key[2:])
+
     @classmethod
     def generate(cls):
         private_key = os.urandom(32)
@@ -264,6 +268,10 @@ class HierarchicalDeterministicWallet(AbstractEthereumAccount):
     def private_key(self):
         wallet = self.__class__.get_wallet(index=self.index)
         return wallet.private_key()
+
+    @property
+    def private_key_bytes(self) -> bytes:
+        return bytearray.fromhex(self.private_key)
 
     @classmethod
     def get_wallet(cls, index: int) -> Wallet:
