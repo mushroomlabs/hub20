@@ -13,7 +13,6 @@ from django.db.models import Max, Q, Sum
 from eth_utils import to_checksum_address
 from eth_wallet import Wallet
 from ethereum.abi import ContractTranslator
-from ethtoken.abi import EIP20_ABI
 from model_utils.managers import QueryManager
 from web3 import Web3
 from web3.contract import Contract
@@ -21,6 +20,7 @@ from web3.contract import Contract
 from hub20.apps.blockchain.fields import EthereumAddressField, HexField
 from hub20.apps.blockchain.models import Chain, Transaction
 
+from .abi import EIP20_ABI
 from .app_settings import HD_WALLET_MNEMONIC, HD_WALLET_ROOT_KEY, TRANSFER_GAS_LIMIT
 from .typing import EthereumAccount_T
 

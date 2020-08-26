@@ -5,7 +5,6 @@ from typing import Optional
 from asgiref.sync import sync_to_async
 from eth_utils import to_checksum_address
 from ethereum.abi import ContractTranslator
-from ethtoken.abi import EIP20_ABI
 from web3 import Web3
 from web3.exceptions import TimeExhausted, TransactionNotFound
 
@@ -14,6 +13,8 @@ from hub20.apps.blockchain.models import Block, Chain, Transaction
 from hub20.apps.ethereum_money import get_ethereum_account_model, signals
 from hub20.apps.ethereum_money.app_settings import TRANSFER_GAS_LIMIT
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
+
+from .abi import EIP20_ABI
 
 logger = logging.getLogger(__name__)
 EthereumAccount = get_ethereum_account_model()
