@@ -17,7 +17,8 @@ class AppSettings:
         raiden_route_lifetime = 15 * 60  # In seconds
 
     class Raiden:
-        minimum_ether_required = Decimal("0.05")
+        minimum_ether_required = Decimal("0.025")
+        minimum_service_token_required = Decimal("5.5")
 
     class Web3:
         event_listeners = [
@@ -35,6 +36,7 @@ class AppSettings:
             "PAYMENT_MININUM_CONFIRMATIONS": (self.Payment, "minimum_confirmations"),
             "PAYMENT_BLOCKCHAIN_ROUTE_LIFETIME": (self.Payment, "blockchain_route_lifetime"),
             "RAIDEN_MINIMUM_ETHER_REQUIRED": (self.Raiden, "minimum_ether_required"),
+            "RAIDEN_MINIMUM_RDN_REQUIRED": (self.Raiden, "minimum_service_token_required"),
             "WEB3_EVENT_LISTENERS": (self.Web3, "event_listeners"),
         }
         user_settings = getattr(settings, "HUB20", {})

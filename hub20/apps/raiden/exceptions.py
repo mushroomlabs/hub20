@@ -4,3 +4,7 @@ class RaidenOperationError(Exception):
 
 class RaidenMissingPrecondition(Exception):
     pass
+
+
+class RaidenConnectionError(Exception):
+    pass
