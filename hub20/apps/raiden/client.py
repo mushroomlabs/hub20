@@ -53,7 +53,7 @@ def mint_tokens(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
         abi=contract_manager.get_contract_abi(CONTRACT_CUSTOM_TOKEN),
     )
 
-    return send_transaction(
+    send_transaction(
         w3=w3,
         contract_function=token_proxy.functions.mint,
         account=raiden,
@@ -62,11 +62,18 @@ def mint_tokens(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
     )
 
 
-def lock_into_deposit_contract(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
+def make_service_deposit(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
     token = amount.currency
-    deposit_proxy = _make_deposit_proxy(w3=w3, token=token)
-    token_proxy = w3.eth.contract(address=token.address, abi=EIP20_ABI)
+    deposit_proxy = _make_deposit_proxy(w3=w3)
 
+    service_token_address = to_checksum_address(deposit_proxy.functions.token().call())
+
+    if service_token_address != token.address:
+        raise ValueError(
+            f"Deposit must be in {service_token_address}, {token.code} is {token.address}"
+        )
+
+    token_proxy = w3.eth.contract(address=token.address, abi=EIP20_ABI)
     current_deposit_amount = token.from_wei(
         deposit_proxy.functions.total_deposit(raiden.address).call()
     )
@@ -91,11 +98,11 @@ def lock_into_deposit_contract(w3: Web3, raiden: Raiden, amount: EthereumTokenAm
         gas=GAS_REQUIRED_FOR_APPROVE,
     )
 
-    return send_transaction(
+    send_transaction(
         w3=w3,
         account=raiden,
         contract_function=deposit_proxy.functions.deposit,
-        contract_args=tuple(total_deposit.as_wei),
+        contract_args=(raiden.address, total_deposit.as_wei),
         gas=GAS_REQUIRED_FOR_DEPOSIT,
     )
 

@@ -7,10 +7,10 @@ from django.urls import include, path
 from rest_auth.views import (
     LoginView,
     LogoutView,
-    UserDetailsView,
     PasswordChangeView,
-    PasswordResetView,
     PasswordResetConfirmView,
+    PasswordResetView,
+    UserDetailsView,
 )
 
 
@@ -30,6 +30,7 @@ urlpatterns = [
     make_auth_view("api/session/logout", LogoutView, "rest_logout"),
     path("api/register/", include("rest_auth.registration.urls")),
     path("api/tokens/", include("hub20.apps.ethereum_money.api", namespace="ethereum_money")),
+    path("api/raiden/", include("hub20.apps.raiden.api", namespace="raiden")),
     path("api/", include("hub20.apps.core.api", namespace="hub20")),
     path("admin/", admin.site.urls),
 ]

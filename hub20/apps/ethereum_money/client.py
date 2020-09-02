@@ -105,6 +105,12 @@ def get_token_information(w3: Web3, address):
     }
 
 
+def make_token(w3: Web3, address) -> EthereumToken:
+    token_data = get_token_information(w3=w3, address=address)
+    chain = Chain.make(chain_id=int(w3.net.version))
+    return EthereumToken.make(chain=chain, address=address, **token_data)
+
+
 def sync_token_transfers(w3: Web3, token: EthereumToken, starting_block: int, end_block: int):
     chain_id = int(w3.net.version)
     chain = Chain.make(chain_id=chain_id)

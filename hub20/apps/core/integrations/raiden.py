@@ -64,9 +64,7 @@ def ensure_preconditions(raiden: Raiden, w3: Web3):
     chain_uri = chain.provider_url
     w3_uri = w3.provider.endpoint_uri
     if w3_uri != chain_uri:
-        raise RaidenMissingPrecondition(
-            f"Chain is using {chain_uri} and we are connected to {w3_uri}"
-        )
+        logger.warning(f"Chain is using {chain_uri} and we are connected to {w3_uri}")
 
     check_is_ethereum_node_synced(w3=w3, chain=chain)
     check_required_ether_balance(raiden=raiden, w3=w3, chain=chain)

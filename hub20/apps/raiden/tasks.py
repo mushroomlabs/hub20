@@ -3,11 +3,13 @@ from concurrent.futures import TimeoutError
 from typing import Optional
 
 from celery import shared_task
+from django.db import transaction
 
 from hub20.apps.blockchain.client import get_block_by_hash, get_transaction_by_hash, get_web3
 from hub20.apps.blockchain.models import Block
 
-from .models import TokenNetwork, TokenNetworkChannel
+from .client import make_service_deposit
+from .models import ServiceDeposit, TokenNetwork, TokenNetworkChannel
 
 logger = logging.getLogger(__name__)
 
@@ -74,3 +76,17 @@ def sync_token_network_events():
 
         process_events(token_network, channel_open_filter)
         process_events(token_network, channel_closed_filter)
+
+
+@shared_task
+def send_service_deposit(deposit_id: int):
+    service_deposit = ServiceDeposit.objects.filter(transfer__isnull=True, id=deposit_id).first()
+
+    if service_deposit:
+        with transaction.atomic():
+            w3 = get_web3()
+            make_service_deposit(
+                w3=w3, raiden=service_deposit.raiden, amount=service_deposit.as_token_amount
+            )
+    else:
+        logger.warning(f"Service Deposit {deposit_id} not found or already sent")

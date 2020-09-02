@@ -13,10 +13,11 @@ from web3.exceptions import TimeExhausted, TransactionNotFound
 from web3.gas_strategies.time_based import fast_gas_price_strategy
 from web3.middleware import geth_poa_middleware
 from web3.providers import HTTPProvider, IPCProvider, WebsocketProvider
-from web3.types import TxParams, Wei
+from web3.types import TxParams, TxReceipt, Wei
 
 from . import signals
 from .app_settings import BLOCK_SCAN_RANGE
+from .exceptions import Web3TransactionError
 from .models import Block, Chain, Transaction
 
 BLOCK_CREATION_INTERVAL = 10  # In seconds
@@ -46,22 +47,36 @@ def database_history_gas_price_strategy(w3: Web3, params: Optional[TxParams] = N
 
 def send_transaction(
     w3: Web3, contract_function, account, gas, contract_args: Optional[Tuple] = None, **kw,
-):
+) -> TxReceipt:
+    nonce = kw.pop("nonce", w3.eth.getTransactionCount(account.address))
+
     transaction_params = {
         "chainId": int(w3.net.version),
-        "nonce": w3.eth.getTransactionCount(account.address),
+        "nonce": nonce,
         "gasPrice": kw.pop("gas_price", w3.eth.generateGasPrice()),
         "gas": gas,
     }
 
     transaction_params.update(**kw)
 
-    result = contract_function(*contract_args) if contract_args else contract_function()
-    transaction_data = result.buildTransaction(transaction_params)
-    signed = w3.eth.account.signTransaction(transaction_data, account.private_key)
-    tx_hash = w3.eth.sendRawTransaction(signed.rawTransaction)
-    logger.info(f"Waiting for receipt of {tx_hash.hex()}")
-    return w3.eth.waitForTransactionReceipt(tx_hash)
+    try:
+        result = contract_function(*contract_args) if contract_args else contract_function()
+        transaction_data = result.buildTransaction(transaction_params)
+        signed = w3.eth.account.signTransaction(transaction_data, account.private_key)
+        tx_hash = w3.eth.sendRawTransaction(signed.rawTransaction)
+        return w3.eth.waitForTransactionReceipt(tx_hash)
+    except ValueError as exc:
+        try:
+            if exc.args[0].get("message") == "nonce too low":
+                logger.warning("Node reported that nonce is too low. Trying tx again...")
+                kw["nonce"] = nonce + 1
+                return send_transaction(
+                    w3, contract_function, account, gas, contract_args=contract_args, **kw
+                )
+        except (AttributeError, IndexError):
+            pass
+
+        raise Web3TransactionError from exc
 
 
 def make_web3(provider_url: str) -> Web3:
@@ -96,7 +111,7 @@ def get_block_by_hash(w3: Web3, block_hash: HexBytes) -> Optional[Block]:
     try:
         chain = Chain.objects.get(id=int(w3.net.version))
         block_data = w3.eth.getBlock(block_hash)
-        return Block.make(block_data, chain)
+        return Block.make(block_data, chain.id)
     except (AttributeError, Chain.DoesNotExist):
         return None
 
