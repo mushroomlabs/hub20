@@ -1,41 +1,35 @@
-from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
-
-import requests
-from django.utils.timezone import make_aware
 from eth_utils import to_checksum_address
-from raiden_contracts.constants import CONTRACT_CUSTOM_TOKEN, CONTRACT_USER_DEPOSIT
-from raiden_contracts.contract_manager import ContractManager, contracts_precompiled_path
+from raiden_contracts.constants import (
+    CONTRACT_CUSTOM_TOKEN,
+    CONTRACT_SERVICE_REGISTRY,
+    CONTRACT_TOKEN_NETWORK,
+    CONTRACT_TOKEN_NETWORK_REGISTRY,
+    CONTRACT_USER_DEPOSIT,
+)
+from raiden_contracts.contract_manager import (
+    ContractManager,
+    contracts_precompiled_path,
+    get_contracts_deployment_info,
+)
 from web3 import Web3
-from web3.datastructures import AttributeDict
 
 from hub20.apps.blockchain.client import send_transaction
 from hub20.apps.ethereum_money.abi import EIP20_ABI
+from hub20.apps.ethereum_money.client import make_token
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
-
-from .contracts import get_contract_address
-from .exceptions import RaidenConnectionError
-from .models import Channel, Raiden
+from hub20.apps.raiden.models import Raiden
 
 GAS_REQUIRED_FOR_DEPOSIT: int = 200_000
 GAS_REQUIRED_FOR_APPROVE: int = 70_000
 GAS_REQUIRED_FOR_MINT: int = 100_000
 
 
-def _make_request(url: str, method: str = "GET", **params: Any) -> Union[List, Dict]:
-    action = {
-        "GET": requests.get,
-        "PUT": requests.put,
-        "POST": requests.post,
-        "DELETE": requests.delete,
-    }[method.upper()]
-
+def _get_contract_data(chain_id: int, contract_name: str):
     try:
-        response = action(url)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.ConnectionError:
-        raise RaidenConnectionError(f"Could not connect to {url}")
+        contract_data = get_contracts_deployment_info(chain_id)
+        return contract_data["contracts"][contract_name]
+    except KeyError:
+        return None
 
 
 def _make_deposit_proxy(w3: Web3):
@@ -44,6 +38,44 @@ def _make_deposit_proxy(w3: Web3):
     return w3.eth.contract(
         address=contract_address, abi=contract_manager.get_contract_abi(CONTRACT_USER_DEPOSIT)
     )
+
+
+def _get_contract(w3: Web3, contract_name: str):
+    chain_id = int(w3.net.version)
+    manager = ContractManager(contracts_precompiled_path())
+
+    contract_data = _get_contract_data(chain_id, contract_name)
+    assert contract_data
+
+    abi = manager.get_contract_abi(contract_name)
+    return w3.eth.contract(abi=abi, address=contract_data["address"])
+
+
+def get_contract_address(chain_id, contract_name):
+    try:
+        contract_data = _get_contract_data(chain_id, contract_name)
+        return contract_data["address"]
+    except (TypeError, AssertionError, KeyError) as exc:
+        raise ValueError(f"{contract_name} does not exist on chain id {chain_id}") from exc
+
+
+def get_token_network_registry_contract(w3: Web3):
+    return _get_contract(w3, CONTRACT_TOKEN_NETWORK_REGISTRY)
+
+
+def get_token_network_contract(w3: Web3):
+    return _get_contract(w3, CONTRACT_TOKEN_NETWORK)
+
+
+def get_service_token_address(chain_id: int):
+    service_contract_data = _get_contract_data(chain_id, CONTRACT_SERVICE_REGISTRY)
+    return service_contract_data["constructor_arguments"][0]
+
+
+def get_service_token(w3: Web3) -> EthereumToken:
+    chain_id = int(w3.net.version)
+    service_token_address = get_service_token_address(chain_id)
+    return make_token(w3=w3, address=service_token_address)
 
 
 def mint_tokens(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
@@ -107,45 +139,7 @@ def make_service_deposit(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
     )
 
 
-def get_locked_amount(w3: Web3, raiden: Raiden, token: EthereumToken) -> EthereumTokenAmount:
+def get_service_deposit_balance(w3: Web3, raiden: Raiden) -> EthereumTokenAmount:
     deposit_proxy = _make_deposit_proxy(w3=w3)
+    token = get_service_token(w3=w3)
     return token.from_wei(deposit_proxy.functions.effectiveBalance(raiden.address).call())
-
-
-class RaidenClient:
-    def __init__(self, raiden: Raiden) -> None:
-        self.raiden = raiden
-
-    def _parse_payment(self, payment_data: Dict, channel: Channel) -> Optional[AttributeDict]:
-        event_name = payment_data.pop("event")
-        payment_data.pop("token_address", None)
-
-        if event_name == "EventPaymentReceivedSuccess":
-            payment_data["sender_address"] = payment_data.pop("initiator")
-            payment_data["receiver_address"] = self.raiden.address
-        elif event_name == "EventPaymentSentSuccess":
-            payment_data["sender_address"] = self.raiden.address
-            payment_data["receiver_address"] = payment_data.pop("target")
-        else:
-            return None
-
-        iso_time = payment_data.pop("log_time")
-
-        payment_data["amount"] = channel.token.from_wei(payment_data.pop("amount")).amount
-        payment_data["timestamp"] = make_aware(datetime.fromisoformat(iso_time))
-        return AttributeDict(payment_data)
-
-    def get_channels(self):
-        return _make_request(f"{self.raiden.api_root_url}/channels")
-
-    def get_new_payments(self, channel: Channel) -> List[AttributeDict]:
-
-        offset = channel.payments.count()
-        events = _make_request(channel.payments_url, offset=offset)
-        assert type(events) is list
-
-        payments = [self._parse_payment(ev, channel) for ev in events]
-        return [payment for payment in payments if payment is not None]
-
-    def get_token_addresses(self):
-        return _make_request(f"{self.raiden.api_root_url}/tokens")

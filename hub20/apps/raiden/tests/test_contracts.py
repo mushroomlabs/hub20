@@ -1,7 +1,7 @@
 import pytest
 
 from hub20.apps.blockchain.choices import ETHEREUM_CHAINS
-from hub20.apps.raiden.contracts import get_service_token_address
+from hub20.apps.raiden.client.blockchain import get_service_token_address
 
 
 @pytest.mark.parametrize(

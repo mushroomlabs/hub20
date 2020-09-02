@@ -6,8 +6,7 @@ from hub20.apps.blockchain.models import Chain
 from hub20.apps.core.settings import app_settings
 from hub20.apps.ethereum_money.client import get_account_balance, get_token_information
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
-from hub20.apps.raiden.client import get_locked_amount
-from hub20.apps.raiden.contracts import get_service_token_address
+from hub20.apps.raiden.client.blockchain import get_service_deposit_balance, get_service_token
 from hub20.apps.raiden.exceptions import RaidenMissingPrecondition
 from hub20.apps.raiden.models import Raiden
 
@@ -35,26 +34,24 @@ def check_required_ether_balance(raiden: Raiden, w3: Web3, chain: Chain):
         logger.info(f"{on_chain_ether_balance.formatted} available for transactions")
 
 
-def check_required_service_token_deposit(raiden: Raiden, w3: Web3, chain: Chain):
-    token_address = get_service_token_address(chain.id)
-    token_data = get_token_information(w3=w3, address=token_address)
-    token = EthereumToken.make(address=token_address, chain=chain, **token_data)
+def check_required_service_token_deposit(raiden: Raiden, w3: Web3):
+    service_token = get_service_token(w3=w3)
     required_balance = EthereumTokenAmount(
-        amount=app_settings.Raiden.minimum_service_token_required, currency=token
+        amount=app_settings.Raiden.minimum_service_token_required, currency=service_token
     )
-    on_chain_balance = get_account_balance(w3=w3, token=token, address=raiden.address)
-    locked_balance = get_locked_amount(w3=w3, raiden=raiden, token=token)
+    on_chain_balance = get_account_balance(w3=w3, token=service_token, address=raiden.address)
+    deposit_balance = get_service_deposit_balance(w3=w3, raiden=raiden)
 
     logger.info(
-        f"Service token: {on_chain_balance.formatted} on chain, {locked_balance.formatted} locked"
+        f"Service token: {on_chain_balance.formatted} on chain, {deposit_balance.formatted} locked"
     )
-    if locked_balance < required_balance:
+    if deposit_balance < required_balance:
 
         raise RaidenMissingPrecondition(
-            f"Minimum of {required_balance.formatted} must be locked into User Deposit Contract"
+            f"Minimum of {required_balance.formatted} must be deposited for Raiden Services"
         )
     else:
-        logger.info(f"{locked_balance.formatted} locked for payment of Raiden Services")
+        logger.info(f"{deposit_balance.formatted} deposited for payment of Raiden Services")
 
 
 def ensure_preconditions(raiden: Raiden, w3: Web3):
@@ -68,4 +65,4 @@ def ensure_preconditions(raiden: Raiden, w3: Web3):
 
     check_is_ethereum_node_synced(w3=w3, chain=chain)
     check_required_ether_balance(raiden=raiden, w3=w3, chain=chain)
-    check_required_service_token_deposit(raiden=raiden, w3=w3, chain=chain)
+    check_required_service_token_deposit(raiden=raiden, w3=w3)

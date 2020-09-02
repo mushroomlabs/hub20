@@ -8,7 +8,7 @@ from django.db import transaction
 from hub20.apps.blockchain.client import get_block_by_hash, get_transaction_by_hash, get_web3
 from hub20.apps.blockchain.models import Block
 
-from .client import make_service_deposit
+from .client.blockchain import make_service_deposit
 from .models import ServiceDeposit, TokenNetwork, TokenNetworkChannel
 
 logger = logging.getLogger(__name__)
