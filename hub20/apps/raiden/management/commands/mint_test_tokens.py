@@ -6,8 +6,7 @@ from hub20.apps.blockchain.client import get_web3
 from hub20.apps.blockchain.models import Chain
 from hub20.apps.core.settings import app_settings
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
-from hub20.apps.raiden.client import mint_tokens
-from hub20.apps.raiden.contracts import get_service_token_address
+from hub20.apps.raiden.client.blockchain import get_service_token_address, mint_tokens
 from hub20.apps.raiden.models import Raiden
 
 logger = logging.getLogger(__name__)
