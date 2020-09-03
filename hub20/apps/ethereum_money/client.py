@@ -275,7 +275,9 @@ async def download_all_token_transfers(w3: Web3):
     chain_id = int(w3.net.version)
     chain = await sync_to_async(Chain.make)(chain_id=chain_id)
 
-    tokens = await sync_to_async(list)(EthereumToken.ERC20tokens.filter(chain=chain))
+    tokens = await sync_to_async(list)(
+        EthereumToken.tracked.filter(chain=chain).exclude(address=EthereumToken.NULL_ADDRESS)
+    )
 
     for token in tokens:
         current_block = await sync_to_async(Transaction.objects.last_block_with)(

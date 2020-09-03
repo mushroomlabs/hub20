@@ -1,3 +1,7 @@
+import asyncio
+import logging
+
+from asgiref.sync import sync_to_async
 from eth_utils import to_checksum_address
 from raiden_contracts.constants import (
     CONTRACT_CUSTOM_TOKEN,
@@ -13,15 +17,20 @@ from raiden_contracts.contract_manager import (
 )
 from web3 import Web3
 
-from hub20.apps.blockchain.client import send_transaction
+from hub20.apps.blockchain.client import BLOCK_CREATION_INTERVAL, send_transaction
+from hub20.apps.blockchain.models import Block, Transaction
 from hub20.apps.ethereum_money.abi import EIP20_ABI
 from hub20.apps.ethereum_money.client import make_token
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
+from hub20.apps.raiden import signals
 from hub20.apps.raiden.models import Raiden
 
 GAS_REQUIRED_FOR_DEPOSIT: int = 200_000
 GAS_REQUIRED_FOR_APPROVE: int = 70_000
 GAS_REQUIRED_FOR_MINT: int = 100_000
+
+
+logger = logging.getLogger(__name__)
 
 
 def _get_contract_data(chain_id: int, contract_name: str):
@@ -79,6 +88,7 @@ def get_service_token(w3: Web3) -> EthereumToken:
 
 
 def mint_tokens(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
+    logger.debug(f"Minting {amount.formatted}")
     contract_manager = ContractManager(contracts_precompiled_path())
     token_proxy = w3.eth.contract(
         address=to_checksum_address(amount.currency.address),
@@ -143,3 +153,45 @@ def get_service_deposit_balance(w3: Web3, raiden: Raiden) -> EthereumTokenAmount
     deposit_proxy = _make_deposit_proxy(w3=w3)
     token = get_service_token(w3=w3)
     return token.from_wei(deposit_proxy.functions.effectiveBalance(raiden.address).call())
+
+
+def process_latest_deposits(w3: Web3, block_filter, deposit_proxy, service_token):
+    chain_id = int(w3.net.version)
+    raidens_by_address = {a.address: a for a in Raiden.objects.all()}
+
+    for block_hash in block_filter.get_new_entries():
+        block_data = w3.eth.getBlock(block_hash.hex(), full_transactions=True)
+        deposit_txs = [t for t in block_data.transactions if t["to"] == deposit_proxy.address]
+
+        for tx_data in deposit_txs:
+            fn, params = deposit_proxy.decode_function_input(tx_data.input)
+
+            deposit_identifier = deposit_proxy.functions.deposit.function_identifier
+
+            if fn.function_identifier == deposit_identifier:
+                beneficiary = params["beneficiary"]
+
+                if beneficiary in raidens_by_address.keys():
+                    raiden = raidens_by_address[beneficiary]
+                    tx_hash = tx_data.hash
+                    amount = service_token.from_wei(params["new_total_deposit"])
+                    logger.info(f"Deposit of {amount.formatted} from {raiden.address} detected")
+                    tx_receipt = w3.eth.waitForTransactionReceipt(tx_hash)
+                    block = Block.make(block_data, chain_id=chain_id)
+                    tx = Transaction.make(tx_receipt=tx_receipt, tx_data=tx_data, block=block)
+                    signals.service_deposit_sent.send(
+                        sender=Transaction, transaction=tx, raiden=raiden, amount=amount
+                    )
+
+
+async def listen_service_deposits(w3: Web3):
+    block_filter = w3.eth.filter("latest")
+
+    deposit_proxy = _make_deposit_proxy(w3=w3)
+    service_token = get_service_token(w3=w3)
+
+    while True:
+        await asyncio.sleep(BLOCK_CREATION_INTERVAL)
+        await sync_to_async(process_latest_deposits)(
+            w3, block_filter, deposit_proxy, service_token
+        )

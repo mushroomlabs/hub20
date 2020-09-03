@@ -3,13 +3,14 @@ from concurrent.futures import TimeoutError
 from typing import Optional
 
 from celery import shared_task
-from django.db import transaction
 
 from hub20.apps.blockchain.client import get_block_by_hash, get_transaction_by_hash, get_web3
 from hub20.apps.blockchain.models import Block
+from hub20.apps.ethereum_money.models import EthereumTokenAmount
+from hub20.apps.ethereum_money.typing import TokenAmount_T
 
-from .client.blockchain import make_service_deposit
-from .models import ServiceDeposit, TokenNetwork, TokenNetworkChannel
+from .client.blockchain import get_service_token, make_service_deposit
+from .models import Raiden, TokenNetwork, TokenNetworkChannel
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +62,7 @@ def sync_token_network_events():
     for token_network in TokenNetwork.objects.all():
         token_network_contract = token_network.get_contract(w3=w3)
         event_blocks = Block.objects.filter(
-            transaction__tokennetworkchannelevent__channel__token_network=token_network
+            transactions__tokennetworkchannelevent__channel__token_network=token_network
         )
         from_block = Block.get_latest_block_number(event_blocks) + 1
 
@@ -79,14 +80,9 @@ def sync_token_network_events():
 
 
 @shared_task
-def send_service_deposit(deposit_id: int):
-    service_deposit = ServiceDeposit.objects.filter(transfer__isnull=True, id=deposit_id).first()
-
-    if service_deposit:
-        with transaction.atomic():
-            w3 = get_web3()
-            make_service_deposit(
-                w3=w3, raiden=service_deposit.raiden, amount=service_deposit.as_token_amount
-            )
-    else:
-        logger.warning(f"Service Deposit {deposit_id} not found or already sent")
+def send_service_deposit(raiden_id: int, token_amount: TokenAmount_T):
+    raiden = Raiden.objects.get(id=raiden_id)
+    w3 = get_web3()
+    service_token = get_service_token(w3=w3)
+    service_token_amount = EthereumTokenAmount(currency=service_token, amount=token_amount)
+    make_service_deposit(w3=w3, raiden=raiden, amount=service_token_amount)

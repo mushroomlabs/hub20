@@ -25,6 +25,7 @@ class AppSettings:
             "hub20.apps.ethereum_money.client.listen_latest_transfers",
             "hub20.apps.ethereum_money.client.listen_pending_transfers",
             "hub20.apps.ethereum_money.client.download_all_token_transfers",
+            "hub20.apps.raiden.client.blockchain.listen_service_deposits",
         ]
 
     def __init__(self):

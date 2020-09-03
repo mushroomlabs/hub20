@@ -121,9 +121,7 @@ class TokenNetworkChannelEvent(models.Model):
 
 
 class Raiden(KeystoreAccount):
-    url = models.URLField(
-        default=settings.HUB20_RAIDEN_URL, help_text="Root URL of server (without api/v1)"
-    )
+    url = models.URLField(help_text="Root URL of server (without api/v1)")
     token_networks = models.ManyToManyField(TokenNetwork, blank=True)
 
     @property
@@ -247,13 +245,7 @@ class Payment(models.Model):
 
 class ServiceDeposit(TimeStampedModel, EthereumTokenValueModel):
     raiden = models.ForeignKey(Raiden, on_delete=models.CASCADE)
-
-
-class ServiceDepositTransaction(models.Model):
-    deposit = models.OneToOneField(
-        ServiceDeposit, related_name="transfer", on_delete=models.CASCADE
-    )
-    transaction = models.ForeignKey(Transaction, on_delete=models.CASCADE)
+    transaction = models.OneToOneField(Transaction, on_delete=models.CASCADE)
 
 
 __all__ = [
@@ -263,5 +255,4 @@ __all__ = [
     "Channel",
     "Payment",
     "ServiceDeposit",
-    "ServiceDepositTransaction",
 ]
