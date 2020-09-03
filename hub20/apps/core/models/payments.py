@@ -158,7 +158,7 @@ class BlockchainPaymentRoute(PaymentRoute):
     NAME = "blockchain"
 
     account = models.ForeignKey(
-        settings.ETHEREUM_ACCOUNT_MODEL, on_delete=models.CASCADE, related_name="payment_routes"
+        settings.ETHEREUM_ACCOUNT_MODEL, on_delete=models.CASCADE, related_name="blockchain_routes"
     )
     payment_window = IntegerRangeField(default=calculate_blockchain_payment_window)
 

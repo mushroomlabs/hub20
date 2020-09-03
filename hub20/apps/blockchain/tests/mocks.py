@@ -1,7 +1,7 @@
 import datetime
 
 import factory
-from attributedict.collections import AttributeDict
+from web3.datastructures import AttributeDict
 
 from hub20.apps.blockchain.factories.providers import EthereumProvider
 

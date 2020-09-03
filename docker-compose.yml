@@ -17,10 +17,6 @@ services:
   redis:
     image: redis:latest
 
-  raiden:
-    image: raidennetwork/raiden:latest
-    entrypoint: /opt/venv/bin/raiden --accept-disclaimer
-
   # Web API
   web:
     build: .
@@ -41,7 +37,12 @@ services:
   # Celery app
   celery:
     build: .
-    command: celery worker -A hub20.api -l info
+    command: >
+      /bin/bash -c "
+      while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+      while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+      celery worker -A hub20.api -l info
+      "
     depends_on:
       - db
       - redis
@@ -61,6 +62,21 @@ services:
         celery beat -A hub20.api -l info -s ${HUB20_DATA_FOLDER}/celery/celerybeat-schedule.db --pidfile=${HUB20_DATA_FOLDER}/celery/celerybeat.pid
       "
 
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - ./.env
+
+  # Run raiden via django-admin command
+  raiden:
+    build: .
+    command: >
+      /bin/bash -c "
+        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+        django-admin run_raiden
+      "
     depends_on:
       - db
       - redis

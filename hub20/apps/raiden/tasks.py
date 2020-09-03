@@ -6,8 +6,11 @@ from celery import shared_task
 
 from hub20.apps.blockchain.client import get_block_by_hash, get_transaction_by_hash, get_web3
 from hub20.apps.blockchain.models import Block
+from hub20.apps.ethereum_money.models import EthereumTokenAmount
+from hub20.apps.ethereum_money.typing import TokenAmount_T
 
-from .models import TokenNetwork, TokenNetworkChannel
+from .client.blockchain import get_service_token, make_service_deposit
+from .models import Raiden, TokenNetwork, TokenNetworkChannel
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +62,7 @@ def sync_token_network_events():
     for token_network in TokenNetwork.objects.all():
         token_network_contract = token_network.get_contract(w3=w3)
         event_blocks = Block.objects.filter(
-            transaction__tokennetworkchannelevent__channel__token_network=token_network
+            transactions__tokennetworkchannelevent__channel__token_network=token_network
         )
         from_block = Block.get_latest_block_number(event_blocks) + 1
 
@@ -74,3 +77,12 @@ def sync_token_network_events():
 
         process_events(token_network, channel_open_filter)
         process_events(token_network, channel_closed_filter)
+
+
+@shared_task
+def send_service_deposit(raiden_id: int, token_amount: TokenAmount_T):
+    raiden = Raiden.objects.get(id=raiden_id)
+    w3 = get_web3()
+    service_token = get_service_token(w3=w3)
+    service_token_amount = EthereumTokenAmount(currency=service_token, amount=token_amount)
+    make_service_deposit(w3=w3, raiden=raiden, amount=service_token_amount)

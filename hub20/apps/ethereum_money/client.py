@@ -5,7 +5,6 @@ from typing import Optional
 from asgiref.sync import sync_to_async
 from eth_utils import to_checksum_address
 from ethereum.abi import ContractTranslator
-from ethtoken.abi import EIP20_ABI
 from web3 import Web3
 from web3.exceptions import TimeExhausted, TransactionNotFound
 
@@ -14,6 +13,8 @@ from hub20.apps.blockchain.models import Block, Chain, Transaction
 from hub20.apps.ethereum_money import get_ethereum_account_model, signals
 from hub20.apps.ethereum_money.app_settings import TRANSFER_GAS_LIMIT
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
+
+from .abi import EIP20_ABI
 
 logger = logging.getLogger(__name__)
 EthereumAccount = get_ethereum_account_model()
@@ -102,6 +103,12 @@ def get_token_information(w3: Web3, address):
         "code": contract.functions.symbol().call(),
         "decimals": contract.functions.decimals().call(),
     }
+
+
+def make_token(w3: Web3, address) -> EthereumToken:
+    token_data = get_token_information(w3=w3, address=address)
+    chain = Chain.make(chain_id=int(w3.net.version))
+    return EthereumToken.make(chain=chain, address=address, **token_data)
 
 
 def sync_token_transfers(w3: Web3, token: EthereumToken, starting_block: int, end_block: int):
@@ -268,7 +275,9 @@ async def download_all_token_transfers(w3: Web3):
     chain_id = int(w3.net.version)
     chain = await sync_to_async(Chain.make)(chain_id=chain_id)
 
-    tokens = await sync_to_async(list)(EthereumToken.ERC20tokens.filter(chain=chain))
+    tokens = await sync_to_async(list)(
+        EthereumToken.tracked.filter(chain=chain).exclude(address=EthereumToken.NULL_ADDRESS)
+    )
 
     for token in tokens:
         current_block = await sync_to_async(Transaction.objects.last_block_with)(

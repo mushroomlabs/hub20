@@ -1,4 +1,4 @@
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
 
 import pytest
 from django.test import TestCase
@@ -20,7 +20,7 @@ class PaymentTransferTestCase(BaseTestCase):
         self.checkout = CheckoutFactory()
         self.token = self.checkout.currency
         self.w3 = get_web3()
-        
+
         self.block_filter = Mock()
 
     def test_can_detect_erc20_transfers(self):
@@ -36,11 +36,11 @@ class PaymentTransferTestCase(BaseTestCase):
         amount = self.checkout.as_token_amount
 
         tx_data = Erc20TransferDataMock(
-            from_address=from_address, recipient=recipient, amount=amount, **tx.to_dict()
+            from_address=from_address, recipient=recipient, amount=amount, **tx
         )
 
         tx_receipt = Erc20TransferReceiptMock(
-            from_address=from_address, recipient=recipient, amount=amount, **tx.to_dict()
+            from_address=from_address, recipient=recipient, amount=amount, **tx
         )
         block_data = BlockWithTransactionDetailsMock(
             hash=tx_data.blockHash, number=tx_data.blockNumber, transactions=[tx_data]

@@ -2,6 +2,7 @@ import random
 from datetime import timedelta
 
 import factory
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from factory import fuzzy
 
@@ -11,6 +12,18 @@ from hub20.apps.ethereum_money.factories import Erc20TokenFactory
 from . import models
 
 factory.Faker.add_provider(EthereumProvider)
+
+
+User = get_user_model()
+
+
+class AdminUserFactory(factory.django.DjangoModelFactory):
+    username = factory.Sequence(lambda n: f"admin-user-{n:03}")
+    is_superuser = True
+    is_staff = True
+
+    class Meta:
+        model = User
 
 
 class TokenNetworkFactory(factory.django.DjangoModelFactory):
@@ -71,4 +84,10 @@ class PaymentEventFactory(factory.django.DjangoModelFactory):
         model = models.Payment
 
 
-__all__ = ["TokenNetworkFactory", "RaidenFactory", "ChannelFactory", "PaymentEventFactory"]
+__all__ = [
+    "AdminUserFactory",
+    "TokenNetworkFactory",
+    "RaidenFactory",
+    "ChannelFactory",
+    "PaymentEventFactory",
+]

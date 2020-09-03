@@ -2,10 +2,11 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
 import requests
-from attributedict.collections import AttributeDict
 from django.utils.timezone import make_aware
+from web3.datastructures import AttributeDict
 
-from . import models
+from hub20.apps.raiden.exceptions import RaidenConnectionError
+from hub20.apps.raiden.models import Channel, Raiden
 
 
 def _make_request(url: str, method: str = "GET", **params: Any) -> Union[List, Dict]:
@@ -24,17 +25,11 @@ def _make_request(url: str, method: str = "GET", **params: Any) -> Union[List, D
         raise RaidenConnectionError(f"Could not connect to {url}")
 
 
-class RaidenConnectionError(Exception):
-    pass
-
-
 class RaidenClient:
-    def __init__(self, raiden: models.Raiden) -> None:
+    def __init__(self, raiden: Raiden) -> None:
         self.raiden = raiden
 
-    def _parse_payment(
-        self, payment_data: Dict, channel: models.Channel
-    ) -> Optional[AttributeDict]:
+    def _parse_payment(self, payment_data: Dict, channel: Channel) -> Optional[AttributeDict]:
         event_name = payment_data.pop("event")
         payment_data.pop("token_address", None)
 
@@ -56,7 +51,7 @@ class RaidenClient:
     def get_channels(self):
         return _make_request(f"{self.raiden.api_root_url}/channels")
 
-    def get_new_payments(self, channel: models.Channel) -> List[AttributeDict]:
+    def get_new_payments(self, channel: Channel) -> List[AttributeDict]:
 
         offset = channel.payments.count()
         events = _make_request(channel.payments_url, offset=offset)

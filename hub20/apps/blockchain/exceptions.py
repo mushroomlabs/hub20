@@ -23,3 +23,7 @@ class HubServiceOutOfSync(APIException):
     status_code = 503
     default_detail = "Hub node is out of sync with ethereum network, please try again later"
     default_code = "hub_service_out_of_sync"
+
+
+class Web3TransactionError(Exception):
+    pass

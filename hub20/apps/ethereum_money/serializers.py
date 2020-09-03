@@ -27,6 +27,11 @@ class EthereumTokenSerializer(serializers.ModelSerializer):
         read_only_fields = ("code", "name", "address", "network_id", "decimals")
 
 
+class EthereumTokenAmountSerializer(serializers.ModelSerializer):
+    currency = CurrencyRelatedField()
+    amount = TokenValueField()
+
+
 class HyperlinkedEthereumTokenSerializer(EthereumTokenSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name="ethereum_money:token-detail", lookup_field="address"

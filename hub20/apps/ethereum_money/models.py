@@ -3,8 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import random
-from decimal import Decimal
-from typing import Any, List, Optional, Tuple, Union
+from typing import Any, List, Optional, Tuple
 
 import ethereum
 from django.conf import settings
@@ -13,7 +12,6 @@ from django.db.models import Max, Q, Sum
 from eth_utils import to_checksum_address
 from eth_wallet import Wallet
 from ethereum.abi import ContractTranslator
-from ethtoken.abi import EIP20_ABI
 from model_utils.managers import QueryManager
 from web3 import Web3
 from web3.contract import Contract
@@ -21,8 +19,14 @@ from web3.contract import Contract
 from hub20.apps.blockchain.fields import EthereumAddressField, HexField
 from hub20.apps.blockchain.models import Chain, Transaction
 
-from .app_settings import HD_WALLET_MNEMONIC, HD_WALLET_ROOT_KEY, TRANSFER_GAS_LIMIT
-from .typing import EthereumAccount_T
+from .abi import EIP20_ABI
+from .app_settings import (
+    HD_WALLET_MNEMONIC,
+    HD_WALLET_ROOT_KEY,
+    TRACKED_TOKENS,
+    TRANSFER_GAS_LIMIT,
+)
+from .typing import EthereumAccount_T, TokenAmount, TokenAmount_T, Wei
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +55,7 @@ class EthereumToken(models.Model):
 
     objects = models.Manager()
     ERC20tokens = QueryManager(~Q(address=NULL_ADDRESS))
+    tracked = QueryManager(address__in=TRACKED_TOKENS)
     ethereum = QueryManager(address=NULL_ADDRESS)
 
     @property
@@ -141,8 +146,8 @@ class EthereumToken(models.Model):
             logger.exception(exc)
             return None, None
 
-    def from_wei(self, wei_amount: int) -> EthereumTokenAmount:
-        value = Decimal(wei_amount) / (10 ** self.decimals)
+    def from_wei(self, wei_amount: Wei) -> EthereumTokenAmount:
+        value = TokenAmount(wei_amount) / (10 ** self.decimals)
         return EthereumTokenAmount(amount=value, currency=self)
 
     @staticmethod
@@ -247,6 +252,10 @@ class AbstractEthereumAccount(models.Model):
 class KeystoreAccount(AbstractEthereumAccount):
     private_key = HexField(max_length=64, unique=True)
 
+    @property
+    def private_key_bytes(self) -> bytes:
+        return bytearray.fromhex(self.private_key[2:])
+
     @classmethod
     def generate(cls):
         private_key = os.urandom(32)
@@ -264,6 +273,10 @@ class HierarchicalDeterministicWallet(AbstractEthereumAccount):
     def private_key(self):
         wallet = self.__class__.get_wallet(index=self.index)
         return wallet.private_key()
+
+    @property
+    def private_key_bytes(self) -> bytes:
+        return bytearray.fromhex(self.private_key)
 
     @classmethod
     def get_wallet(cls, index: int) -> Wallet:
@@ -295,8 +308,8 @@ class AccountBalanceEntry(EthereumTokenValueModel):
 
 
 class EthereumTokenAmount:
-    def __init__(self, amount: Union[int, str, Decimal], currency: EthereumToken):
-        self.amount: Decimal = Decimal(amount)
+    def __init__(self, amount: TokenAmount_T, currency: EthereumToken):
+        self.amount: TokenAmount = TokenAmount(amount)
         self.currency: EthereumToken = currency
 
     @property
@@ -304,8 +317,8 @@ class EthereumTokenAmount:
         return f"{self.amount} {self.currency.code}"
 
     @property
-    def as_wei(self) -> int:
-        return int(self.amount * (10 ** self.currency.decimals))
+    def as_wei(self) -> Wei:
+        return Wei(self.amount * (10 ** self.currency.decimals))
 
     @property
     def as_hex(self) -> str:
@@ -323,10 +336,10 @@ class EthereumTokenAmount:
         self._check_currency_type(self)
         return self.__class__(self.amount + other.amount, self.currency)
 
-    def __mul__(self, other: Union[int, Decimal]) -> EthereumTokenAmount:
-        return EthereumTokenAmount(amount=Decimal(other * self.amount), currency=self.currency)
+    def __mul__(self, other: TokenAmount_T) -> EthereumTokenAmount:
+        return EthereumTokenAmount(amount=TokenAmount(other * self.amount), currency=self.currency)
 
-    def __rmul__(self, other: Union[int, Decimal]) -> EthereumTokenAmount:
+    def __rmul__(self, other: TokenAmount_T) -> EthereumTokenAmount:
         return self.__mul__(other)
 
     def __eq__(self, other: object) -> bool:
@@ -360,7 +373,7 @@ class EthereumTokenAmount:
     @classmethod
     def aggregated(cls, queryset, currency: EthereumToken):
         entries = queryset.filter(currency=currency)
-        amount = entries.aggregate(total=Sum("amount")).get("total") or Decimal(0)
+        amount = entries.aggregate(total=Sum("amount")).get("total") or TokenAmount(0)
         return cls(amount=amount, currency=currency)
 
 

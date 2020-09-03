@@ -2,11 +2,12 @@ import datetime
 import random
 from typing import Optional
 
+from django.conf import settings
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from model_utils.choices import Choices
 from model_utils.managers import QueryManager
-from model_utils.models import StatusModel
+from model_utils.models import StatusModel, TimeStampedModel
 from raiden_contracts.constants import CONTRACT_TOKEN_NETWORK, CONTRACT_TOKEN_NETWORK_REGISTRY
 from raiden_contracts.contract_manager import (
     ContractManager,
@@ -20,10 +21,11 @@ from web3.contract import Contract
 from hub20.apps.blockchain.fields import EthereumAddressField
 from hub20.apps.blockchain.models import Transaction
 from hub20.apps.ethereum_money.models import (
-    AbstractEthereumAccount,
     EthereumToken,
     EthereumTokenAmount,
     EthereumTokenAmountField,
+    EthereumTokenValueModel,
+    KeystoreAccount,
 )
 
 CHANNEL_STATUSES = Choices("open", "settling", "settled", "unusable", "closed", "closing")
@@ -39,10 +41,6 @@ def get_token_network_registry_contract(w3: Web3):
 
     abi = manager.get_contract_abi(CONTRACT_TOKEN_NETWORK_REGISTRY)
     return w3.eth.contract(abi=abi, address=address)
-
-
-class RaidenOperationError(Exception):
-    pass
 
 
 class TokenNetwork(models.Model):
@@ -122,7 +120,7 @@ class TokenNetworkChannelEvent(models.Model):
         unique_together = ("channel", "transaction")
 
 
-class Raiden(AbstractEthereumAccount):
+class Raiden(KeystoreAccount):
     url = models.URLField(help_text="Root URL of server (without api/v1)")
     token_networks = models.ManyToManyField(TokenNetwork, blank=True)
 
@@ -245,4 +243,16 @@ class Payment(models.Model):
         unique_together = ("channel", "timestamp", "sender_address", "receiver_address")
 
 
-__all__ = ["TokenNetwork", "Raiden", "TokenNetwork", "Channel", "Payment"]
+class ServiceDeposit(TimeStampedModel, EthereumTokenValueModel):
+    raiden = models.ForeignKey(Raiden, on_delete=models.CASCADE)
+    transaction = models.OneToOneField(Transaction, on_delete=models.CASCADE)
+
+
+__all__ = [
+    "TokenNetwork",
+    "Raiden",
+    "TokenNetwork",
+    "Channel",
+    "Payment",
+    "ServiceDeposit",
+]

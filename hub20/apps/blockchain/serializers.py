@@ -1,19 +1,18 @@
 import logging
 
 from django.utils.translation import gettext_lazy as _
-
 from ethereum.utils import checksum_encode
 from hexbytes import HexBytes
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 
 from .constants import (
-    SIGNATURE_R_MIN_VALUE,
     SIGNATURE_R_MAX_VALUE,
-    SIGNATURE_S_MIN_VALUE,
+    SIGNATURE_R_MIN_VALUE,
     SIGNATURE_S_MAX_VALUE,
-    SIGNATURE_V_MIN_VALUE,
+    SIGNATURE_S_MIN_VALUE,
     SIGNATURE_V_MAX_VALUE,
+    SIGNATURE_V_MIN_VALUE,
 )
 
 logger = logging.getLogger(__name__)
