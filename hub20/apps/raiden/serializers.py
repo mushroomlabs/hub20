@@ -4,17 +4,31 @@ from hub20.apps.blockchain.client import get_web3
 from hub20.apps.blockchain.serializers import HexadecimalField
 from hub20.apps.ethereum_money.client import get_account_balance
 from hub20.apps.ethereum_money.models import EthereumTokenAmount
-from hub20.apps.ethereum_money.serializers import EthereumTokenAmountSerializer, TokenValueField
+from hub20.apps.ethereum_money.serializers import (
+    CurrencyRelatedField,
+    EthereumTokenAmountSerializer,
+    TokenValueField,
+)
 from hub20.apps.ethereum_money.typing import TokenAmount
 
 from .client.blockchain import get_service_token
-from .models import Raiden, ServiceDeposit
+from .models import Channel, Raiden, ServiceDeposit
+
+
+class HyperlinkedRaidenField(serializers.HyperlinkedIdentityField):
+    lookup_field = "address"
+
+    def __init__(self, **kw):
+        super().__init__(view_name="raiden:raiden-detail", **kw)
+
+
+class HyperlinkedRelatedRaidenField(serializers.HyperlinkedRelatedField):
+    view_name = "raiden:raiden-detail"
+    lookup_field = "address"
 
 
 class RaidenSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(
-        view_name="raiden:raiden-detail", lookup_field="address"
-    )
+    url = HyperlinkedRaidenField()
 
     class Meta:
         model = Raiden
@@ -24,15 +38,24 @@ class RaidenSerializer(serializers.ModelSerializer):
 
 class DepositSerializer(EthereumTokenAmountSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="raiden:deposit-detail")
-    raiden = serializers.HyperlinkedRelatedField(
-        view_name="raiden:raiden-detail", queryset=Raiden.objects.all(), lookup_field="address",
-    )
+    raiden = HyperlinkedRelatedRaidenField(read_only=True)
     transaction = HexadecimalField(read_only=True, source="transaction.hash")
 
     class Meta:
         model = ServiceDeposit
         fields = ("url", "created", "raiden", "amount", "currency", "transaction")
         read_only_fields = ("url", "created", "raiden", "amount", "currency", "transaction")
+
+
+class ChannelSerializer(serializers.ModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name="raiden:channel-detail")
+    raiden = HyperlinkedRelatedRaidenField(read_only=True)
+    token = CurrencyRelatedField(queryset=None, source="token_network.token", read_only=True)
+
+    class Meta:
+        model = Channel
+        fields = ("url", "raiden", "token", "status", "balance")
+        read_only_fields = ("url", "raiden", "token", "status", "balance")
 
 
 class ServiceDepositTaskSerializer(serializers.Serializer):

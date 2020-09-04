@@ -28,7 +28,7 @@ from hub20.apps.ethereum_money.models import (
     KeystoreAccount,
 )
 
-CHANNEL_STATUSES = Choices("open", "settling", "settled", "unusable", "closed", "closing")
+CHANNEL_STATUSES = Choices("opened", "settling", "settled", "unusable", "closed", "closing")
 
 
 def get_token_network_registry_contract(w3: Web3):
@@ -57,7 +57,7 @@ class TokenNetwork(models.Model):
 
         # However, our main purpose is only to find out if a given address is
         # being used by raiden and that we can _try_ to use for a transfer.
-        open_channels = self.channels.filter(status__status=CHANNEL_STATUSES.open)
+        open_channels = self.channels.filter(status__status=CHANNEL_STATUSES.opened)
         return open_channels.filter(participant_addresses__contains=[address]).exists()
 
     @property
@@ -105,7 +105,7 @@ class TokenNetworkChannelStatus(StatusModel):
         last_event = channel.events.last()
         event_name = last_event and last_event.name
         status = event_name and {
-            "ChannelOpened": CHANNEL_STATUSES.open,
+            "ChannelOpened": CHANNEL_STATUSES.opened,
             "ChannelClosed": CHANNEL_STATUSES.closed,
         }.get(event_name)
         cls.objects.update_or_create(channel=channel, defaults={"status": status})
@@ -144,8 +144,8 @@ class Channel(StatusModel):
     total_withdraw = EthereumTokenAmountField()
 
     objects = models.Manager()
-    funded = QueryManager(status=STATUS.open, balance__gt=0)
-    available = QueryManager(status=STATUS.open)
+    funded = QueryManager(status=STATUS.opened, balance__gt=0)
+    available = QueryManager(status=STATUS.opened)
 
     @property
     def url(self):

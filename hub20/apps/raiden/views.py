@@ -6,8 +6,13 @@ from rest_framework import mixins, status, viewsets
 from rest_framework.permissions import IsAdminUser
 from rest_framework.response import Response
 
-from .models import Raiden, ServiceDeposit
-from .serializers import DepositSerializer, RaidenSerializer, ServiceDepositTaskSerializer
+from .models import Channel, Raiden, ServiceDeposit
+from .serializers import (
+    ChannelSerializer,
+    DepositSerializer,
+    RaidenSerializer,
+    ServiceDepositTaskSerializer,
+)
 from .tasks import send_service_deposit
 
 
@@ -30,6 +35,11 @@ class RaidenViewSet(BaseRaidenAdminViewSet):
             raise Http404(f"{address} is not a valid raiden account address")
 
         return get_object_or_404(Raiden, address=address)
+
+
+class ChannelViewSet(BaseRaidenAdminViewSet):
+    queryset: QuerySet = Channel.available.all()
+    serializer_class = ChannelSerializer
 
 
 class ServiceDepositViewSet(BaseRaidenAdminViewSet):
