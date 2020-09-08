@@ -16,7 +16,7 @@ class Command(BaseCommand):
     help = "Mints the service token (RDN) on test networks"
 
     def handle(self, *args, **options):
-        raiden_node = Raiden.objects.first() or Raiden.generate()
+        raiden = Raiden.get()
 
         w3 = get_web3()
         chain_id = int(w3.net.version)
@@ -33,4 +33,4 @@ class Command(BaseCommand):
         amount = EthereumTokenAmount(
             amount=app_settings.Raiden.minimum_service_token_required, currency=service_token
         )
-        mint_tokens(w3, raiden_node, amount)
+        mint_tokens(w3=w3, raiden=raiden, amount=amount)

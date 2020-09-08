@@ -6,16 +6,16 @@ from celery import shared_task
 
 from hub20.apps.blockchain.client import get_block_by_hash, get_transaction_by_hash, get_web3
 from hub20.apps.blockchain.models import Block
+from hub20.apps.ethereum_money.client import get_account_balance
 from hub20.apps.ethereum_money.models import EthereumTokenAmount
-from hub20.apps.ethereum_money.typing import TokenAmount_T
-
-from .client.blockchain import get_service_token, make_service_deposit
-from .models import Raiden, TokenNetwork, TokenNetworkChannel
+from hub20.apps.raiden import models
+from hub20.apps.raiden.client.blockchain import get_service_token, make_service_deposit
+from hub20.apps.raiden.client.node import RaidenClient
 
 logger = logging.getLogger(__name__)
 
 
-def _get_channel_from_event(token_network, event) -> Optional[TokenNetworkChannel]:
+def _get_channel_from_event(token_network, event) -> Optional[models.TokenNetworkChannel]:
     event_name = event.event
     if event_name == "ChannelOpened":
         participants = (event.args.participant1, event.args.participant2)
@@ -32,7 +32,7 @@ def _get_channel_from_event(token_network, event) -> Optional[TokenNetworkChanne
     return None
 
 
-def process_events(token_network: TokenNetwork, event_filter):
+def process_events(token_network: models.TokenNetwork, event_filter):
     w3 = get_web3()
     try:
         for event in event_filter.get_all_entries():
@@ -59,7 +59,7 @@ def process_events(token_network: TokenNetwork, event_filter):
 @shared_task
 def sync_token_network_events():
     w3 = get_web3()
-    for token_network in TokenNetwork.objects.all():
+    for token_network in models.TokenNetwork.objects.all():
         token_network_contract = token_network.get_contract(w3=w3)
         event_blocks = Block.objects.filter(
             transactions__tokennetworkchannelevent__channel__token_network=token_network
@@ -80,9 +80,70 @@ def sync_token_network_events():
 
 
 @shared_task
-def send_service_deposit(raiden_id: int, token_amount: TokenAmount_T):
-    raiden = Raiden.objects.get(id=raiden_id)
+def make_udc_deposit(order_id: int):
+    order = models.UserDepositContractOrder.objects.filter(id=order_id).first()
+
+    if not order:
+        logging.warning(f"UDC Order {order_id} not found")
+        return
+
     w3 = get_web3()
     service_token = get_service_token(w3=w3)
-    service_token_amount = EthereumTokenAmount(currency=service_token, amount=token_amount)
-    make_service_deposit(w3=w3, raiden=raiden, amount=service_token_amount)
+    service_token_amount = EthereumTokenAmount(currency=service_token, amount=order.amount)
+
+    make_service_deposit(w3=w3, raiden=order.raiden, amount=service_token_amount)
+
+
+@shared_task
+def make_channel_deposit(order_id: int):
+    order = models.ChannelDepositOrder.objects.filter(id=order_id).first()
+
+    if not order:
+        logger.warning(f"Channel Deposit Order {order_id} not found")
+        return
+
+    w3 = get_web3()
+
+    client = RaidenClient(order.raiden)
+    token_amount = EthereumTokenAmount(currency=order.channel.token, amount=order.amount)
+
+    chain_balance = get_account_balance(
+        w3=w3, token=order.channel.token, address=order.raiden.address
+    )
+
+    if chain_balance < token_amount:
+        logger.warning(f"Insufficient balance {chain_balance.formatted} to deposit on channel")
+
+    client.make_channel_deposit(order.channel, token_amount)
+
+
+@shared_task
+def make_channel_withdraw(order_id: int):
+    order = models.ChannelWithdrawOrder.objects.filter(id=order_id).first()
+
+    if not order:
+        logger.warning(f"Channel Withdraw Order {order_id} not found")
+        return
+
+    client = RaidenClient(order.raiden)
+    token_amount = EthereumTokenAmount(currency=order.channel.token, amount=order.amount)
+    channel_balance = order.channel.balance_amount
+
+    if channel_balance < token_amount:
+        logger.warning(f"Insufficient balance {channel_balance.formatted} to withdraw")
+
+    client.make_channel_withdraw(order.channel, token_amount)
+
+
+@shared_task
+def join_token_network(raiden_id: int, token_network_address: str):
+    raiden = models.Raiden.objects.get(id=raiden_id)
+
+    logger.info(f"Adding {token_network_address} to {raiden}")
+
+
+@shared_task
+def leave_token_network(raiden_id: int, token_network_address: str):
+    raiden = models.Raiden.objects.get(id=raiden_id)
+
+    logger.info(f"Leaving {token_network_address} to {raiden}")

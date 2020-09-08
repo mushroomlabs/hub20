@@ -93,8 +93,6 @@ class RaidenPaymentTestCase(BaseTestCase):
         token_network = TokenNetworkFactory()
 
         self.channel = ChannelFactory(token_network=token_network)
-        self.channel.raiden.token_networks.add(token_network)
-
         self.order = Erc20TokenPaymentOrderFactory(currency=token_network.token)
         self.raiden_route = RaidenPaymentRoute.objects.filter(order=self.order).first()
 
