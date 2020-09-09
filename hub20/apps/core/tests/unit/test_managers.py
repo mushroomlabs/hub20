@@ -4,7 +4,7 @@ from django.test import TestCase
 from hub20.apps.core.factories import Erc20TokenPaymentOrderFactory
 from hub20.apps.core.models import BlockchainPaymentRoute, PaymentOrder, RaidenPaymentRoute
 from hub20.apps.ethereum_money.tests.base import add_token_to_account
-from hub20.apps.raiden.factories import ChannelFactory, TokenNetworkFactory
+from hub20.apps.raiden.factories import ChannelFactory
 
 
 @pytest.mark.django_db(transaction=True)
@@ -14,11 +14,10 @@ class BaseTestCase(TestCase):
 
 class PaymentOrderManagerTestCase(BaseTestCase):
     def setUp(self):
-        token_network = TokenNetworkFactory()
-        self.raiden_channel = ChannelFactory(
-            token_network=token_network, raiden__token_networks=[token_network]
+        self.raiden_channel = ChannelFactory()
+        self.order = Erc20TokenPaymentOrderFactory(
+            currency=self.raiden_channel.token_network.token
         )
-        self.order = Erc20TokenPaymentOrderFactory(currency=token_network.token)
 
     def test_order_has_blockchain_route(self):
         self.assertTrue(PaymentOrder.objects.with_blockchain_route().exists())

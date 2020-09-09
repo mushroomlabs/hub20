@@ -1,25 +1,23 @@
+from __future__ import annotations
+
 import datetime
 import random
 from typing import Optional
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from model_utils.choices import Choices
-from model_utils.managers import QueryManager
+from model_utils.managers import InheritanceManager, QueryManager
 from model_utils.models import StatusModel, TimeStampedModel
-from raiden_contracts.constants import CONTRACT_TOKEN_NETWORK, CONTRACT_TOKEN_NETWORK_REGISTRY
-from raiden_contracts.contract_manager import (
-    ContractManager,
-    contracts_precompiled_path,
-    get_contracts_deployment_info,
-)
-from raiden_contracts.utils.type_aliases import ChainID
+from raiden_contracts.constants import CONTRACT_TOKEN_NETWORK
+from raiden_contracts.contract_manager import ContractManager, contracts_precompiled_path
 from web3 import Web3
-from web3.contract import Contract
 
 from hub20.apps.blockchain.fields import EthereumAddressField
 from hub20.apps.blockchain.models import Transaction
+from hub20.apps.ethereum_money.app_settings import TRACKED_TOKENS
 from hub20.apps.ethereum_money.models import (
     EthereumToken,
     EthereumTokenAmount,
@@ -28,24 +26,15 @@ from hub20.apps.ethereum_money.models import (
     KeystoreAccount,
 )
 
-CHANNEL_STATUSES = Choices("open", "settling", "settled", "unusable", "closed", "closing")
-
-
-def get_token_network_registry_contract(w3: Web3):
-    chain_id = int(w3.net.version)
-    manager = ContractManager(contracts_precompiled_path())
-
-    contract_data = get_contracts_deployment_info(ChainID(chain_id))
-    assert contract_data
-    address = contract_data["contracts"][CONTRACT_TOKEN_NETWORK_REGISTRY]["address"]
-
-    abi = manager.get_contract_abi(CONTRACT_TOKEN_NETWORK_REGISTRY)
-    return w3.eth.contract(abi=abi, address=address)
+CHANNEL_STATUSES = Choices("opened", "settling", "settled", "unusable", "closed", "closing")
+User = get_user_model()
 
 
 class TokenNetwork(models.Model):
     address = EthereumAddressField()
     token = models.OneToOneField(EthereumToken, on_delete=models.CASCADE)
+    objects = models.Manager()
+    tracked = QueryManager(token__address__in=TRACKED_TOKENS)
 
     @property
     def url(self):
@@ -57,7 +46,7 @@ class TokenNetwork(models.Model):
 
         # However, our main purpose is only to find out if a given address is
         # being used by raiden and that we can _try_ to use for a transfer.
-        open_channels = self.channels.filter(status__status=CHANNEL_STATUSES.open)
+        open_channels = self.channels.filter(status__status=CHANNEL_STATUSES.opened)
         return open_channels.filter(participant_addresses__contains=[address]).exists()
 
     @property
@@ -68,12 +57,6 @@ class TokenNetwork(models.Model):
         manager = ContractManager(contracts_precompiled_path())
         abi = manager.get_contract_abi(CONTRACT_TOKEN_NETWORK)
         return w3.eth.contract(abi=abi, address=self.address)
-
-    @classmethod
-    def make(cls, token: EthereumToken, token_network_contract: Contract):
-        address = token_network_contract.functions.token_to_token_networks(token.address).call()
-        token_network, _ = cls.objects.get_or_create(token=token, defaults={"address": address})
-        return token_network
 
     def __str__(self):
         return f"{self.address} - ({self.token.code} @ {self.token.chain_id})"
@@ -105,7 +88,7 @@ class TokenNetworkChannelStatus(StatusModel):
         last_event = channel.events.last()
         event_name = last_event and last_event.name
         status = event_name and {
-            "ChannelOpened": CHANNEL_STATUSES.open,
+            "ChannelOpened": CHANNEL_STATUSES.opened,
             "ChannelClosed": CHANNEL_STATUSES.closed,
         }.get(event_name)
         cls.objects.update_or_create(channel=channel, defaults={"status": status})
@@ -121,16 +104,40 @@ class TokenNetworkChannelEvent(models.Model):
 
 
 class Raiden(KeystoreAccount):
-    url = models.URLField(help_text="Root URL of server (without api/v1)")
-    token_networks = models.ManyToManyField(TokenNetwork, blank=True)
-
     @property
     def api_root_url(self):
-        url = self.url.strip("/")
-        return f"{url}/api/v1"
+        return f"{settings.HUB20_RAIDEN_URL}/api/v1"
+
+    @property
+    def token_networks(self):
+        return TokenNetwork.objects.filter(
+            channel__status=Channel.STATUS.opened, channel__raiden=self
+        )
+
+    @property
+    def open_channels(self):
+        return self.channels.filter(status=Channel.STATUS.opened)
+
+    @staticmethod
+    def get(address: Optional[str] = None) -> Optional[Raiden]:
+        if not settings.HUB20_RAIDEN_ENABLED:
+            return None
+
+        accounts = Raiden.objects.all()
+
+        if address is None and not accounts.exists():
+            return Raiden.generate()
+
+        if address is not None:
+            accounts = accounts.filter(address=address)
+
+        return accounts.first()
 
     def __str__(self):
         return f"Raiden @ {self.address}"
+
+    class Meta:
+        proxy = True
 
 
 class Channel(StatusModel):
@@ -144,8 +151,8 @@ class Channel(StatusModel):
     total_withdraw = EthereumTokenAmountField()
 
     objects = models.Manager()
-    funded = QueryManager(status=STATUS.open, balance__gt=0)
-    available = QueryManager(status=STATUS.open)
+    funded = QueryManager(status=STATUS.opened, balance__gt=0)
+    available = QueryManager(status=STATUS.opened)
 
     @property
     def url(self):
@@ -162,6 +169,14 @@ class Channel(StatusModel):
     @property
     def balance_amount(self) -> EthereumTokenAmount:
         return EthereumTokenAmount(amount=self.balance, currency=self.token)
+
+    @property
+    def deposit_amount(self) -> EthereumTokenAmount:
+        return EthereumTokenAmount(amount=self.total_deposit, currency=self.token)
+
+    @property
+    def withdraw_amount(self) -> EthereumTokenAmount:
+        return EthereumTokenAmount(amount=self.total_withdraw, currency=self.token)
 
     @property
     def last_event_timestamp(self) -> Optional[datetime.datetime]:
@@ -243,9 +258,41 @@ class Payment(models.Model):
         unique_together = ("channel", "timestamp", "sender_address", "receiver_address")
 
 
-class ServiceDeposit(TimeStampedModel, EthereumTokenValueModel):
+class RaidenManagementOrder(TimeStampedModel):
     raiden = models.ForeignKey(Raiden, on_delete=models.CASCADE)
-    transaction = models.OneToOneField(Transaction, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.PROTECT)
+    objects = InheritanceManager()
+
+
+class JoinTokenNetworkOrder(RaidenManagementOrder):
+    token_network = models.ForeignKey(TokenNetwork, on_delete=models.PROTECT)
+    amount = EthereumTokenAmountField()
+
+
+class LeaveTokenNetworkOrder(RaidenManagementOrder):
+    token_network = models.ForeignKey(TokenNetwork, on_delete=models.PROTECT)
+
+
+class ChannelDepositOrder(RaidenManagementOrder):
+    channel = models.ForeignKey(Channel, on_delete=models.PROTECT)
+    amount = EthereumTokenAmountField()
+
+
+class ChannelWithdrawOrder(RaidenManagementOrder):
+    channel = models.ForeignKey(Channel, on_delete=models.PROTECT)
+    amount = EthereumTokenAmountField()
+
+
+class UserDepositContractOrder(RaidenManagementOrder, EthereumTokenValueModel):
+    pass
+
+
+class RaidenManagementOrderResult(TimeStampedModel):
+    order = models.OneToOneField(
+        RaidenManagementOrder, on_delete=models.CASCADE, related_name="result"
+    )
+    success = models.BooleanField(default=True)
+    transaction = models.OneToOneField(Transaction, null=True, on_delete=models.SET_NULL)
 
 
 __all__ = [
@@ -254,5 +301,11 @@ __all__ = [
     "TokenNetwork",
     "Channel",
     "Payment",
-    "ServiceDeposit",
+    "RaidenManagementOrder",
+    "JoinTokenNetworkOrder",
+    "LeaveTokenNetworkOrder",
+    "ChannelDepositOrder",
+    "ChannelWithdrawOrder",
+    "UserDepositContractOrder",
+    "RaidenManagementOrderResult",
 ]

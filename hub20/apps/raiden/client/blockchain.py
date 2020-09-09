@@ -20,10 +20,10 @@ from web3 import Web3
 from hub20.apps.blockchain.client import BLOCK_CREATION_INTERVAL, send_transaction
 from hub20.apps.blockchain.models import Block, Transaction
 from hub20.apps.ethereum_money.abi import EIP20_ABI
-from hub20.apps.ethereum_money.client import make_token
+from hub20.apps.ethereum_money.client import get_account_balance, make_token
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
 from hub20.apps.raiden import signals
-from hub20.apps.raiden.models import Raiden
+from hub20.apps.raiden.models import Raiden, TokenNetwork
 
 GAS_REQUIRED_FOR_DEPOSIT: int = 200_000
 GAS_REQUIRED_FOR_APPROVE: int = 70_000
@@ -106,8 +106,14 @@ def mint_tokens(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
 
 def make_service_deposit(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
     token = amount.currency
-    deposit_proxy = _make_deposit_proxy(w3=w3)
 
+    on_chain_balance = get_account_balance(w3=w3, token=token, address=raiden.address)
+
+    if amount < on_chain_balance:
+        logger.warning(f"Insufficient balance {on_chain_balance.formatted} to make deposit")
+        return
+
+    deposit_proxy = _make_deposit_proxy(w3=w3)
     service_token_address = to_checksum_address(deposit_proxy.functions.token().call())
 
     if service_token_address != token.address:
@@ -182,6 +188,19 @@ def process_latest_deposits(w3: Web3, block_filter, deposit_proxy, service_token
                     signals.service_deposit_sent.send(
                         sender=Transaction, transaction=tx, raiden=raiden, amount=amount
                     )
+
+
+async def get_token_networks(w3: Web3):
+    token_registry_contract = get_token_network_registry_contract(w3=w3)
+    get_token_network_address = token_registry_contract.functions.token_to_token_networks
+
+    tracked_tokens = await sync_to_async(EthereumToken.tracked.all)()
+    for token in tracked_tokens:
+        token_network_address = get_token_network_address(token.address).call()
+        if token_network_address != EthereumToken.NULL_ADDRESS:
+            sync_to_async(TokenNetwork.objects.update_or_create)(
+                token=token, defaults={"address": token_network_address}
+            )
 
 
 async def listen_service_deposits(w3: Web3):

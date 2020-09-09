@@ -35,17 +35,7 @@ class TokenNetworkFactory(factory.django.DjangoModelFactory):
 
 
 class RaidenFactory(factory.django.DjangoModelFactory):
-    url = factory.Sequence(lambda n: f"http://raiden{n:02}.example.org")
     address = factory.Faker("ethereum_address")
-
-    @factory.post_generation
-    def token_networks(self, create, extracted, **kw):
-        if not create:
-            return
-
-        token_networks = extracted or []
-        for network in token_networks:
-            self.token_networks.add(network)
 
     class Meta:
         model = models.Raiden
@@ -59,7 +49,7 @@ class ChannelFactory(factory.django.DjangoModelFactory):
     balance = fuzzy.FuzzyDecimal(1, 100, precision=6)
     total_deposit = factory.LazyAttribute(lambda obj: obj.balance)
     total_withdraw = 0
-    status = "open"
+    status = models.Channel.STATUS.opened
 
     class Meta:
         model = models.Channel
@@ -84,10 +74,24 @@ class PaymentEventFactory(factory.django.DjangoModelFactory):
         model = models.Payment
 
 
+class RaidenManagementOrderFactory(factory.django.DjangoModelFactory):
+    raiden = factory.SubFactory(RaidenFactory)
+    user = factory.SubFactory(AdminUserFactory)
+
+
+class UserDepositContractOrderFactory(RaidenManagementOrderFactory):
+    currency = factory.SubFactory(Erc20TokenFactory)
+    amount = factory.fuzzy.FuzzyDecimal(1, 10, precision=3)
+
+    class Meta:
+        model = models.UserDepositContractOrder
+
+
 __all__ = [
     "AdminUserFactory",
     "TokenNetworkFactory",
     "RaidenFactory",
     "ChannelFactory",
     "PaymentEventFactory",
+    "UserDepositContractOrderFactory",
 ]

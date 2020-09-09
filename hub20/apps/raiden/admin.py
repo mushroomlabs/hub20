@@ -1,4 +1,4 @@
-from typing import Optional, Any
+from typing import Any, Optional
 
 from django.contrib import admin
 from django.http import HttpRequest
@@ -19,8 +19,7 @@ class ReadOnlyModelAdmin(admin.ModelAdmin):
 
 @admin.register(models.Raiden)
 class RaidenAdmin(ReadOnlyModelAdmin):
-    list_display = ("url", "address")
-    exclude = ("token_networks",)
+    list_display = ("address",)
 
     def has_add_permission(self, request: HttpRequest, obj: Optional[Any] = None) -> bool:
         return request.user.is_superuser

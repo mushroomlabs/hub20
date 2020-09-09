@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
@@ -5,20 +6,24 @@ import requests
 from django.utils.timezone import make_aware
 from web3.datastructures import AttributeDict
 
+from hub20.apps.ethereum_money.models import EthereumTokenAmount
 from hub20.apps.raiden.exceptions import RaidenConnectionError
-from hub20.apps.raiden.models import Channel, Raiden
+from hub20.apps.raiden.models import Channel, Raiden, TokenNetwork
+
+logger = logging.getLogger(__name__)
 
 
-def _make_request(url: str, method: str = "GET", **params: Any) -> Union[List, Dict]:
+def _make_request(url: str, method: str = "GET", **payload: Any) -> Union[List, Dict]:
     action = {
         "GET": requests.get,
+        "PATCH": requests.patch,
         "PUT": requests.put,
         "POST": requests.post,
         "DELETE": requests.delete,
     }[method.upper()]
 
     try:
-        response = action(url)
+        response = action(url, json=payload)
         response.raise_for_status()
         return response.json()
     except requests.exceptions.ConnectionError:
@@ -48,6 +53,12 @@ class RaidenClient:
         payment_data["timestamp"] = make_aware(datetime.fromisoformat(iso_time))
         return AttributeDict(payment_data)
 
+    def _refresh_channel(self, channel: Channel) -> Channel:
+        channel_data = _make_request(channel.url)
+        Channel.make(channel.raiden, **channel_data)
+        channel.refresh_from_db()
+        return channel
+
     def get_channels(self):
         return _make_request(f"{self.raiden.api_root_url}/channels")
 
@@ -62,3 +73,33 @@ class RaidenClient:
 
     def get_token_addresses(self):
         return _make_request(f"{self.raiden.api_root_url}/tokens")
+
+    def get_status(self):
+        try:
+            response = _make_request(f"{self.raiden.api_root_url}/status")
+            return response.get("status")
+        except RaidenConnectionError:
+            return "offline"
+
+    def join_token_network(self, token_network: TokenNetwork, amount: EthereumTokenAmount):
+        url = f"{self.raiden.api_root_url}/connections/{token_network.token.address}"
+        return _make_request(url, method="PUT", funds=amount.as_wei)
+
+    def leave_token_network(self, token_network: TokenNetwork):
+        url = f"{self.raiden.api_root_url}/connections/{token_network.token.address}"
+        return _make_request(url, method="DELETE")
+
+    def make_channel_deposit(self, channel: Channel, amount: EthereumTokenAmount):
+        channel = self._refresh_channel(channel)
+        new_deposit = channel.deposit_amount + amount
+        return _make_request(channel.url, method="PATCH", total_deposit=new_deposit.as_wei)
+
+    def make_channel_withdraw(self, channel: Channel, amount: EthereumTokenAmount):
+        channel = self._refresh_channel(channel)
+        new_withdraw = channel.withdraw_amount + amount
+        return _make_request(channel.url, method="PATCH", total_withdraw=new_withdraw.as_wei)
+
+
+def get_raiden_client(address: Optional[str] = None) -> Optional[RaidenClient]:
+    raiden = Raiden.get(address=address)
+    return raiden and RaidenClient(raiden)
