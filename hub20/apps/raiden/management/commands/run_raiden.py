@@ -1,7 +1,7 @@
+import hashlib
 import json
 import logging
 import os
-import secrets
 import subprocess
 import tempfile
 import time
@@ -64,7 +64,7 @@ class Command(BaseCommand):
         is_production = (chain.id == 1) and not settings.DEBUG
 
         exponential_backoff_wait(raiden=raiden, w3=w3)
-        password = secrets.token_urlsafe(30)
+        password = hashlib.sha256(settings.SECRET_KEY.encode()).hexdigest()
         keyfile_json = create_keyfile_json(raiden.private_key_bytes, password=password.encode())
 
         with tempfile.NamedTemporaryFile("w+") as keystore_file:
