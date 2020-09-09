@@ -17,6 +17,7 @@ from web3 import Web3
 
 from hub20.apps.blockchain.fields import EthereumAddressField
 from hub20.apps.blockchain.models import Transaction
+from hub20.apps.ethereum_money.app_settings import TRACKED_TOKENS
 from hub20.apps.ethereum_money.models import (
     EthereumToken,
     EthereumTokenAmount,
@@ -32,6 +33,8 @@ User = get_user_model()
 class TokenNetwork(models.Model):
     address = EthereumAddressField()
     token = models.OneToOneField(EthereumToken, on_delete=models.CASCADE)
+    objects = models.Manager()
+    tracked = QueryManager(token__address__in=TRACKED_TOKENS)
 
     @property
     def url(self):
@@ -107,8 +110,8 @@ class Raiden(KeystoreAccount):
 
     @property
     def token_networks(self):
-        return self.channels.filter(status=Channel.STATUS.opened).values_list(
-            "token_network", flat=True
+        return TokenNetwork.objects.filter(
+            channel__status=Channel.STATUS.opened, channel__raiden=self
         )
 
     @property

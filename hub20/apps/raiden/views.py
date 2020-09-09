@@ -86,24 +86,26 @@ class TokenNetworkViewMixin:
     queryset: QuerySet = models.TokenNetwork.objects.filter(token__address__in=TRACKED_TOKENS)
 
 
-class TokenNetworkListView(TokenNetworkViewMixin, generics.ListAPIView):
-    pass
+class TokenNetworkViewSet(
+    TokenNetworkViewMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    viewsets.GenericViewSet,
+):
+    def destroy(self, request, *args, **kw):
+        models.LeaveTokenNetworkOrder.objects.create(
+            raiden=models.Raiden.get(), user=request.user, token_network=self.get_object()
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
-
-class TokenNetworkDetailView(TokenNetworkViewMixin, generics.RetrieveDestroyAPIView):
-    pass
-
-    # @action(detail=True, methods=["post"], serializer_class=TokenNetworkConnectionSerializer)
-    # def join(self, request, address=None):
-    #     serializer = self.get_serializer()
-    #     token_network = self.get_object()
-
-    #     if serializer.is_valid():
-    #         raiden = serializer.data["raiden"]
-    #         amount = serializer.data["amount"]
-    #         task = join_token_network.delay(
-    #             raiden_id=raiden.id, token_network_id=token_network.id, amount=amount
-    #         )
-    #         return Response(dict(task_id=task.id), status=status.HTTP_202_ACCEPTED)
-    #     else:
-    #         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    @action(
+        detail=True, methods=["post"], serializer_class=serializers.JoinTokenNetworkOrderSerializer
+    )
+    def join(self, request, address=None):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        else:
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

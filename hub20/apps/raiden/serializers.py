@@ -3,7 +3,6 @@ from rest_framework import serializers
 from hub20.apps.blockchain.client import get_web3
 from hub20.apps.blockchain.serializers import HexadecimalField
 from hub20.apps.ethereum_money.app_settings import TRACKED_TOKENS
-from hub20.apps.ethereum_money.client import get_account_balance
 from hub20.apps.ethereum_money.models import EthereumTokenAmount
 from hub20.apps.ethereum_money.serializers import (
     CurrencyRelatedField,
@@ -134,20 +133,36 @@ class RaidenSerializer(serializers.ModelSerializer):
         read_only_fields = ("address", "channels", "status")
 
 
-class TokenNetworkConnectionSerializer(serializers.Serializer):
-    token_network = TokenNetworkField()
-    amount = TokenValueField(write_only=True)
+class JoinTokenNetworkOrderSerializer(serializers.ModelSerializer):
+    token_network = serializers.HyperlinkedRelatedField(
+        view_name="raiden:token-network-detail", lookup_field="address", read_only=True
+    )
+
+    def get_token_network(self):
+        view = self.context.get("view")
+        return view and view.get_object()
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        token_network = self.get_token_network()
+        raiden = models.Raiden.get()
+
+        return self.Meta.model.objects.create(
+            raiden=raiden, token_network=token_network, user=request.user, **validated_data
+        )
 
     def validate(self, data):
-        w3 = get_web3()
-        token = get_service_token(w3=w3)
+        raiden = models.Raiden.get()
+        token_network = self.get_token_network()
 
-        raiden_account = data["raiden"]
-        amount = TokenAmount(data["amount"]).normalize()
-        deposit_amount = EthereumTokenAmount(amount=amount, currency=token)
-        token_balance = get_account_balance(w3=w3, token=token, address=raiden_account.address)
-
-        if token_balance < deposit_amount:
-            raise serializers.ValidationError(f"Insufficient balance: {token_balance.formatted}")
+        if token_network in raiden.token_networks:
+            raise serializers.ValidationError(
+                f"Already joined token network {token_network.address}"
+            )
 
         return data
+
+    class Meta:
+        model = models.JoinTokenNetworkOrder
+        fields = ("id", "created", "token_network", "amount")
+        read_only_fields = ("id", "created", "token_network")

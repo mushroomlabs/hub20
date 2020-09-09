@@ -7,6 +7,8 @@ from hub20.apps.blockchain.models import Transaction
 from hub20.apps.raiden.models import (
     ChannelDepositOrder,
     ChannelWithdrawOrder,
+    JoinTokenNetworkOrder,
+    LeaveTokenNetworkOrder,
     Payment,
     RaidenManagementOrderResult,
     TokenNetworkChannelEvent,
@@ -76,6 +78,22 @@ def on_service_deposit_transaction_create_record(sender, **kw):
     )
 
 
+@receiver(post_save, sender=JoinTokenNetworkOrder)
+def on_join_token_network_order_create_schedule_task(sender, **kw):
+    order = kw["instance"]
+
+    if kw["created"]:
+        tasks.join_token_network.delay(order_id=order.id)
+
+
+@receiver(post_save, sender=LeaveTokenNetworkOrder)
+def on_leave_token_network_order_create_schedule_task(sender, **kw):
+    order = kw["instance"]
+
+    if kw["created"]:
+        tasks.leave_token_network.delay(order_id=order.id)
+
+
 __all__ = [
     "on_payment_created_check_received",
     "on_token_network_channel_event_set_status",
@@ -83,4 +101,6 @@ __all__ = [
     "on_channel_withdraw_order_schedule_task",
     "on_service_deposit_created_schedule_task",
     "on_service_deposit_transaction_create_record",
+    "on_join_token_network_order_create_schedule_task",
+    "on_leave_token_network_order_create_schedule_task",
 ]

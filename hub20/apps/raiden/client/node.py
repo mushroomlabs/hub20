@@ -8,7 +8,7 @@ from web3.datastructures import AttributeDict
 
 from hub20.apps.ethereum_money.models import EthereumTokenAmount
 from hub20.apps.raiden.exceptions import RaidenConnectionError
-from hub20.apps.raiden.models import Channel, Raiden
+from hub20.apps.raiden.models import Channel, Raiden, TokenNetwork
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 def _make_request(url: str, method: str = "GET", **payload: Any) -> Union[List, Dict]:
     action = {
         "GET": requests.get,
+        "PATCH": requests.patch,
         "PUT": requests.put,
         "POST": requests.post,
         "DELETE": requests.delete,
-        "PATCH": requests.patch,
     }[method.upper()]
 
     try:
@@ -80,6 +80,14 @@ class RaidenClient:
             return response.get("status")
         except RaidenConnectionError:
             return "offline"
+
+    def join_token_network(self, token_network: TokenNetwork, amount: EthereumTokenAmount):
+        url = f"{self.raiden.api_root_url}/connections/{token_network.token.address}"
+        return _make_request(url, method="PUT", funds=amount.as_wei)
+
+    def leave_token_network(self, token_network: TokenNetwork):
+        url = f"{self.raiden.api_root_url}/connections/{token_network.token.address}"
+        return _make_request(url, method="DELETE")
 
     def make_channel_deposit(self, channel: Channel, amount: EthereumTokenAmount):
         channel = self._refresh_channel(channel)
