@@ -35,15 +35,17 @@ class HDWalletFactory(KeystoreAccountFactory):
 
 class EthereumCurrencyFactory(factory.django.DjangoModelFactory):
     chain = factory.SubFactory(SyncedChainFactory)
+    is_listed = True
 
 
 class ETHFactory(EthereumCurrencyFactory):
     name = fuzzy.FuzzyChoice(choices=["Ethereum"])
     code = fuzzy.FuzzyChoice(choices=["ETH"])
+    address = EthereumToken.NULL_ADDRESS
 
     class Meta:
         model = EthereumToken
-        django_get_or_create = ("chain", "name")
+        django_get_or_create = ("chain", "name", "address")
 
 
 class Erc20TokenFactory(EthereumCurrencyFactory):

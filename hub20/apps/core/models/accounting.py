@@ -39,7 +39,7 @@ class UserAccount:
         return EthereumTokenAmount.aggregated(self.user.balance_entries.all(), currency=currency)
 
     def get_balances(self) -> List[EthereumTokenAmount]:
-        return [self.get_balance(token) for token in EthereumToken.objects.all()]
+        return [self.get_balance(token) for token in EthereumToken.tracked.all()]
 
 
 class HubSite(Site):

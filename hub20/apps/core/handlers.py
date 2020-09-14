@@ -6,6 +6,7 @@ from psycopg2.extras import NumericRange
 
 from hub20.apps.blockchain.models import Block, Chain, Transaction
 from hub20.apps.blockchain.signals import (
+    block_sealed,
     ethereum_node_connected,
     ethereum_node_disconnected,
     ethereum_node_sync_lost,
@@ -13,15 +14,20 @@ from hub20.apps.blockchain.signals import (
 )
 from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.models import EthereumToken
-from hub20.apps.ethereum_money.signals import account_deposit_received, incoming_transfer_broadcast
-from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
+from hub20.apps.ethereum_money.signals import (
+    account_deposit_received,
+    incoming_transfer_broadcast,
+    outgoing_transfer_mined,
+)
+from hub20.apps.raiden.models import Payment as RaidenNodePayment, Raiden
 from hub20.apps.raiden.signals import raiden_payment_received
 
 from . import tasks
-from .choices import PAYMENT_METHODS, TRANSFER_EVENT_TYPES
+from .choices import PAYMENT_METHODS
 from .models import (
     BlockchainPayment,
     BlockchainPaymentRoute,
+    BlockchainTransferExecution,
     Checkout,
     CheckoutEvents,
     ExternalTransfer,
@@ -34,16 +40,11 @@ from .models import (
     Store,
     StoreRSAKeyPair,
     Transfer,
+    TransferConfirmation,
+    TransferFailure,
 )
 from .settings import app_settings
-from .signals import (
-    payment_confirmed,
-    payment_received,
-    transfer_confirmed,
-    transfer_executed,
-    transfer_failed,
-    transfer_scheduled,
-)
+from .signals import payment_confirmed, payment_received
 
 logger = logging.getLogger(__name__)
 EthereumAccount = get_ethereum_account_model()
@@ -115,7 +116,38 @@ def on_incoming_transfer_broadcast_sent_maybe_publish_checkout(sender, **kw):
     )
 
 
-@receiver(raiden_payment_received, sender=RaidenPaymentEvent)
+@receiver(outgoing_transfer_mined, sender=Transaction)
+def on_blockchain_transfer_mined_record_execution(sender, **kw):
+    amount = kw["amount"]
+    transaction = kw["transaction"]
+    recipient_address = kw["recipient_address"]
+
+    transfer = ExternalTransfer.objects.filter(
+        execution__isnull=True,
+        amount=amount.amount,
+        currency=amount.currency,
+        recipient_address=recipient_address,
+    ).first()
+
+    if transfer:
+        BlockchainTransferExecution.objects.create(transfer=transfer, transaction=transaction)
+
+
+@receiver(block_sealed, sender=Block)
+def on_block_sealed_check_confirmed_transfers(sender, **kw):
+    block_data = kw["block_data"]
+
+    confirmed_block = block_data.number - app_settings.Transfer.minimum_confirmations
+
+    transfers_to_confirm = ExternalTransfer.unconfirmed.filter(
+        execution__blockchaintransferexecution__transaction__block__number__lte=confirmed_block
+    )
+
+    for transfer in transfers_to_confirm:
+        TransferConfirmation.objects.create(transfer=transfer)
+
+
+@receiver(raiden_payment_received, sender=RaidenNodePayment)
 def on_raiden_payment_received_check_raiden_payments(sender, **kw):
     raiden_payment = kw["payment"]
 
@@ -172,22 +204,19 @@ def on_order_created_set_raiden_route(sender, **kw):
         raiden.payment_routes.create(order=order)
 
 
-@receiver(post_save, sender=Block)
-def on_block_added_check_confirmed_payments(sender, **kw):
-    block = kw["instance"]
-    created = kw["created"]
+@receiver(block_sealed, sender=Block)
+def on_block_sealed_check_confirmed_payments(sender, **kw):
+    block_data = kw["block_data"]
 
-    block_number_to_confirm = block.number - app_settings.Payment.minimum_confirmations
+    block_number_to_confirm = block_data.number - app_settings.Payment.minimum_confirmations
 
-    if created and block_number_to_confirm >= 0:
+    if block_number_to_confirm >= 0:
         payments = BlockchainPayment.objects.all()
 
-        for payment in payments.filter(
-            transaction__block__number=block_number_to_confirm,
-            transaction__block__chain=block.chain,
-        ):
-            logger.info(f"Confirming {payment}")
-            payment_confirmed.send(sender=BlockchainPayment, payment=payment)
+        for payment in payments.filter(transaction__block__number=block_number_to_confirm):
+            if not payment.is_confirmed:
+                logger.info(f"Confirming {payment}")
+                payment_confirmed.send(sender=BlockchainPayment, payment=payment)
 
 
 @receiver(post_save, sender=Block)
@@ -214,24 +243,6 @@ def on_block_added_publish_expired_blockchain_routes(sender, **kw):
             event=CheckoutEvents.BLOCKCHAIN_ROUTE_EXPIRED.value,
             route=route.account.address,
         )
-
-
-@receiver(post_save, sender=Block)
-def on_block_added_check_confirmed_transfers(sender, **kw):
-    block = kw["instance"]
-    created = kw["created"]
-
-    block_number_to_confirm = block.number - app_settings.Transfer.minimum_confirmations
-    if created and block_number_to_confirm >= 0:
-        transactions = Transaction.objects.filter(
-            block__number=block_number_to_confirm, block__chain=block.chain
-        )
-
-        tx_hashes = transactions.values_list("hash", flat=True)
-        transfers = ExternalTransfer.objects.all()
-        for transfer in transfers.filter(chain_transaction__transaction_hash__in=tx_hashes):
-            logger.info(f"Confirming {transfer}")
-            transfer_confirmed.send(sender=ExternalTransfer, transfer=transfer)
 
 
 @receiver(payment_received, sender=BlockchainPayment)
@@ -298,49 +309,24 @@ def on_payment_confirmed_publish_checkout(sender, **kw):
 
 @receiver(post_save, sender=InternalTransfer)
 @receiver(post_save, sender=ExternalTransfer)
-def on_transfer_created_mark_transfer_scheduled(sender, **kw):
+def on_transfer_created_schedule_execution(sender, **kw):
     transfer = kw["instance"]
     if kw["created"]:
-        transfer.events.create(status=TRANSFER_EVENT_TYPES.scheduled)
         tasks.execute_transfer.delay(transfer.id)
-        transfer_scheduled.send(sender=sender, transfer=transfer)
 
 
-@receiver(transfer_failed, sender=Transfer)
-def on_transfer_failed_mark_as_failed(sender, **kw):
-    transfer = kw["transfer"]
-    transfer.events.create(status=TRANSFER_EVENT_TYPES.failed)
-
-
-@receiver(transfer_confirmed, sender=ExternalTransfer)
-@receiver(transfer_confirmed, sender=InternalTransfer)
-def on_transfer_confirmed_mark_as_confirmed(sender, **kw):
-    transfer = kw["transfer"]
-    transfer.events.create(status=TRANSFER_EVENT_TYPES.confirmed)
-
-
-@receiver(transfer_executed, sender=ExternalTransfer)
-def on_external_transfer_executed_mark_as_executed(sender, **kw):
-    transfer = kw["transfer"]
-    transfer.events.create(status=TRANSFER_EVENT_TYPES.executed)
-
-
-@receiver(transfer_confirmed, sender=ExternalTransfer)
-def on_external_transfer_confirmed_destroy_reserve(sender, **kw):
-    transfer = kw["transfer"]
-    try:
-        transfer.reserve.delete()
-    except Transfer.reserve.RelatedObjectDoesNotExist:
-        pass
-    except Exception as exc:
-        logger.exception(exc)
-
-
-@receiver(transfer_confirmed, sender=InternalTransfer)
-def on_internal_transfer_confirmed_move_balances(sender, **kw):
-    transfer = kw["transfer"]
-    transfer.receiver.balance_entries.create(amount=transfer.amount, currency=transfer.currency)
-    transfer.sender.balance_entries.create(amount=-transfer.amount, currency=transfer.currency)
+@receiver(post_save, sender=TransferFailure)
+@receiver(post_save, sender=TransferConfirmation)
+def on_transfer_finalization_destroy_reserve(sender, **kw):
+    final_event = kw["instance"]
+    if kw["created"]:
+        transfer = final_event.transfer
+        try:
+            transfer.reserve.delete()
+        except Transfer.reserve.RelatedObjectDoesNotExist:
+            pass
+        except Exception as exc:
+            logger.exception(exc)
 
 
 @receiver(post_save, sender=Store)
@@ -360,16 +346,13 @@ __all__ = [
     "on_order_created_set_raiden_route",
     "on_block_added_publish_block_created_event",
     "on_block_added_publish_expired_blockchain_routes",
-    "on_block_added_check_confirmed_payments",
-    "on_block_added_check_confirmed_transfers",
+    "on_block_sealed_check_confirmed_payments",
+    "on_block_sealed_check_confirmed_transfers",
     "on_blockchain_payment_received_maybe_publish_checkout",
+    "on_blockchain_transfer_mined_record_execution",
     "on_payment_confirmed_set_credit",
     "on_payment_confirmed_publish_checkout",
-    "on_transfer_created_mark_transfer_scheduled",
-    "on_transfer_failed_mark_as_failed",
-    "on_transfer_confirmed_mark_as_confirmed",
-    "on_external_transfer_executed_mark_as_executed",
-    "on_external_transfer_confirmed_destroy_reserve",
-    "on_internal_transfer_confirmed_move_balances",
+    "on_transfer_created_schedule_execution",
+    "on_transfer_finalization_destroy_reserve",
     "on_store_created_generate_key_pair",
 ]

@@ -1,19 +1,25 @@
+from __future__ import annotations
+
 import logging
+import random
 from typing import Optional
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
-from model_utils.managers import InheritanceManager
-from model_utils.models import StatusModel, TimeStampedModel
+from model_utils.managers import InheritanceManager, QueryManager
+from model_utils.models import TimeStampedModel
 
-from hub20.apps.blockchain.fields import EthereumAddressField, HexField
+from hub20.apps.blockchain.fields import EthereumAddressField
 from hub20.apps.blockchain.models import Transaction
 from hub20.apps.core.choices import TRANSFER_EVENT_TYPES
-from hub20.apps.core.signals import transfer_confirmed, transfer_executed, transfer_failed
 from hub20.apps.ethereum_money import get_ethereum_account_model
-from hub20.apps.ethereum_money.models import EthereumTokenValueModel
-from hub20.apps.raiden.models import Channel, Payment
+from hub20.apps.ethereum_money.client import EthereumClient
+from hub20.apps.ethereum_money.models import EthereumTokenAmount, EthereumTokenValueModel
+from hub20.apps.ethereum_money.typing import EthereumAccount_T
+from hub20.apps.raiden.client.node import RaidenClient
+from hub20.apps.raiden.exceptions import RaidenPaymentError
+from hub20.apps.raiden.models import Channel, Raiden
 
 from .accounting import UserAccount, UserReserve
 
@@ -31,6 +37,88 @@ class TransferOperationError(Exception):
     pass
 
 
+class BlockchainTransferExecutor(EthereumClient):
+    def execute(self, transfer: ExternalTransfer):
+        try:
+            self.transfer(amount=transfer.as_token_amount, address=transfer.recipient_address)
+        except Exception as exc:
+            raise TransferError(str(exc)) from exc
+
+    @classmethod
+    def can_reach(cls, transfer: ExternalTransfer) -> bool:
+        return True
+
+    @classmethod
+    def select_account(
+        cls, transfer: ExternalTransfer, transfer_fee: EthereumTokenAmount
+    ) -> Optional[EthereumAccount_T]:
+        assert transfer_fee.is_ETH
+
+        ETH = transfer_fee.currency
+
+        token_required = transfer.as_token_amount
+        accounts = EthereumAccount.objects.all()
+
+        if token_required.is_ETH:
+            token_required += transfer_fee
+            funded_accounts = [
+                account for account in accounts if account.get_balance(ETH) >= token_required
+            ]
+        else:
+            funded_accounts = [
+                account
+                for account in accounts
+                if account.get_balance(token_required.currency) >= token_required
+                and account.get_balance(ETH) >= transfer_fee
+            ]
+
+        try:
+            return random.choice(funded_accounts)
+        except IndexError:
+            return None
+
+    @classmethod
+    def make_for_transfer(cls, transfer: ExternalTransfer):
+        transfer_fee = cls.estimate_transfer_fees()
+        account = cls.select_account(transfer=transfer, transfer_fee=transfer_fee)
+
+        return account and cls(account=account)
+
+
+class RaidenTransferExecutor(RaidenClient):
+    def execute(self, transfer: ExternalTransfer):
+        try:
+            self.transfer(
+                amount=transfer.as_token_amount,
+                address=transfer.recipient_address,
+                identifier=self._ensure_valid_identifier(transfer.identifier),
+            )
+        except RaidenPaymentError as exc:
+            raise TransferError(exc.message) from exc
+
+        TransferExecution.objects.create(transfer=transfer)
+        TransferConfirmation.objects.create(transfer=transfer)
+
+    @classmethod
+    def can_reach(cls, transfer: ExternalTransfer) -> bool:
+        return Channel.available.filter(token_network__token=transfer.currency).exists()
+
+    @classmethod
+    def select_account(cls, transfer: ExternalTransfer) -> Optional[EthereumAccount_T]:
+        return Raiden.get() if cls.can_reach(transfer) else None
+
+    @classmethod
+    def make_for_transfer(cls, transfer: ExternalTransfer):
+        if not settings.HUB20_RAIDEN_ENABLED:
+            return None
+
+        if not cls.can_reach(transfer):
+            return None
+
+        raiden = cls.select_account(transfer)
+        return raiden and cls(raiden)
+
+
 class Transfer(TimeStampedModel, EthereumTokenValueModel):
     sender = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="transfers_sent"
@@ -40,19 +128,37 @@ class Transfer(TimeStampedModel, EthereumTokenValueModel):
     objects = InheritanceManager()
 
     @property
-    def status(self) -> Optional[str]:
-        try:
-            return self.events.latest().status
-        except TransferEvent.DoesNotExist:
-            return None
+    def status(self) -> str:
+        if self.failed:
+            return TRANSFER_EVENT_TYPES.failed
+        elif self.canceled:
+            return TRANSFER_EVENT_TYPES.canceled
+        elif self.confirmed:
+            return TRANSFER_EVENT_TYPES.confirmed
+        elif self.executed:
+            return TRANSFER_EVENT_TYPES.executed
+        else:
+            return TRANSFER_EVENT_TYPES.scheduled
+
+    @property
+    def canceled(self):
+        return TransferCancellation.objects.filter(transfer=self).exists()
+
+    @property
+    def confirmed(self):
+        return TransferConfirmation.objects.filter(transfer=self).exists()
+
+    @property
+    def executed(self):
+        return TransferExecution.objects.filter(transfer=self).exists()
+
+    @property
+    def failed(self):
+        return TransferFailure.objects.filter(transfer=self).exists()
 
     @property
     def is_finalized(self) -> bool:
-        return self.status in [
-            TRANSFER_EVENT_TYPES.confirmed,
-            TRANSFER_EVENT_TYPES.failed,
-            TRANSFER_EVENT_TYPES.canceled,
-        ]
+        return self.status != TRANSFER_EVENT_TYPES.scheduled
 
     def _execute(self):
         pass
@@ -80,8 +186,9 @@ class Transfer(TimeStampedModel, EthereumTokenValueModel):
             self._execute()
         except TransferError as exc:
             logger.info(f"{self} failed: {exc}")
-            transfer_failed.send_robust(sender=Transfer, transfer=self, reason=str(exc))
+            TransferFailure.objects.create(transfer=self)
         except Exception as exc:
+            TransferFailure.objects.create(transfer=self)
             logger.exception(exc)
 
 
@@ -100,11 +207,20 @@ class InternalTransfer(Transfer):
 
     @transaction.atomic()
     def _execute(self):
-        transfer_confirmed.send_robust(sender=InternalTransfer, transfer=self)
+        try:
+            self.receiver.balance_entries.create(amount=self.amount, currency=self.currency)
+            self.sender.balance_entries.create(amount=-self.amount, currency=self.currency)
+            TransferExecution.objects.create(transfer=self)
+            TransferConfirmation.objects.create(transfer=self)
+        except Exception as exc:
+            raise TransferError from exc
 
 
 class ExternalTransfer(Transfer):
+    EXECUTORS = (RaidenTransferExecutor, BlockchainTransferExecutor)
     recipient_address = EthereumAddressField(db_index=True)
+    objects = models.Manager()
+    unconfirmed = QueryManager(confirmation__isnull=True)
 
     @property
     def target(self):
@@ -112,22 +228,12 @@ class ExternalTransfer(Transfer):
 
     @transaction.atomic()
     def _execute(self):
-        transfer_amount = self.as_token_amount
-        channel = Channel.select_for_transfer(self.recipient_address, transfer_amount)
-        if channel:
-            payment_id = channel.send(
-                self.recipient_address, transfer_amount, payment_identifier=self.identifier
-            )
-            RaidenTransaction.objects.create(
-                transfer=self, channel=channel, payment_identifier=payment_id
-            )
-        else:
-            account = EthereumAccount.select_for_transfer(transfer_amount)
-            if account is None:
-                raise TransferError("No channel nor account with funds to make transfer found")
-            tx_hash = account.send(self.recipient_address, transfer_amount)
-            BlockchainTransaction.objects.create(transfer=self, transaction_hash=tx_hash)
-        transfer_executed.send_robust(sender=ExternalTransfer, transfer=self)
+        try:
+            executor_class = next(e for e in self.EXECUTORS if e.make_for_transfer(self))
+            executor = executor_class.make_for_transfer(self)
+            executor.execute(self)
+        except StopIteration:
+            raise TransferError("No executor found to complete transfer")
 
     @transaction.atomic()
     def _make_reserve(self):
@@ -142,48 +248,41 @@ class UserTransferReserve(UserReserve):
     transfer = models.OneToOneField(Transfer, on_delete=models.CASCADE, related_name="reserve")
 
 
-class BlockchainTransaction(TimeStampedModel):
+class TransferExecution(TimeStampedModel):
+    transfer = models.OneToOneField(Transfer, on_delete=models.CASCADE, related_name="execution")
+
+
+class BlockchainTransferExecution(TransferExecution):
+    transaction = models.OneToOneField(Transaction, on_delete=models.CASCADE)
+
+
+class TransferConfirmation(TimeStampedModel):
     transfer = models.OneToOneField(
-        Transfer, on_delete=models.CASCADE, related_name="chain_transaction"
+        Transfer, on_delete=models.CASCADE, related_name="confirmation"
     )
-    transaction_hash = HexField(max_length=64, unique=True, db_index=True)
-
-    @property
-    def transaction(self) -> Optional[Transaction]:
-        return Transaction.objects.filter(hash=self.transaction_hash).first()
 
 
-class RaidenTransaction(TimeStampedModel):
+class TransferFailure(TimeStampedModel):
+    transfer = models.OneToOneField(Transfer, on_delete=models.CASCADE, related_name="failure")
+
+
+class TransferCancellation(TimeStampedModel):
     transfer = models.OneToOneField(
-        Transfer, on_delete=models.CASCADE, related_name="raiden_transaction"
+        Transfer, on_delete=models.CASCADE, related_name="cancellation"
     )
-    channel = models.ForeignKey(Channel, on_delete=models.CASCADE)
-    identifier = models.PositiveIntegerField()
-
-    @property
-    def payment(self) -> Optional[Payment]:
-        return self.channel.payments.filter(identifier=self.identifier).first()
-
-    class Meta:
-        unique_together = ("channel", "identifier")
-
-
-class TransferEvent(TimeStampedModel, StatusModel):
-    STATUS = TRANSFER_EVENT_TYPES
-
-    transfer = models.ForeignKey(Transfer, on_delete=models.CASCADE, related_name="events")
-
-    class Meta:
-        get_latest_by = "created"
-        unique_together = ("transfer", "status")
+    canceled_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
 
 
 __all__ = [
+    "BlockchainTransferExecutor",
     "Transfer",
+    "TransferFailure",
+    "TransferCancellation",
+    "TransferExecution",
+    "BlockchainTransferExecution",
+    "TransferConfirmation",
     "InternalTransfer",
     "ExternalTransfer",
     "TransferError",
     "UserTransferReserve",
-    "BlockchainTransaction",
-    "RaidenTransaction",
 ]

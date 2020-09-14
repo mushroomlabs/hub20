@@ -1,14 +1,18 @@
+from __future__ import annotations
+
 import logging
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
 import requests
+from django.conf import settings
 from django.utils.timezone import make_aware
 from web3.datastructures import AttributeDict
 
+from hub20.apps.blockchain.typing import Address
 from hub20.apps.ethereum_money.models import EthereumTokenAmount
-from hub20.apps.raiden.exceptions import RaidenConnectionError
-from hub20.apps.raiden.models import Channel, Raiden, TokenNetwork
+from hub20.apps.raiden.exceptions import RaidenConnectionError, RaidenPaymentError
+from hub20.apps.raiden.models import Channel, Payment, Raiden, TokenNetwork
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +35,8 @@ def _make_request(url: str, method: str = "GET", **payload: Any) -> Union[List, 
 
 
 class RaidenClient:
-    def __init__(self, raiden: Raiden) -> None:
-        self.raiden = raiden
+    def __init__(self, account: Raiden, *args, **kw) -> None:
+        self.raiden = account
 
     def _parse_payment(self, payment_data: Dict, channel: Channel) -> Optional[AttributeDict]:
         event_name = payment_data.pop("event")
@@ -98,6 +102,39 @@ class RaidenClient:
         channel = self._refresh_channel(channel)
         new_withdraw = channel.withdraw_amount + amount
         return _make_request(channel.url, method="PATCH", total_withdraw=new_withdraw.as_wei)
+
+    def _ensure_valid_identifier(self, identifier: Optional[str] = None) -> Optional[int]:
+        if not identifier:
+            return None
+
+        try:
+            identifier = int(identifier)
+        except ValueError:
+            identifier = int(identifier.encode().hex(), 16)
+
+        return identifier % Payment.MAX_IDENTIFIER_ID
+
+    def transfer(
+        self, amount: EthereumTokenAmount, address: Address, identifier: Optional[int] = None, **kw
+    ):
+        if not settings.HUB20_RAIDEN_ENABLED:
+            return
+
+        url = f"{self.raiden.api_root_url}/payments/{amount.currency.address}/{address}"
+
+        payload = dict(amount=amount.as_wei)
+
+        if identifier:
+            payload["identifier"] = identifier
+
+        try:
+            _make_request(url, method="POST", **payload)
+        except requests.exceptions.HTTPError as error:
+            logger.exception(error)
+
+            error_code = error.response.status_code
+            message = error.response.json().get("errors")
+            raise RaidenPaymentError(error_code=error_code, message=message) from error
 
 
 def get_raiden_client(address: Optional[str] = None) -> Optional[RaidenClient]:

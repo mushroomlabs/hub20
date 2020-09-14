@@ -36,7 +36,7 @@ class TokenBalanceSerializer(serializers.Serializer):
     def get_url(self, obj):
         return reverse(
             "hub20:balance-detail",
-            kwargs={"code": obj.currency.code},
+            kwargs={"address": obj.currency.address},
             request=self.context.get("request"),
         )
 
@@ -45,7 +45,7 @@ class TransferSerializer(serializers.ModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="hub20:transfer-detail")
     address = EthereumAddressField(write_only=True, required=False)
     recipient = UserRelatedField(write_only=True, required=False, allow_null=True)
-    token = CurrencyRelatedField()
+    token = CurrencyRelatedField(source="currency")
     target = serializers.CharField(read_only=True)
     status = serializers.CharField(read_only=True)
 

@@ -102,7 +102,7 @@ class TokenBalanceView(generics.RetrieveAPIView):
 
     def get_object(self) -> EthereumTokenAmount:
         user_account = models.UserAccount(self.request.user)
-        token = get_object_or_404(EthereumToken, code=self.kwargs["code"])
+        token = get_object_or_404(EthereumToken, address=self.kwargs["address"])
         return user_account.get_balance(token)
 
 

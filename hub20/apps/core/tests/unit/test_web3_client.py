@@ -3,8 +3,11 @@ from unittest.mock import Mock, patch
 import pytest
 from django.test import TestCase
 
-from hub20.apps.blockchain.client import get_web3
-from hub20.apps.blockchain.tests.mocks import BlockWithTransactionDetailsMock, TransactionMock
+from hub20.apps.blockchain.tests.mocks import (
+    BlockWithTransactionDetailsMock,
+    TransactionMock,
+    Web3Mock,
+)
 from hub20.apps.core.factories import CheckoutFactory
 from hub20.apps.ethereum_money.client import process_latest_transfers
 from hub20.apps.ethereum_money.tests.mocks import Erc20TransferDataMock, Erc20TransferReceiptMock
@@ -19,7 +22,7 @@ class PaymentTransferTestCase(BaseTestCase):
     def setUp(self):
         self.checkout = CheckoutFactory()
         self.token = self.checkout.currency
-        self.w3 = get_web3()
+        self.w3 = Web3Mock
 
         self.block_filter = Mock()
 

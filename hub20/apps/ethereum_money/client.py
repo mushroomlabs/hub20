@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 from typing import Optional
@@ -8,13 +10,20 @@ from ethereum.abi import ContractTranslator
 from web3 import Web3
 from web3.exceptions import TimeExhausted, TransactionNotFound
 
-from hub20.apps.blockchain.client import BLOCK_CREATION_INTERVAL, BLOCK_SCAN_RANGE
+from hub20.apps.blockchain.client import BLOCK_CREATION_INTERVAL, BLOCK_SCAN_RANGE, get_web3
 from hub20.apps.blockchain.models import Block, Chain, Transaction
-from hub20.apps.ethereum_money import get_ethereum_account_model, signals
-from hub20.apps.ethereum_money.app_settings import TRANSFER_GAS_LIMIT
-from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
+from hub20.apps.ethereum_money import get_ethereum_account_model
 
 from .abi import EIP20_ABI
+from .app_settings import TRANSFER_GAS_LIMIT
+from .models import EthereumToken, EthereumTokenAmount
+from .signals import (
+    incoming_transfer_broadcast,
+    incoming_transfer_mined,
+    outgoing_transfer_broadcast,
+    outgoing_transfer_mined,
+)
+from .typing import EthereumAccount_T
 
 logger = logging.getLogger(__name__)
 EthereumAccount = get_ethereum_account_model()
@@ -43,29 +52,6 @@ def encode_transfer_data(recipient_address, amount: EthereumTokenAmount):
     return f"0x{encoded_data.hex()}"
 
 
-def build_transfer_transaction(w3: Web3, sender, recipient, amount: EthereumTokenAmount):
-    token = amount.currency
-    chain_id = int(w3.net.version)
-    message = f"Web3 client is on network {chain_id}, token {token.code} is on {token.chain_id}"
-    assert token.chain_id == chain_id, message
-
-    transaction_params = {
-        "chainId": chain_id,
-        "nonce": w3.eth.getTransactionCount(sender),
-        "gasPrice": w3.eth.generateGasPrice(),
-        "gas": TRANSFER_GAS_LIMIT,
-        "from": sender,
-    }
-
-    if token.is_ERC20:
-        transaction_params.update(
-            {"to": token.address, "value": 0, "data": encode_transfer_data(recipient, amount)}
-        )
-    else:
-        transaction_params.update({"to": recipient, "value": amount.as_wei})
-    return transaction_params
-
-
 def get_transfer_value_by_tx_data(
     w3: Web3, token: EthereumToken, tx_data
 ) -> Optional[EthereumTokenAmount]:
@@ -86,6 +72,14 @@ def get_transfer_recipient_by_receipt(w3: Web3, token: EthereumToken, tx_receipt
     assert len(tx_logs) == 1, "There should be only one log entry on transfer function"
 
     return tx_logs[0].args["_to"]
+
+
+def get_max_fee(w3: Web3) -> EthereumTokenAmount:
+    chain = Chain.make(chain_id=int(w3.net.version))
+    ETH = EthereumToken.ETH(chain=chain)
+
+    gas_price = w3.eth.generateGasPrice()
+    return ETH.from_wei(TRANSFER_GAS_LIMIT * gas_price)
 
 
 def get_account_balance(w3: Web3, token: EthereumToken, address) -> EthereumTokenAmount:
@@ -146,7 +140,7 @@ def sync_token_transfers(w3: Web3, token: EthereumToken, starting_block: int, en
 
 
 def sync_account_transactions(
-    w3: Web3, account: EthereumAccount, starting_block: int, end_block: int
+    w3: Web3, account: EthereumAccount_T, starting_block: int, end_block: int
 ):
     chain_id = int(w3.net.version)
 
@@ -197,12 +191,21 @@ def process_pending_transfers(w3: Web3, chain: Chain, tx_filter):
             else:
                 continue
 
-            recipient = accounts_by_addresses.get(recipient_address)
-            if recipient is not None and amount is not None:
+            recipient_account = accounts_by_addresses.get(recipient_address)
+            if recipient_account is not None and amount is not None:
                 logger.info(f"Processing pending Tx {tx_hash}")
-                signals.incoming_transfer_broadcast.send(
+                incoming_transfer_broadcast.send(
                     sender=EthereumToken,
-                    account=recipient,
+                    account=recipient_account,
+                    amount=amount,
+                    transaction_hash=tx_hash,
+                )
+
+            sender_account = accounts_by_addresses.get(tx_data["from"])
+            if sender_account is not None and amount is not None:
+                outgoing_transfer_broadcast.send(
+                    sender=EthereumToken,
+                    account=sender_account,
                     amount=amount,
                     transaction_hash=tx_hash,
                 )
@@ -231,24 +234,88 @@ def process_latest_transfers(w3: Web3, chain: Chain, block_filter):
             tx_hash = tx_data.hash
 
             token = tokens_by_address.get(tx_data.to)
-            sender = tx_data["from"]
-            sender_account = accounts_by_address.get(sender)
+            sender_address = tx_data["from"]
+            sender_account = accounts_by_address.get(sender_address)
 
             if token:
-                recipient = get_transfer_recipient_by_tx_data(w3, token, tx_data)
+                recipient_address = get_transfer_recipient_by_tx_data(w3, token, tx_data)
             else:
-                recipient = tx_data.to
+                recipient_address = tx_data.to
 
-            recipient_account = accounts_by_address.get(recipient)
+            recipient_account = accounts_by_address.get(recipient_address)
 
             try:
                 if sender_account or recipient_account:
-                    logger.info(f"Saving tx {tx_hash.hex()}: {sender} -> {recipient}")
+                    logger.info(
+                        f"Saving tx {tx_hash.hex()}: {sender_address} -> {recipient_address}"
+                    )
                     tx_receipt = w3.eth.waitForTransactionReceipt(tx_data.hash)
                     block = Block.make(block_data, chain_id=chain.id)
-                    Transaction.make(tx_data=tx_data, tx_receipt=tx_receipt, block=block)
+                    tx = Transaction.make(tx_data=tx_data, tx_receipt=tx_receipt, block=block)
+
             except TimeExhausted:
                 logger.warning(f"Timeout when waiting for receipt of tx {tx_hash.hex()}")
+
+            transfer_amount = get_transfer_value_by_tx_data(w3=w3, token=token, tx_data=tx_data)
+            if sender_account:
+                outgoing_transfer_mined.send(
+                    sender=Transaction,
+                    account=sender_account,
+                    transaction=tx,
+                    amount=transfer_amount,
+                    recipient_address=recipient_address,
+                )
+
+            if recipient_account:
+                incoming_transfer_mined.send(
+                    sender=Transaction,
+                    account=sender_account,
+                    transaction=tx,
+                    amount=transfer_amount,
+                )
+
+
+class EthereumClient:
+    def __init__(self, account: EthereumAccount_T, w3: Optional[Web3] = None) -> None:
+        self.account = account
+        self.w3 = w3 or get_web3()
+
+    def build_transfer_transaction(self, recipient, amount: EthereumTokenAmount):
+        token = amount.currency
+        chain_id = int(self.w3.net.version)
+        message = f"Connected to network {chain_id}, token {token.code} is on {token.chain_id}"
+        assert token.chain_id == chain_id, message
+
+        transaction_params = {
+            "chainId": chain_id,
+            "nonce": self.w3.eth.getTransactionCount(self.account.address),
+            "gasPrice": self.w3.eth.generateGasPrice(),
+            "gas": TRANSFER_GAS_LIMIT,
+            "from": self.account.address,
+        }
+
+        if token.is_ERC20:
+            transaction_params.update(
+                {"to": token.address, "value": 0, "data": encode_transfer_data(recipient, amount)}
+            )
+        else:
+            transaction_params.update({"to": recipient, "value": amount.as_wei})
+        return transaction_params
+
+    def transfer(self, amount: EthereumTokenAmount, address, *args, **kw):
+        transaction_data = self.build_transfer_transaction(recipient=address, amount=amount)
+        signed_tx = self.sign_transaction(transaction_data=transaction_data)
+        return self.w3.eth.sendRawTransaction(signed_tx.rawTransaction)
+
+    def sign_transaction(self, transaction_data, *args, **kw):
+        if not hasattr(self.account, "private_key"):
+            raise NotImplementedError("Can not sign transaction without the private key")
+        return self.w3.eth.account.signTransaction(transaction_data, self.account.private_key)
+
+    @classmethod
+    def estimate_transfer_fees(cls, *args, **kw) -> EthereumTokenAmount:
+        w3 = kw.pop("w3", get_web3())
+        return get_max_fee(w3=w3)
 
 
 async def listen_latest_transfers(w3: Web3):
