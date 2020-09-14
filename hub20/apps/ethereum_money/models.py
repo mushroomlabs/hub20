@@ -52,11 +52,14 @@ class EthereumToken(models.Model):
     name = models.CharField(max_length=500)
     decimals = models.PositiveIntegerField(default=18)
     address = EthereumAddressField(default=NULL_ADDRESS)
+    is_listed = models.BooleanField(default=False)
 
     objects = models.Manager()
-    ERC20tokens = QueryManager(~Q(address=NULL_ADDRESS))
-    tracked = QueryManager(address__in=TRACKED_TOKENS)
-    ethereum = QueryManager(address=NULL_ADDRESS)
+    ERC20tokens = QueryManager(
+        ~Q(address=NULL_ADDRESS) & Q(chain_id=settings.BLOCKCHAIN_NETWORK_ID)
+    )
+    tracked = QueryManager(is_listed=True, chain_id=settings.BLOCKCHAIN_NETWORK_ID)
+    ethereum = QueryManager(address=NULL_ADDRESS, chain_id=settings.BLOCKCHAIN_NETWORK_ID)
 
     @property
     def is_ERC20(self) -> bool:
@@ -152,8 +155,11 @@ class EthereumToken(models.Model):
 
     @staticmethod
     def ETH(chain: Chain):
-        eth, _ = EthereumToken.objects.get_or_create(
-            chain=chain, code="ETH", defaults={"name": "Ethereum"}
+        eth, _ = EthereumToken.objects.update_or_create(
+            chain=chain,
+            code="ETH",
+            address=EthereumToken.NULL_ADDRESS,
+            defaults={"is_listed": True, "name": "Ethereum"},
         )
         return eth
 

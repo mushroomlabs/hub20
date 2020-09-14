@@ -29,7 +29,9 @@ class Command(BaseCommand):
             logger.info(f"Checking token {token_address}...")
             try:
                 token_data = get_token_information(w3=w3, address=token_address)
-                EthereumToken.make(address=token_address, chain=chain, **token_data)
+                EthereumToken.make(
+                    address=token_address, chain=chain, is_listed=True, **token_data
+                )
             except OverflowError:
                 logger.error(f"{token_address} is not a valid address or not ERC20-compliant")
             except Exception as exc:

@@ -104,6 +104,11 @@ def get_web3(provider_url: Optional[str] = None, force_new: bool = False) -> Web
         w3 = make_web3(provider_url)
         WEB3_CLIENTS[provider_url] = w3
 
+    client_network_id = int(w3.net.version)
+    app_network_id = settings.BLOCKCHAIN_NETWORK_ID
+    if client_network_id != app_network_id:
+        raise ValueError(f"Web3 node connected to {client_network_id}, we are on {app_network_id}")
+
     return w3
 
 
