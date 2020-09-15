@@ -5,14 +5,13 @@ from eth_utils import is_address
 from rest_framework import generics
 
 from . import models, serializers
-from .app_settings import TRACKED_TOKENS
 
 
 class TokenListView(generics.ListAPIView):
     serializer_class = serializers.HyperlinkedEthereumTokenSerializer
 
     def get_queryset(self) -> QuerySet:
-        return models.EthereumToken.objects.filter(address__in=TRACKED_TOKENS)
+        return models.EthereumToken.tracked.all()
 
 
 class TokenView(generics.RetrieveAPIView):

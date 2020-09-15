@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import random
 from typing import Any, List, Optional, Tuple
 
 import ethereum
@@ -20,23 +19,10 @@ from hub20.apps.blockchain.fields import EthereumAddressField, HexField
 from hub20.apps.blockchain.models import Chain, Transaction
 
 from .abi import EIP20_ABI
-from .app_settings import (
-    HD_WALLET_MNEMONIC,
-    HD_WALLET_ROOT_KEY,
-    TRACKED_TOKENS,
-    TRANSFER_GAS_LIMIT,
-)
-from .typing import EthereumAccount_T, TokenAmount, TokenAmount_T, Wei
+from .app_settings import HD_WALLET_MNEMONIC, HD_WALLET_ROOT_KEY
+from .typing import TokenAmount, TokenAmount_T, Wei
 
 logger = logging.getLogger(__name__)
-
-
-def get_max_fee(chain: Chain) -> EthereumTokenAmount:
-    w3 = chain.get_web3()
-    ETH = EthereumToken.ETH(chain=chain)
-
-    gas_price = w3.eth.generateGasPrice()
-    return ETH.from_wei(TRANSFER_GAS_LIMIT * gas_price)
 
 
 def encode_transfer_data(recipient_address, amount: EthereumTokenAmount):
@@ -52,11 +38,14 @@ class EthereumToken(models.Model):
     name = models.CharField(max_length=500)
     decimals = models.PositiveIntegerField(default=18)
     address = EthereumAddressField(default=NULL_ADDRESS)
+    is_listed = models.BooleanField(default=False)
 
     objects = models.Manager()
-    ERC20tokens = QueryManager(~Q(address=NULL_ADDRESS))
-    tracked = QueryManager(address__in=TRACKED_TOKENS)
-    ethereum = QueryManager(address=NULL_ADDRESS)
+    ERC20tokens = QueryManager(
+        ~Q(address=NULL_ADDRESS) & Q(chain_id=settings.BLOCKCHAIN_NETWORK_ID)
+    )
+    tracked = QueryManager(is_listed=True, chain_id=settings.BLOCKCHAIN_NETWORK_ID)
+    ethereum = QueryManager(address=NULL_ADDRESS, chain_id=settings.BLOCKCHAIN_NETWORK_ID)
 
     @property
     def is_ERC20(self) -> bool:
@@ -75,28 +64,6 @@ class EthereumToken(models.Model):
             raise ValueError("Not an ERC20 token")
 
         return w3.eth.contract(abi=EIP20_ABI, address=self.address)
-
-    def build_transfer_transaction(self, w3: Web3, sender, recipient, amount: EthereumTokenAmount):
-
-        chain_id = int(w3.net.version)
-        message = f"Web3 client is on network {chain_id}, token {self.code} is on {self.chain_id}"
-        assert self.chain_id == chain_id, message
-
-        transaction_params = {
-            "chainId": chain_id,
-            "nonce": w3.eth.getTransactionCount(sender),
-            "gasPrice": w3.eth.generateGasPrice(),
-            "gas": TRANSFER_GAS_LIMIT,
-            "from": sender,
-        }
-
-        if self.is_ERC20:
-            transaction_params.update(
-                {"to": self.address, "value": 0, "data": encode_transfer_data(recipient, amount)}
-            )
-        else:
-            transaction_params.update({"to": recipient, "value": amount.as_wei})
-        return transaction_params
 
     def _decode_transaction_data(self, tx_data, contract: Optional[Contract] = None) -> Tuple:
         if not self.is_ERC20:
@@ -130,7 +97,7 @@ class EthereumToken(models.Model):
 
             recipient_address = to_checksum_address(transaction.data[-104:-64])
 
-            wei_transferred = int(transaction.data[-64:], 16)
+            wei_transferred = Wei(transaction.data[-64:], 16)
             tx_log = transaction.logs.first()
 
             assert int(tx_log.data, 16) == wei_transferred, "Log data and tx amount do not match"
@@ -152,8 +119,11 @@ class EthereumToken(models.Model):
 
     @staticmethod
     def ETH(chain: Chain):
-        eth, _ = EthereumToken.objects.get_or_create(
-            chain=chain, code="ETH", defaults={"name": "Ethereum"}
+        eth, _ = EthereumToken.objects.update_or_create(
+            chain=chain,
+            code="ETH",
+            address=EthereumToken.NULL_ADDRESS,
+            defaults={"is_listed": True, "name": "Ethereum"},
         )
         return eth
 
@@ -196,54 +166,11 @@ class EthereumTokenValueModel(models.Model):
 class AbstractEthereumAccount(models.Model):
     address = EthereumAddressField(unique=True, db_index=True)
 
-    def send(self, recipient_address, transfer_amount: EthereumTokenAmount, *args, **kw) -> str:
-        chain = transfer_amount.currency.chain
-        w3 = chain.get_web3()
-        transaction_data = transfer_amount.currency.build_transfer_transaction(
-            w3=w3, sender=self.address, recipient=recipient_address, amount=transfer_amount
-        )
-        signed_tx = self.sign_transaction(w3=w3, transaction_data=transaction_data)
-        return w3.eth.sendRawTransaction(signed_tx.rawTransaction)
-
-    def sign_transaction(self, w3: Web3, transaction_data, *args, **kw):
-        if not hasattr(self, "private_key"):
-            raise NotImplementedError("Can not sign transaction without the private key")
-        return w3.eth.account.signTransaction(transaction_data, self.private_key)
-
     def get_balance(self, currency: EthereumToken) -> EthereumTokenAmount:
         return EthereumTokenAmount.aggregated(self.balance_entries.all(), currency=currency)
 
     def get_balances(self, chain: Chain) -> List[EthereumTokenAmount]:
         return [self.get_balance(token) for token in EthereumToken.objects.filter(chain=chain)]
-
-    @classmethod
-    def select_for_transfer(cls, amount: EthereumTokenAmount) -> Optional[EthereumAccount_T]:
-        max_fee_amount: EthereumTokenAmount = get_max_fee(chain=amount.currency.chain)
-        assert max_fee_amount.is_ETH
-
-        ETH = max_fee_amount.currency
-
-        eth_required = max_fee_amount
-        token_required = EthereumTokenAmount(amount=amount.amount, currency=amount.currency)
-        accounts = cls.objects.all()
-
-        if amount.is_ETH:
-            token_required += eth_required
-            funded_accounts = [
-                account for account in accounts if account.get_balance(ETH) >= token_required
-            ]
-        else:
-            funded_accounts = [
-                account
-                for account in accounts
-                if account.get_balance(token_required.currency) >= token_required
-                and account.get_balance(ETH) >= eth_required
-            ]
-
-        try:
-            return random.choice(funded_accounts)
-        except IndexError:
-            return None
 
     class Meta:
         abstract = True
@@ -384,6 +311,5 @@ __all__ = [
     "KeystoreAccount",
     "HierarchicalDeterministicWallet",
     "AccountBalanceEntry",
-    "get_max_fee",
     "encode_transfer_data",
 ]

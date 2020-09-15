@@ -4,6 +4,7 @@ from django.contrib import admin
 from django.http import HttpRequest
 
 from . import get_ethereum_account_model, models
+from .typing import EthereumAccount_T
 
 EthereumAccount = get_ethereum_account_model()
 
@@ -20,16 +21,16 @@ class EthereumAccountAdmin(admin.ModelAdmin):
     list_display = ["address"]
 
     def has_add_permission(
-        self, request: HttpRequest, obj: Optional[EthereumAccount] = None
+        self, request: HttpRequest, obj: Optional[EthereumAccount_T] = None
     ) -> bool:
         return False
 
     def has_change_permission(
-        self, request: HttpRequest, obj: Optional[EthereumAccount] = None
+        self, request: HttpRequest, obj: Optional[EthereumAccount_T] = None
     ) -> bool:
         return False
 
     def has_delete_permission(
-        self, request: HttpRequest, obj: Optional[EthereumAccount] = None
+        self, request: HttpRequest, obj: Optional[EthereumAccount_T] = None
     ) -> bool:
         return False

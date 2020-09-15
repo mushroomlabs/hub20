@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import datetime
-import random
 from typing import Optional
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
+from django.db.models import F
 from model_utils.choices import Choices
 from model_utils.managers import InheritanceManager, QueryManager
 from model_utils.models import StatusModel, TimeStampedModel
@@ -46,7 +46,7 @@ class TokenNetwork(models.Model):
 
         # However, our main purpose is only to find out if a given address is
         # being used by raiden and that we can _try_ to use for a transfer.
-        open_channels = self.channels.filter(status__status=CHANNEL_STATUSES.opened)
+        open_channels = self.channels.filter(status=CHANNEL_STATUSES.opened)
         return open_channels.filter(participant_addresses__contains=[address]).exists()
 
     @property
@@ -183,9 +183,6 @@ class Channel(StatusModel):
         latest_event = self.payments.order_by("-timestamp").first()
         return latest_event and latest_event.timestamp
 
-    def send(self, address, transfer_amount: EthereumTokenAmount):
-        raise NotImplementedError("TODO")
-
     def __str__(self):
         return f"Channel {self.identifier} ({self.partner_address})"
 
@@ -214,14 +211,6 @@ class Channel(StatusModel):
         )
         return channel
 
-    @classmethod
-    def select_for_transfer(cls, recipient_address, transfer_amount: EthereumTokenAmount):
-        funded = cls.objects.filter(
-            token_network__token=transfer_amount.currency, balance__gte=transfer_amount.amount
-        )
-        reachable = [c for c in funded if c.token_network.can_reach(recipient_address)]
-        return random.choice(reachable) if reachable else None
-
     class Meta:
         unique_together = (
             ("raiden", "token_network", "partner_address"),
@@ -230,12 +219,16 @@ class Channel(StatusModel):
 
 
 class Payment(models.Model):
+    MAX_IDENTIFIER_ID = (2 ** 64) - 1
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="payments")
     amount = EthereumTokenAmountField()
     timestamp = models.DateTimeField()
     identifier = models.BigIntegerField()
     sender_address = EthereumAddressField()
     receiver_address = EthereumAddressField()
+    objects = models.Manager()
+    sent = QueryManager(sender_address=F("channel__raiden__address"))
+    received = QueryManager(receiver_address=F("channel__raiden__address"))
 
     @property
     def url(self):
@@ -251,11 +244,21 @@ class Payment(models.Model):
 
     @classmethod
     def make(cls, channel: Channel, **payment_data):
-        payment, _ = channel.payments.get_or_create(channel=channel, **payment_data)
+        sender_address = payment_data.pop("sender_address")
+        receiver_address = payment_data.pop("receiver_address")
+        identifier = payment_data.pop("identifier")
+
+        payment, _ = channel.payments.update_or_create(
+            channel=channel,
+            sender_address=sender_address,
+            receiver_address=receiver_address,
+            identifier=identifier,
+            defaults=payment_data,
+        )
         return payment
 
     class Meta:
-        unique_together = ("channel", "timestamp", "sender_address", "receiver_address")
+        unique_together = ("channel", "identifier", "sender_address", "receiver_address")
 
 
 class RaidenManagementOrder(TimeStampedModel):

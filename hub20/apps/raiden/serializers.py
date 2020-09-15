@@ -116,12 +116,7 @@ class ChannelWithdrawSerializer(ChannelManagementSerializer):
 
 class RaidenSerializer(serializers.ModelSerializer):
     channels = ChannelSerializer(many=True)
-    chain = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
-
-    def get_chain(self, obj):
-        w3 = get_web3()
-        return int(w3.net.version)
 
     def get_status(self, obj):
         client = RaidenClient(obj)
@@ -129,7 +124,7 @@ class RaidenSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Raiden
-        fields = ("address", "chain", "channels", "status")
+        fields = ("address", "channels", "status")
         read_only_fields = ("address", "channels", "status")
 
 

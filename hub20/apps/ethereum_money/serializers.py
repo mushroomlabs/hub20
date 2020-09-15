@@ -11,7 +11,7 @@ class TokenValueField(serializers.DecimalField):
 
 
 class CurrencyRelatedField(serializers.SlugRelatedField):
-    queryset = models.EthereumToken.objects.all()
+    queryset = models.EthereumToken.tracked.all()
 
     def __init__(self, *args, **kw):
         kw.setdefault("slug_field", "address")

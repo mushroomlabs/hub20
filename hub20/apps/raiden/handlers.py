@@ -15,7 +15,11 @@ from hub20.apps.raiden.models import (
     TokenNetworkChannelStatus,
     UserDepositContractOrder,
 )
-from hub20.apps.raiden.signals import raiden_payment_received, service_deposit_sent
+from hub20.apps.raiden.signals import (
+    raiden_payment_received,
+    raiden_payment_sent,
+    service_deposit_sent,
+)
 
 from . import tasks
 
@@ -29,6 +33,15 @@ def on_payment_created_check_received(sender, **kw):
         if payment.receiver_address == payment.channel.raiden.address:
             logger.info(f"New payment received by {payment.channel}")
             raiden_payment_received.send(sender=Payment, payment=payment)
+
+
+@receiver(post_save, sender=Payment)
+def on_payment_created_check_sent(sender, **kw):
+    payment = kw["instance"]
+    if kw["created"]:
+        if payment.sender_address == payment.channel.raiden.address:
+            logger.info(f"New payment sent by {payment.channel}")
+            raiden_payment_sent.send(sender=Payment, payment=payment)
 
 
 @receiver(post_save, sender=TokenNetworkChannelEvent)
@@ -96,6 +109,7 @@ def on_leave_token_network_order_create_schedule_task(sender, **kw):
 
 __all__ = [
     "on_payment_created_check_received",
+    "on_payment_created_check_sent",
     "on_token_network_channel_event_set_status",
     "on_channel_deposit_order_schedule_task",
     "on_channel_withdraw_order_schedule_task",

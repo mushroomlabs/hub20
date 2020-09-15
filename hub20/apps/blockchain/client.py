@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import Optional, Tuple
+from typing import Dict, Optional, Tuple
 from urllib.parse import urlparse
 
 from asgiref.sync import sync_to_async
@@ -21,7 +21,7 @@ from .exceptions import Web3TransactionError
 from .models import Block, Chain, Transaction
 
 BLOCK_CREATION_INTERVAL = 10  # In seconds
-WEB3_CLIENTS = {}
+WEB3_CLIENTS: Dict[str, Web3] = {}
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +104,11 @@ def get_web3(provider_url: Optional[str] = None, force_new: bool = False) -> Web
         w3 = make_web3(provider_url)
         WEB3_CLIENTS[provider_url] = w3
 
+    client_network_id = int(w3.net.version)
+    app_network_id = settings.BLOCKCHAIN_NETWORK_ID
+    if client_network_id != app_network_id:
+        raise ValueError(f"Web3 node connected to {client_network_id}, we are on {app_network_id}")
+
     return w3
 
 
@@ -182,11 +187,7 @@ async def listen_new_blocks(w3: Web3):
         for event in block_filter.get_new_entries():
             block_hash = event.hex()
             block_data = w3.eth.getBlock(block_hash, full_transactions=True)
-            block = await sync_to_async(get_block_by_hash)(w3, block_hash)
-
-            for tx_hash in block_data.transactions:
-                await sync_to_async(get_transaction_by_hash)(w3, tx_hash, block)
-            await sync_to_async(signals.block_sealed.send)(sender=Block, block=block)
+            await sync_to_async(signals.block_sealed.send)(sender=Block, block_data=block_data)
 
 
 async def sync_chain(w3: Web3):

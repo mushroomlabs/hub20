@@ -1,11 +1,21 @@
 import datetime
+from unittest.mock import MagicMock
 
 import factory
+from django.conf import settings
+from web3 import Web3
 from web3.datastructures import AttributeDict
 
 from hub20.apps.blockchain.factories.providers import EthereumProvider
 
 factory.Faker.add_provider(EthereumProvider)
+
+
+def _make_web3_mock():
+    w3 = Web3()
+    w3.net = MagicMock()
+    w3.net.version = MagicMock(return_value=str(settings.BLOCKCHAIN_NETWORK_ID))
+    return w3
 
 
 class Web3Model(AttributeDict):
@@ -76,10 +86,13 @@ class BlockWithTransactionDetailsMock(BlockMock):
     )
 
 
+Web3Mock = _make_web3_mock()
+
 __all__ = [
     "BlockMock",
     "BlockWithTransactionDetailsMock",
     "TransactionMock",
     "TransactionDataMock",
     "TransactionReceiptDataMock",
+    "Web3Mock",
 ]
