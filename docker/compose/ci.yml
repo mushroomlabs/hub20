@@ -6,7 +6,7 @@ x-disabled: &disabled_service
 services:
   web:
     volumes:
-      - .:/app
+      - ./backend:/app
 
   ethereum: *disabled_service
   raiden: *disabled_service
