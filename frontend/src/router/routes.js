@@ -1,69 +1,64 @@
-import DashboardLayout from "@/layout/dashboard/DashboardLayout.vue";
+import DashboardLayout from '@/layout/dashboard/DashboardLayout';
 // GeneralViews
-import NotFound from "@/pages/NotFoundPage.vue";
+import NotFound from '@/pages/NotFoundPage';
+import Login from '@/pages/Login';
+import Register from '@/pages/Register';
+import store from '@/store/index';
 
-// Admin pages
-import Dashboard from "@/pages/Dashboard.vue";
-import UserProfile from "@/pages/UserProfile.vue";
-import Notifications from "@/pages/Notifications.vue";
-import Icons from "@/pages/Icons.vue";
-import Maps from "@/pages/Maps.vue";
-import Typography from "@/pages/Typography.vue";
-import TableList from "@/pages/TableList.vue";
+
+const requireAuthenticated = (to, from, next) => {
+  store.dispatch('auth/initialize')
+    .then(() => {
+      if (!store.getters['auth/isAuthenticated']) {
+        next('/login');
+      } else {
+        next();
+      }
+    });
+};
+
+const requireAnonymous = (to, from, next) => {
+  store.dispatch('auth/initialize')
+    .then(() => {
+      if (store.getters['auth/isAuthenticated']) {
+        next('/');
+      } else {
+        next();
+      }
+    });
+};
+
+const redirectLogout = (to, from, next) => {
+  store.dispatch('auth/logout')
+    .then(() => next('/login'));
+};
+
 
 const routes = [
   {
     path: "/",
+    name: "home",
     component: DashboardLayout,
-    redirect: "/dashboard",
-    children: [
-      {
-        path: "dashboard",
-        name: "dashboard",
-        component: Dashboard
-      },
-      {
-        path: "stats",
-        name: "stats",
-        component: UserProfile
-      },
-      {
-        path: "notifications",
-        name: "notifications",
-        component: Notifications
-      },
-      {
-        path: "icons",
-        name: "icons",
-        component: Icons
-      },
-      {
-        path: "maps",
-        name: "maps",
-        component: Maps
-      },
-      {
-        path: "typography",
-        name: "typography",
-        component: Typography
-      },
-      {
-        path: "table-list",
-        name: "table-list",
-        component: TableList
-      }
-    ]
+    beforeEnter: requireAuthenticated
+  },
+  {
+    path: "/login",
+    name: "login",
+    component: Login,
+    beforeEnter: requireAnonymous
+  },
+  {
+    path: "/logout",
+    name: "logout",
+    beforeEnter: redirectLogout
+  },
+  {
+    path: "/register",
+    name: "register",
+    component: Register,
+    beforeEnter: requireAnonymous
   },
   { path: "*", component: NotFound }
 ];
-
-/**
- * Asynchronously load view (Webpack Lazy loading compatible)
- * The specified component must be inside the Views folder
- * @param  {string} name  the filename (basename) of the view to load.
-function view(name) {
-   var res= require('../components/Dashboard/Views/' + name + '.vue');
-   return res;
-};**/
 
 export default routes;
