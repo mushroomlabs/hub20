@@ -5,6 +5,7 @@ import createLogger from 'vuex/dist/logger';
 import auth from './auth';
 import password from './password';
 import signup from './signup';
+import notifications from './notifications';
 
 const debug = process.env.NODE_ENV !== 'production';
 
@@ -15,6 +16,7 @@ export default new Vuex.Store({
     auth,
     password,
     signup,
+    notifications,
   },
   strict: debug,
   plugins: debug ? [createLogger()] : [],
