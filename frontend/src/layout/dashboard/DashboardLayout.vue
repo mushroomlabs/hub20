@@ -16,7 +16,7 @@
 
       </dashboard-content>
 
-      <content-footer></content-footer>
+      <action-menu></action-menu>
     </div>
   </div>
 </template>
@@ -25,13 +25,13 @@
 <script>
 import { mapGetters } from 'vuex';
 
-import TopNavbar from "./TopNavbar.vue";
-import ContentFooter from "./ContentFooter.vue";
-import DashboardContent from "./Content.vue";
+import TopNavbar from "./TopNavbar";
+import DashboardContent from "./Content";
+import ActionMenu from "@/components/ActionMenu";
 export default {
   components: {
     TopNavbar,
-    ContentFooter,
+    ActionMenu,
     DashboardContent,
   },
   computed: {
