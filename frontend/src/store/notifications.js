@@ -20,7 +20,7 @@ const getters = {
       }
       return 0
     }
-    return state.notifications.sort(compareDateReceived)
+    return [...state.notifications].sort(compareDateReceived)
   }
 }
 
@@ -39,4 +39,4 @@ export default {
   state: initialState,
   getters,
   mutations,
-}  
+}
