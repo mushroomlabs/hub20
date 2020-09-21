@@ -2,23 +2,12 @@
   <div class="sidebar"
        :data-background-color="backgroundColor"
        :data-active-color="activeColor">
-    <!--
-            Tip 1: you can change the color of the sidebar's background using: data-background-color="white | black | darkblue"
-            Tip 2: you can change the color of the active button using the data-active-color="primary | info | success | warning | danger"
-        -->
-    <!-- -->
-    <div class="sidebar-wrapper" id="style-3">
-      <div class="logo">
-        <a href="#" class="simple-text">
-            <div class="logo-img">
-                <img src="@/assets/img/vue-logo.png" alt="">
-            </div>
-          {{title}}
-        </a>
-      </div>
-      <slot>
-
-      </slot>
+    <div class="sidebar-wrapper">
+      <router-link to="home" class="logo">
+        <img src="@/assets/img/logos/ethereum.svg">
+        {{title}}
+      </router-link>
+      <slot></slot>
       <ul class="nav">
         <!--By default vue-router adds an active class to each route link. This way the links are colored when clicked-->
         <slot name="links">
@@ -37,13 +26,14 @@
   </div>
 </template>
 <script>
-import MovingArrow from "./MovingArrow.vue";
+import MovingArrow from "./MovingArrow";
 import SidebarLink from "./SidebarLink";
+
 export default {
   props: {
     title: {
       type: String,
-      default: "Paper Dashboard"
+      default: "Hub20"
     },
     backgroundColor: {
       type: String,
@@ -85,7 +75,7 @@ export default {
   },
   components: {
     MovingArrow,
-    SidebarLink
+    SidebarLink,
   },
   computed: {
     /**

@@ -35,26 +35,17 @@
   font-weight: 200;
 
   .logo {
-    padding: 13px 0;
-    margin: 0 20px;
-
-    p {
-      float: left;
-      font-size: 20px;
-      margin: 10px 10px;
-      line-height: 20px;
-    }
-
-    .simple-text {
-      padding: $padding-small-vertical $padding-zero;
+      padding: $padding-small-vertical $padding-zero 16px;
+      margin: 13px 20px;
       display: block;
       font-size: $font-size-base;
       text-align: center;
       font-weight: $font-weight-bold;
       line-height: 40px;
       text-align: left;
+      color: white !important;
 
-      .logo-img{
+      img{
           width: 40px;
           display: inline-block;
           height: 40px;
@@ -63,12 +54,7 @@
           background: white;
           border-radius: 40px;
           text-align: center;
-
-        img{
-            max-width: 21px;
-        }
       }
-    }
   }
 
   .nav {
