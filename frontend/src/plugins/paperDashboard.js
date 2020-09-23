@@ -1,7 +1,8 @@
 import Notify from "vue-notifyjs";
-import SideBar from "@/components/SidebarPlugin";
+import SideBar from "@/widgets/layouts/SidebarPlugin";
 import GlobalComponents from "./globalComponents";
 import GlobalDirectives from "./globalDirectives";
+
 import "es6-promise/auto";
 
 //css assets

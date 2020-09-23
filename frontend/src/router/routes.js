@@ -49,7 +49,6 @@ const redirectLogout = (to, from, next) => {
 const routes = [
   {
     path: "/",
-    name: "dashboard",
     component: DashboardLayout,
     beforeEnter: requireAuthenticated,
     children: [

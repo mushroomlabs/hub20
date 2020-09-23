@@ -18,7 +18,6 @@
         <dashboard-content @click.native="toggleSidebar">
         </dashboard-content>
 
-        <action-menu></action-menu>
       </div>
     </div>
   </div>
@@ -29,12 +28,10 @@ import { mapGetters } from 'vuex';
 
 import TopNavbar from "./TopNavbar";
 import DashboardContent from "./Content";
-import ActionMenu from "@/components/ActionMenu";
 
 export default {
   components: {
     TopNavbar,
-    ActionMenu,
     DashboardContent,
   },
   computed: {
