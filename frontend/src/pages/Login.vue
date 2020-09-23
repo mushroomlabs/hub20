@@ -40,6 +40,7 @@ export default {
 
 <style lang="scss">
 @import "../assets/sass/paper/_variables.scss";
+@import "../assets/sass/paper/mixins/_buttons.scss";
 
 div.login-screen {
     background-color: rgba($medium-pale-bg, 0.75) !important;
@@ -47,5 +48,17 @@ div.login-screen {
     min-height: 100vh;
     padding: 5vh 3em;
     align-content: center;
+}
+
+div.action-panel div.secondary {
+    a, button {
+        @include button-link(
+            $primary-color,
+            $primary-states-color,
+            $padding-large-vertical,
+            $padding-large-horizontal,
+            $font-size-base
+        );
+    }
 }
 </style>

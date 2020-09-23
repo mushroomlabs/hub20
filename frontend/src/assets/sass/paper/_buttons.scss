@@ -138,10 +138,10 @@
 }
 
 .btn-lg{
-  @include btn-size($padding-large-vertical, $padding-large-horizontal, $font-size-base, $line-height-small);
+  @include btn-size($padding-large-vertical, $padding-large-horizontal, $font-size-base);
 }
 .btn-sm{
-  @include btn-size($padding-small-vertical, $padding-small-horizontal, $font-size-small, $line-height-small);
+  @include btn-size($padding-small-vertical, $padding-small-horizontal, $font-size-small);
 }
 .btn-wd {
   min-width: 140px;
