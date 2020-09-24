@@ -8,7 +8,9 @@ export default {
     return session.post('/api/session/logout', {});
   },
   createAccount(username, password1, password2, email) {
-    return session.post('/api/register', { username, password1, password2, email });
+    let payload = { username, password1, password2 };
+    Object.assign(payload, email && {email});
+    return session.post('/api/register/', payload);
   },
   changeAccountPassword(password1, password2) {
     return session.post('/auth/password/change/', { password1, password2 });

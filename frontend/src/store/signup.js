@@ -8,7 +8,7 @@ import {
   REGISTRATION_BEGIN,
   REGISTRATION_CLEAR,
   REGISTRATION_FAILURE,
-  REGISTRATION_SUCCESS,
+  REGISTRATION_SUCCESS
 } from './types';
 
 export default {
@@ -25,7 +25,10 @@ export default {
     createAccount({ commit }, { username, password1, password2, email }) {
       commit(REGISTRATION_BEGIN);
       return auth.createAccount(username, password1, password2, email)
-        .then(() => commit(REGISTRATION_SUCCESS))
+        .then(({ data }) => {
+          commit(REGISTRATION_SUCCESS);
+          return data.key;
+        })
         .catch(() => commit(REGISTRATION_FAILURE));
     },
     activateAccount({ commit }, { key }) {

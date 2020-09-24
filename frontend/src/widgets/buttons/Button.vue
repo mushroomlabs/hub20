@@ -1,7 +1,7 @@
 <template>
   <component
     :is="tag"
-    :type="nativeType"
+    :type="type"
     :disabled="disabled || loading"
     class="btn"
     :class="[
@@ -35,10 +35,6 @@ export default {
     disabled: Boolean,
     type: {
       type: String,
-      default: "default"
-    },
-    nativeType: {
-      type: String,
       default: "button"
     },
     size: {
@@ -49,5 +45,3 @@ export default {
   }
 };
 </script>
-<style>
-</style>

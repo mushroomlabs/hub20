@@ -1,5 +1,5 @@
 <template>
-  <div class="card">
+  <component :is="tag" class="card">
     <div class="card-image" v-if="$slots.image">
       <slot name="image"></slot>
     </div>
@@ -17,12 +17,16 @@
       <hr>
       <slot name="footer"></slot>
     </div>
-  </div>
+  </component>
 </template>
 <script>
 export default {
   name: "card",
   props: {
+    tag: {
+      type: String,
+      default: "div",
+    },
     title: String,
     subTitle: String
   }

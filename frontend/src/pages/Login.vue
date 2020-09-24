@@ -1,9 +1,21 @@
 <template>
 <card class="login-screen" title="Sign in">
   <slot>
-    <form class="login" @submit.prevent="login">
-      <fg-input id="username" v-model="username" placeholder="Username" required/>
-      <fg-input id="password" v-model="password" type="password" placeholder="Password" required/>
+    <form @submit.prevent="login(username, password)">
+    <fg-input v-model="username"
+              id="username"
+              placeholder="Username"
+              autocomplete="username"
+              required
+              />
+    <fg-input v-model="password"
+              id="password"
+              type="password"
+              placeholder="Password"
+              autocomplete="current-password"
+              required
+              />
+    <input type="submit" hidden />
     </form>
   </slot>
   <slot name="footer">
@@ -11,7 +23,7 @@
       <template v-slot:secondary>
         <router-link to="register">Not registered?</router-link>
       </template>
-      <p-button @click.native="login(username, password)">Login</p-button>
+      <p-button type="submit" @click.native="login(username, password)">Login</p-button>
     </action-panel>
   </slot>
 </card>
@@ -23,13 +35,11 @@ export default {
   data(){
     return {
       username: "",
-      password : ""
+      password: ""
     }
   },
   methods: {
-    login: function () {
-      let username = this.username
-      let password = this.password
+    login (username, password) {
       this.$store.dispatch('auth/login', { username, password })
         .then(() => this.$router.push('/'))
         .catch(err => console.log(err))
@@ -37,28 +47,3 @@ export default {
   }
 }
 </script>
-
-<style lang="scss">
-@import "../assets/sass/paper/_variables.scss";
-@import "../assets/sass/paper/mixins/_buttons.scss";
-
-div.login-screen {
-    background-color: rgba($medium-pale-bg, 0.75) !important;
-    display: grid;
-    min-height: 100vh;
-    padding: 5vh 3em;
-    align-content: center;
-}
-
-div.action-panel div.secondary {
-    a, button {
-        @include button-link(
-            $primary-color,
-            $primary-states-color,
-            $padding-large-vertical,
-            $padding-large-horizontal,
-            $font-size-base
-        );
-    }
-}
-</style>
