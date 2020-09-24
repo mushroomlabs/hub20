@@ -25,6 +25,7 @@ DJANGO_APPS = [
 THIRD_PARTY_APPS = [
     "allauth",
     "allauth.account",
+    "allauth.socialaccount",
     "channels",
     "corsheaders",
     "djmoney",
