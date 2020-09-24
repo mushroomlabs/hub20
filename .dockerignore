@@ -1,3 +1,6 @@
 dist
 docker
 builds
+frontend/node_modules
+.git
+.gitignore

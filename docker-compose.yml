@@ -1,5 +1,15 @@
 version: '3.4'
 
+x-backend: &hub20_backend
+  image: "hub20_backend:${TAG:-latest}"
+  build:
+    context: ./backend
+
+x-frontend: &hub20_frontend
+  image: "hub20_frontend:${TAG:-latest}"
+  build:
+    context: ./frontend
+
 services:
   db:
     image: postgres
@@ -19,7 +29,8 @@ services:
 
   # Web API
   web:
-    build: .
+    <<: *hub20_backend
+
     command: >
       /bin/bash -c "
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
@@ -36,7 +47,8 @@ services:
 
   # Celery app
   celery:
-    build: .
+    <<: *hub20_backend
+
     command: >
       /bin/bash -c "
       while ! nc -w 1 -z db 5432; do sleep 0.5; done;
@@ -53,7 +65,8 @@ services:
 
   # Celery beat (periodic tasks)
   celery_beat:
-    build: .
+    <<: *hub20_backend
+
     command: >
       /bin/bash -c "
         mkdir -p ${HUB20_DATA_FOLDER}/celery;
@@ -70,7 +83,8 @@ services:
 
   # Run raiden via django-admin command
   raiden:
-    build: .
+    <<: *hub20_backend
+
     command: >
       /bin/bash -c "
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
@@ -85,7 +99,8 @@ services:
 
   # Background command to listen to blockchain and raiden events
   job_listen_events:
-    build: .
+    <<: *hub20_backend
+
     command: >
       /bin/bash -c "
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
@@ -97,3 +112,6 @@ services:
       - redis
     env_file:
       - ./.env
+
+  frontend:
+    <<: *hub20_frontend

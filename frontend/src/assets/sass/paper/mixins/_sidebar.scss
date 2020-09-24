@@ -1,0 +1,23 @@
+@mixin sidebar-color-scheme($background-color, $base-font-color, $active-color) {
+
+
+    background-color: $background-color;
+
+    a {
+        color: $base-font-color !important;
+    }
+
+    .logo {
+        border-bottom: 2px solid rgba($base-font-color, .2);
+    }
+
+    .nav {
+        .divider {
+            background-color: rgba($base-font-color, .2);
+        }
+
+        a.active.nav-link {
+            color: $active-color !important;
+        }
+    }
+}
