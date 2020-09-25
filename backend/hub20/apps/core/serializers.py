@@ -152,7 +152,6 @@ class PaymentSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField()
     url = serializers.HyperlinkedIdentityField(view_name="hub20:payments-detail")
     currency = EthereumTokenSerializer()
-    identifier = serializers.CharField()
     confirmed = serializers.BooleanField(source="is_confirmed", read_only=True)
 
     class Meta:
@@ -163,7 +162,6 @@ class PaymentSerializer(serializers.ModelSerializer):
             "created",
             "currency",
             "amount",
-            "identifier",
             "confirmed",
         )
 
@@ -171,8 +169,8 @@ class PaymentSerializer(serializers.ModelSerializer):
 class InternalPaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.InternalPayment
-        fields = PaymentSerializer.Meta.fields + ("user", "memo")
-        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("user", "memo")
+        fields = PaymentSerializer.Meta.fields + ("identifier", "user", "memo")
+        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("identifier", "user", "memo")
 
 
 class BlockchainPaymentSerializer(PaymentSerializer):
@@ -181,8 +179,12 @@ class BlockchainPaymentSerializer(PaymentSerializer):
 
     class Meta:
         model = models.BlockchainPayment
-        fields = PaymentSerializer.Meta.fields + ("transaction", "block")
-        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("transaction", "block")
+        fields = PaymentSerializer.Meta.fields + ("identifier", "transaction", "block")
+        read_only_fields = PaymentSerializer.Meta.read_only_fields + (
+            "identifier",
+            "transaction",
+            "block",
+        )
 
 
 class RaidenPaymentSerializer(PaymentSerializer):
@@ -190,8 +192,8 @@ class RaidenPaymentSerializer(PaymentSerializer):
 
     class Meta:
         model = models.RaidenPayment
-        fields = PaymentSerializer.Meta.fields + ("raiden",)
-        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("raiden",)
+        fields = PaymentSerializer.Meta.fields + ("identifier", "raiden")
+        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("identifier", "raiden")
 
 
 class PaymentOrderSerializer(serializers.ModelSerializer):
@@ -204,7 +206,10 @@ class PaymentOrderSerializer(serializers.ModelSerializer):
     def create(self, validated_data: Dict) -> models.PaymentOrder:
         request = self.context["request"]
         with transaction.atomic():
-            return models.PaymentOrder.objects.create(user=request.user, **validated_data)
+            chain_id = validated_data["currency"].chain_id
+            return models.PaymentOrder.objects.create(
+                user=request.user, chain_id=chain_id, **validated_data
+            )
 
     def get_routes(self, obj):
         def get_route_serializer(route):
@@ -234,7 +239,7 @@ class PaymentOrderSerializer(serializers.ModelSerializer):
 
 class PaymentOrderReadSerializer(PaymentOrderSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="hub20:payment-order-detail")
-    currency = EthereumTokenSerializer(read_only=True)
+    # currency = EthereumTokenSerializer(read_only=True)
 
 
 class CheckoutSerializer(PaymentOrderSerializer):
@@ -269,7 +274,11 @@ class CheckoutSerializer(PaymentOrderSerializer):
 
     class Meta:
         model = models.Checkout
-        fields = PaymentOrderSerializer.Meta.fields + ("store", "external_identifier", "voucher",)
+        fields = PaymentOrderSerializer.Meta.fields + (
+            "store",
+            "external_identifier",
+            "voucher",
+        )
         read_only_fields = PaymentOrderSerializer.Meta.read_only_fields + ("voucher",)
 
 
