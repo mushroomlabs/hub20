@@ -244,14 +244,16 @@ def process_latest_transfers(w3: Web3, chain: Chain, block_filter):
 
             recipient_account = accounts_by_address.get(recipient_address)
 
+            if not any((sender_account, recipient_account)):
+                return
+
             try:
-                if sender_account or recipient_account:
-                    logger.info(
-                        f"Saving tx {tx_hash.hex()}: {sender_address} -> {recipient_address}"
-                    )
-                    tx_receipt = w3.eth.waitForTransactionReceipt(tx_data.hash)
-                    block = Block.make(block_data, chain_id=chain.id)
-                    tx = Transaction.make(tx_data=tx_data, tx_receipt=tx_receipt, block=block)
+                logger.info(
+                    f"Saving tx {tx_hash.hex()}: {sender_address} -> {recipient_address}"
+                )
+                tx_receipt = w3.eth.waitForTransactionReceipt(tx_data.hash)
+                block = Block.make(block_data, chain_id=chain.id)
+                tx = Transaction.make(tx_data=tx_data, tx_receipt=tx_receipt, block=block)
 
             except TimeExhausted:
                 logger.warning(f"Timeout when waiting for receipt of tx {tx_hash.hex()}")
