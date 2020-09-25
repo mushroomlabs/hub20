@@ -33,6 +33,8 @@ from .models import (
     ExternalTransfer,
     InternalPayment,
     InternalTransfer,
+    Payment,
+    PaymentConfirmation,
     PaymentCredit,
     PaymentOrder,
     RaidenPayment,
@@ -44,10 +46,33 @@ from .models import (
     TransferFailure,
 )
 from .settings import app_settings
-from .signals import payment_confirmed, payment_received
+from .signals import payment_received
 
 logger = logging.getLogger(__name__)
 EthereumAccount = get_ethereum_account_model()
+
+
+def _check_for_blockchain_payment_confirmations(block_number):
+    confirmed_block = block_number - app_settings.Payment.minimum_confirmations
+
+    unconfirmed_payments = BlockchainPayment.objects.filter(
+        confirmation__isnull=True, transaction__block__number__lte=confirmed_block
+    )
+
+    for payment in unconfirmed_payments:
+        logger.info(f"Confirming {payment}")
+        PaymentConfirmation.objects.create(payment=payment)
+
+
+def _check_for_blockchain_transfer_confirmations(block_number):
+    confirmed_block = block_number - app_settings.Transfer.minimum_confirmations
+
+    transfers_to_confirm = ExternalTransfer.unconfirmed.filter(
+        execution__blockchaintransferexecution__transaction__block__number__lte=confirmed_block
+    )
+
+    for transfer in transfers_to_confirm:
+        TransferConfirmation.objects.create(transfer=transfer)
 
 
 @receiver(ethereum_node_disconnected, sender=Chain)
@@ -137,14 +162,7 @@ def on_blockchain_transfer_mined_record_execution(sender, **kw):
 def on_block_sealed_check_confirmed_transfers(sender, **kw):
     block_data = kw["block_data"]
 
-    confirmed_block = block_data.number - app_settings.Transfer.minimum_confirmations
-
-    transfers_to_confirm = ExternalTransfer.unconfirmed.filter(
-        execution__blockchaintransferexecution__transaction__block__number__lte=confirmed_block
-    )
-
-    for transfer in transfers_to_confirm:
-        TransferConfirmation.objects.create(transfer=transfer)
+    _check_for_blockchain_transfer_confirmations(block_data.number)
 
 
 @receiver(raiden_payment_received, sender=RaidenNodePayment)
@@ -152,18 +170,18 @@ def on_raiden_payment_received_check_raiden_payments(sender, **kw):
     raiden_payment = kw["payment"]
 
     payment_route = RaidenPaymentRoute.objects.filter(
-        identifier=raiden_payment.identifier, raiden=raiden_payment.channel.raiden,
+        identifier=raiden_payment.identifier,
+        raiden=raiden_payment.channel.raiden,
     ).first()
 
     if payment_route is not None:
         amount = raiden_payment.as_token_amount
-        payment = RaidenPayment.objects.create(
+        RaidenPayment.objects.create(
             route=payment_route,
             amount=amount.amount,
             currency=raiden_payment.token,
             payment=raiden_payment,
         )
-        payment_confirmed.send(sender=RaidenPayment, payment=payment)
 
 
 @receiver(post_save, sender=PaymentOrder)
@@ -208,15 +226,15 @@ def on_order_created_set_raiden_route(sender, **kw):
 def on_block_sealed_check_confirmed_payments(sender, **kw):
     block_data = kw["block_data"]
 
-    block_number_to_confirm = block_data.number - app_settings.Payment.minimum_confirmations
+    _check_for_blockchain_payment_confirmations(block_data.number)
 
-    if block_number_to_confirm >= 0:
-        payments = BlockchainPayment.objects.all()
 
-        for payment in payments.filter(transaction__block__number=block_number_to_confirm):
-            if not payment.is_confirmed:
-                logger.info(f"Confirming {payment}")
-                payment_confirmed.send(sender=BlockchainPayment, payment=payment)
+@receiver(post_save, sender=Block)
+def on_block_created_check_confirmed_transactions(sender, **kw):
+    if kw["created"]:
+        block = kw["instance"]
+        _check_for_blockchain_payment_confirmations(block.number)
+        _check_for_blockchain_transfer_confirmations(block.number)
 
 
 @receiver(post_save, sender=Block)
@@ -264,27 +282,39 @@ def on_blockchain_payment_received_maybe_publish_checkout(sender, **kw):
     )
 
 
-@receiver(payment_confirmed, sender=InternalPayment)
-@receiver(payment_confirmed, sender=BlockchainPayment)
-@receiver(payment_confirmed, sender=RaidenPayment)
+@receiver(post_save, sender=RaidenPayment)
+@receiver(post_save, sender=InternalPayment)
+def on_off_chain_payment_create_confirmation(sender, **kw):
+    if kw["created"]:
+        PaymentConfirmation.objects.create(payment=kw["instance"])
+
+
+@receiver(post_save, sender=PaymentConfirmation)
 def on_payment_confirmed_set_credit(sender, **kw):
-    payment = kw["payment"]
+    if kw["created"]:
+        confirmation = kw["instance"]
+        payment = confirmation.payment
 
-    PaymentCredit.objects.get_or_create(
-        payment=payment,
-        defaults={
-            "user": payment.route.order.user,
-            "currency": payment.currency,
-            "amount": payment.amount,
-        },
-    )
+        PaymentCredit.objects.get_or_create(
+            payment=payment,
+            defaults={
+                "user": payment.route.order.user,
+                "currency": payment.currency,
+                "amount": payment.amount,
+            },
+        )
 
 
-@receiver(payment_confirmed, sender=InternalPayment)
-@receiver(payment_confirmed, sender=BlockchainPayment)
-@receiver(payment_confirmed, sender=RaidenPayment)
+@receiver(post_save, sender=PaymentConfirmation)
 def on_payment_confirmed_publish_checkout(sender, **kw):
-    payment = kw["payment"]
+    if not kw["created"]:
+        return
+
+    confirmation = kw["instance"]
+    payment = Payment.objects.filter(id=confirmation.payment_id).select_subclasses().first()
+
+    if not payment:
+        return
 
     checkouts = Checkout.objects.filter(routes__payment=payment)
     checkout_id = checkouts.values_list("id", flat=True).first()
@@ -296,7 +326,7 @@ def on_payment_confirmed_publish_checkout(sender, **kw):
         InternalPayment: PAYMENT_METHODS.internal,
         BlockchainPayment: PAYMENT_METHODS.blockchain,
         RaidenPayment: PAYMENT_METHODS.raiden,
-    }.get(sender)
+    }.get(type(payment))
 
     tasks.publish_checkout_event.delay(
         checkout_id,
@@ -346,10 +376,12 @@ __all__ = [
     "on_order_created_set_raiden_route",
     "on_block_added_publish_block_created_event",
     "on_block_added_publish_expired_blockchain_routes",
+    "on_block_created_check_confirmed_transactions",
     "on_block_sealed_check_confirmed_payments",
     "on_block_sealed_check_confirmed_transfers",
     "on_blockchain_payment_received_maybe_publish_checkout",
     "on_blockchain_transfer_mined_record_execution",
+    "on_off_chain_payment_create_confirmation",
     "on_payment_confirmed_set_credit",
     "on_payment_confirmed_publish_checkout",
     "on_transfer_created_schedule_execution",

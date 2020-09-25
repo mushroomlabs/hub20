@@ -46,7 +46,12 @@ def database_history_gas_price_strategy(w3: Web3, params: Optional[TxParams] = N
 
 
 def send_transaction(
-    w3: Web3, contract_function, account, gas, contract_args: Optional[Tuple] = None, **kw,
+    w3: Web3,
+    contract_function,
+    account,
+    gas,
+    contract_args: Optional[Tuple] = None,
+    **kw,
 ) -> TxReceipt:
     nonce = kw.pop("nonce", w3.eth.getTransactionCount(account.address))
 
@@ -122,15 +127,22 @@ def get_block_by_hash(w3: Web3, block_hash: HexBytes) -> Optional[Block]:
 
 
 def get_transaction_by_hash(
-    w3: Web3, transaction_hash: HexBytes, block: Block
+    w3: Web3, transaction_hash: HexBytes, block: Optional[Block] = None
 ) -> Optional[Transaction]:
     try:
+        tx_data = w3.eth.getTransaction(transaction_hash)
+
+        if block is None:
+            block = get_block_by_hash(w3=w3, block_hash=tx_data.blockHash)
+
+        assert block is not None
+
         return Transaction.make(
-            tx_data=w3.eth.getTransaction(transaction_hash),
+            tx_data=tx_data,
             tx_receipt=w3.eth.getTransactionReceipt(transaction_hash),
             block=block,
         )
-    except TransactionNotFound:
+    except (TransactionNotFound, AssertionError):
         return None
 
 

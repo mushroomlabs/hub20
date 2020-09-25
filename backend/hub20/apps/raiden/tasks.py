@@ -5,7 +5,7 @@ from typing import Optional
 from celery import shared_task
 from web3 import Web3
 
-from hub20.apps.blockchain.client import get_block_by_hash, get_transaction_by_hash, get_web3
+from hub20.apps.blockchain.client import get_transaction_by_hash, get_web3
 from hub20.apps.blockchain.models import Block
 from hub20.apps.ethereum_money.client import get_account_balance
 from hub20.apps.ethereum_money.models import EthereumTokenAmount
@@ -38,8 +38,7 @@ def process_events(w3: Web3, token_network: models.TokenNetwork, event_filter):
         for event in event_filter.get_all_entries():
             logger.info(f"Processing event {event.event} at {event.transactionHash.hex()}")
 
-            block = get_block_by_hash(w3, event.blockHash)
-            tx = get_transaction_by_hash(w3, event.transactionHash, block)
+            tx = get_transaction_by_hash(w3, event.transactionHash)
             if not tx:
                 logger.warning(f"Transaction {event.transactionHash} could not be synced")
 

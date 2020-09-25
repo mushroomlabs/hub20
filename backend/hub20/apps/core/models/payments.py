@@ -103,7 +103,8 @@ class PaymentOrder(TimeStampedModel, EthereumTokenValueModel):
 
     @property
     def total_confirmed(self):
-        return sum([payment.amount for payment in self.payments if payment.is_confirmed])
+        confirmed = self.payments.filter(confirmation__isnull=False).aggregate(total=Sum("amount"))
+        return confirmed.get("total") or 0
 
     @property
     def due_amount(self):
@@ -205,7 +206,7 @@ class Payment(TimeStampedModel, EthereumTokenValueModel):
 
     @property
     def is_confirmed(self):
-        return True
+        return hasattr(self, "confirmation")
 
 
 class InternalPayment(Payment):
@@ -220,11 +221,6 @@ class BlockchainPayment(Payment):
     transaction = models.OneToOneField(Transaction, on_delete=models.CASCADE)
 
     @property
-    def is_confirmed(self):
-        logger.debug(f"{self} confirmations: {self.transaction.block.confirmations}")
-        return self.transaction.block.confirmations >= app_settings.Payment.minimum_confirmations
-
-    @property
     def identifier(self):
         return str(self.transaction.hash)
 
@@ -235,6 +231,10 @@ class RaidenPayment(Payment):
     @property
     def identifier(self):
         return f"{self.payment.identifier}-{self.id}"
+
+
+class PaymentConfirmation(TimeStampedModel):
+    payment = models.OneToOneField(Payment, on_delete=models.CASCADE, related_name="confirmation")
 
 
 class PaymentCredit(UserBalanceEntry):
@@ -251,5 +251,6 @@ __all__ = [
     "InternalPayment",
     "BlockchainPayment",
     "RaidenPayment",
+    "PaymentConfirmation",
     "PaymentCredit",
 ]
