@@ -16,6 +16,7 @@ body {
 
 div.login-screen, div.registration-screen {
     background-color: transparent !important;
+    box-shadow: none !important;
     display: grid;
     min-height: 100vh;
     max-width: 45rem;

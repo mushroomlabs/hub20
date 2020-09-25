@@ -6,7 +6,7 @@ import GlobalDirectives from "./globalDirectives";
 import "es6-promise/auto";
 
 //css assets
-import "bootstrap/dist/css/bootstrap.css";
+import "bootstrap/scss/bootstrap.scss"
 import "@/assets/sass/paper-dashboard.scss";
 import "@/assets/css/themify-icons.css";
 
