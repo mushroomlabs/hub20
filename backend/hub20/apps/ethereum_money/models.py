@@ -241,7 +241,7 @@ class EthereumTokenAmount:
 
     @property
     def formatted(self):
-        return f"{self.amount} {self.currency.code}"
+        return f"{self.amount.normalize()} {self.currency.code}"
 
     @property
     def as_wei(self) -> Wei:

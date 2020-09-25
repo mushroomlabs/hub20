@@ -13,9 +13,12 @@
   "dependencies": {
     "axios": "^0.20.0",
     "bootstrap": "^4.5.2",
+    "bootstrap-scss": "^4.5.2",
     "chartist": "^0.11.0",
     "core-js": "^3.6.5",
+    "decimal.js-light": "^2.5.0",
     "es6-promise": "^4.2.4",
+    "immutable": "^4.0.0-rc.12",
     "vue": "^2.6.11",
     "vue-clickaway": "^2.1.0",
     "vue-notifyjs": "^0.3.0",
