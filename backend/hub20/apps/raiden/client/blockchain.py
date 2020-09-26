@@ -207,7 +207,7 @@ async def listen_service_deposits(w3: Web3):
     block_filter = w3.eth.filter("latest")
 
     deposit_proxy = _make_deposit_proxy(w3=w3)
-    service_token = get_service_token(w3=w3)
+    service_token = await sync_to_async(get_service_token)(w3=w3)
 
     while True:
         await asyncio.sleep(BLOCK_CREATION_INTERVAL)
