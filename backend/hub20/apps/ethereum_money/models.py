@@ -221,10 +221,14 @@ class HierarchicalDeterministicWallet(AbstractEthereumAccount):
 
     @classmethod
     def generate(cls):
-
-        index = cls.objects.aggregate(generation=Max("index")).get("generation") or 0
+        latest_generation = cls.get_latest_generation()
+        index = 0 if latest_generation is None else latest_generation + 1
         wallet = HierarchicalDeterministicWallet.get_wallet(index)
         return cls.objects.create(index=index, address=wallet.address())
+
+    @classmethod
+    def get_latest_generation(cls) -> Optional[int]:
+        return cls.objects.aggregate(generation=Max("index")).get("generation")
 
 
 class AccountBalanceEntry(EthereumTokenValueModel):
@@ -262,6 +266,10 @@ class EthereumTokenAmount:
     def __add__(self, other: EthereumTokenAmount) -> EthereumTokenAmount:
         self._check_currency_type(self)
         return self.__class__(self.amount + other.amount, self.currency)
+
+    def __sub__(self, other: EthereumTokenAmount) -> EthereumTokenAmount:
+        self._check_currency_type(self)
+        return self.__class__(self.amount - other.amount, self.currency)
 
     def __mul__(self, other: TokenAmount_T) -> EthereumTokenAmount:
         return EthereumTokenAmount(amount=TokenAmount(other * self.amount), currency=self.currency)

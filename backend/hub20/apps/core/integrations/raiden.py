@@ -4,7 +4,7 @@ from web3 import Web3
 
 from hub20.apps.blockchain.models import Chain
 from hub20.apps.core.settings import app_settings
-from hub20.apps.ethereum_money.client import get_account_balance, get_token_information
+from hub20.apps.ethereum_money.client import get_account_balance
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
 from hub20.apps.raiden.client.blockchain import get_service_deposit_balance, get_service_token
 from hub20.apps.raiden.exceptions import RaidenMissingPrecondition

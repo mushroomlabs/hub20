@@ -18,7 +18,6 @@ from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
 
 from ..choices import PAYMENT_ORDER_STATUS
 from ..settings import app_settings
-from .accounting import UserBalanceEntry
 from .managers import BlockchainRouteManager, RaidenRouteManager
 
 logger = logging.getLogger(__name__)
@@ -30,12 +29,8 @@ def generate_payment_order_id():
     return random.randint(1, 2 ** 53 - 1)
 
 
-def calculate_blockchain_payment_window(chain):
-    if not chain.synced:
-        raise ValueError("Chain is not synced")
-
-    current = chain.highest_block
-    return (current, current + app_settings.Payment.blockchain_route_lifetime)
+def calculate_blockchain_payment_window():
+    return BlockchainPaymentRoute.calculate_payment_window(chain=Chain.make())
 
 
 def calculate_raiden_payment_window():
@@ -177,6 +172,14 @@ class BlockchainPaymentRoute(PaymentRoute):
     def is_expired(self):
         return self.order.chain.highest_block > self.expiration_block_number
 
+    @staticmethod
+    def calculate_payment_window(chain):
+        if not chain.synced:
+            raise ValueError("Chain is not synced")
+
+        current = chain.highest_block
+        return (current, current + app_settings.Payment.blockchain_route_lifetime)
+
 
 class RaidenPaymentRoute(PaymentRoute):
     NAME = "raiden"
@@ -194,6 +197,10 @@ class RaidenPaymentRoute(PaymentRoute):
     @property
     def expiration_time(self):
         return self.created + self.payment_window
+
+    @staticmethod
+    def calculate_payment_window():
+        return calculate_raiden_payment_window()
 
     class Meta:
         unique_together = ("raiden", "identifier")
@@ -237,10 +244,6 @@ class PaymentConfirmation(TimeStampedModel):
     payment = models.OneToOneField(Payment, on_delete=models.CASCADE, related_name="confirmation")
 
 
-class PaymentCredit(UserBalanceEntry):
-    payment = models.OneToOneField(Payment, on_delete=models.CASCADE, related_name="credit")
-
-
 __all__ = [
     "PaymentOrder",
     "PaymentRoute",
@@ -252,5 +255,4 @@ __all__ = [
     "BlockchainPayment",
     "RaidenPayment",
     "PaymentConfirmation",
-    "PaymentCredit",
 ]

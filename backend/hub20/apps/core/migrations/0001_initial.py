@@ -59,7 +59,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
         ),
         migrations.CreateModel(
             name="PaymentOrder",
@@ -103,7 +105,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
         ),
         migrations.CreateModel(
             name="PaymentRoute",
@@ -135,7 +139,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
         ),
         migrations.CreateModel(
             name="Store",
@@ -197,7 +203,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
         ),
         migrations.CreateModel(
             name="UserBalanceEntry",
@@ -242,7 +250,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
         ),
         migrations.CreateModel(
             name="UserReserve",
@@ -287,14 +297,22 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
         ),
         migrations.CreateModel(
             name="HubSite",
             fields=[],
-            options={"proxy": True, "indexes": [], "constraints": [],},
+            options={
+                "proxy": True,
+                "indexes": [],
+                "constraints": [],
+            },
             bases=("sites.site",),
-            managers=[("objects", django.contrib.sites.models.SiteManager()),],
+            managers=[
+                ("objects", django.contrib.sites.models.SiteManager()),
+            ],
         ),
         migrations.CreateModel(
             name="ExternalTransfer",
@@ -315,7 +333,9 @@ class Migration(migrations.Migration):
                     hub20.apps.blockchain.fields.EthereumAddressField(db_index=True),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
             bases=("core.transfer",),
         ),
         migrations.CreateModel(
@@ -334,7 +354,9 @@ class Migration(migrations.Migration):
                 ),
                 ("memo", models.TextField(blank=True, null=True)),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
             bases=("core.payment",),
         ),
         migrations.CreateModel(
@@ -352,7 +374,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
             bases=("core.paymentroute",),
         ),
         migrations.CreateModel(
@@ -419,7 +443,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
         ),
         migrations.CreateModel(
             name="UserTransferReserve",
@@ -444,7 +470,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
             bases=("core.userreserve",),
         ),
         migrations.CreateModel(
@@ -501,7 +529,10 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"get_latest_by": "created", "unique_together": {("transfer", "status")},},
+            options={
+                "get_latest_by": "created",
+                "unique_together": {("transfer", "status")},
+            },
         ),
         migrations.CreateModel(
             name="RaidenTransaction",
@@ -540,7 +571,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"unique_together": {("channel", "identifier")},},
+            options={
+                "unique_together": {("channel", "identifier")},
+            },
         ),
         migrations.CreateModel(
             name="RaidenPayment",
@@ -563,7 +596,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
             bases=("core.payment",),
         ),
         migrations.CreateModel(
@@ -589,7 +624,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
             bases=("core.userbalanceentry",),
         ),
         migrations.CreateModel(
@@ -615,7 +652,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
             bases=("core.transfer",),
         ),
         migrations.CreateModel(
@@ -641,7 +680,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
             bases=("core.paymentorder",),
         ),
         migrations.CreateModel(
@@ -660,9 +701,7 @@ class Migration(migrations.Migration):
                 ),
                 (
                     "payment_window",
-                    django.contrib.postgres.fields.ranges.IntegerRangeField(
-                        default=hub20.apps.core.models.payments.calculate_blockchain_payment_window
-                    ),
+                    django.contrib.postgres.fields.ranges.IntegerRangeField(),
                 ),
                 (
                     "account",
@@ -673,7 +712,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
             bases=("core.paymentroute",),
         ),
         migrations.CreateModel(
@@ -697,7 +738,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"abstract": False,},
+            options={
+                "abstract": False,
+            },
             bases=("core.payment",),
         ),
         migrations.CreateModel(
@@ -736,7 +779,9 @@ class Migration(migrations.Migration):
                     ),
                 ),
             ],
-            options={"unique_together": {("raiden", "identifier")},},
+            options={
+                "unique_together": {("raiden", "identifier")},
+            },
             bases=("core.paymentroute",),
         ),
     ]

@@ -1,5 +1,6 @@
 import datetime
 import logging
+from typing import Optional
 from urllib.parse import urlparse
 
 from django.conf import settings
@@ -11,7 +12,7 @@ from hexbytes import HexBytes
 from web3 import Web3
 from web3.types import TxParams, Wei
 
-from .app_settings import START_BLOCK_NUMBER
+from .app_settings import CHAIN_ID, START_BLOCK_NUMBER
 from .choices import ETHEREUM_CHAINS
 from .fields import EthereumAddressField, HexField, Uint256Field
 from .managers import TransactionManager
@@ -34,7 +35,9 @@ def database_history_gas_price_strategy(w3: Web3, params: TxParams = None) -> We
 
 class Chain(models.Model):
     id = models.PositiveIntegerField(
-        primary_key=True, choices=ETHEREUM_CHAINS, default=ETHEREUM_CHAINS.mainnet,
+        primary_key=True,
+        choices=ETHEREUM_CHAINS,
+        default=ETHEREUM_CHAINS.mainnet,
     )
     provider_url = models.URLField(unique=True)
     synced = models.BooleanField()
@@ -46,7 +49,7 @@ class Chain(models.Model):
         return endpoint.hostname
 
     @classmethod
-    def make(cls, chain_id):
+    def make(cls, chain_id: Optional[int] = CHAIN_ID):
         chain, _ = cls.objects.get_or_create(
             id=chain_id,
             defaults={

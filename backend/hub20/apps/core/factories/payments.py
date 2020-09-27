@@ -7,7 +7,11 @@ from hub20.apps.blockchain.factories import (
     TransactionFactory,
 )
 from hub20.apps.core import models
-from hub20.apps.ethereum_money.factories import Erc20TokenFactory, ETHFactory
+from hub20.apps.ethereum_money.factories import (
+    Erc20TokenFactory,
+    EthereumAccountFactory,
+    ETHFactory,
+)
 
 from .base import UserFactory
 
@@ -24,7 +28,7 @@ class PaymentOrderFactory(factory.django.DjangoModelFactory):
         model = models.PaymentOrder
 
 
-class ETHPaymentOrderFactory(PaymentOrderFactory):
+class EtherPaymentOrderFactory(PaymentOrderFactory):
     currency = factory.SubFactory(ETHFactory)
 
     class Meta:
@@ -38,28 +42,50 @@ class Erc20TokenPaymentOrderFactory(PaymentOrderFactory):
         model = models.PaymentOrder
 
 
-class BlockchainPaymentRouteFactory(factory.django.DjangoModelFactory):
-    order = factory.SubFactory(ETHPaymentOrderFactory)
+class EtherBlockchainPaymentRouteFactory(factory.django.DjangoModelFactory):
+    order = factory.SubFactory(EtherPaymentOrderFactory)
+    account = factory.SubFactory(EthereumAccountFactory)
 
     class Meta:
         model = models.BlockchainPaymentRoute
 
 
-class BlockchainPaymentFactory(factory.django.DjangoModelFactory):
-    route = factory.SubFactory(BlockchainPaymentRouteFactory)
+class Erc20TokenBlockchainPaymentRouteFactory(EtherBlockchainPaymentRouteFactory):
+    order = factory.SubFactory(Erc20TokenPaymentOrderFactory)
+
+
+class EtherBlockchainPaymentFactory(factory.django.DjangoModelFactory):
+    route = factory.SubFactory(EtherBlockchainPaymentRouteFactory)
     transaction = factory.SubFactory(TransactionFactory)
+    currency = factory.SelfAttribute("route.order.currency")
+    amount = factory.SelfAttribute("route.order.amount")
 
     class Meta:
         model = models.BlockchainPayment
 
 
-class PendingBlockchainPaymentFactory(BlockchainPaymentFactory):
-    transaction_hash = factory.Faker("hex64")
+class Erc20TokenBlockchainPaymentFactory(EtherBlockchainPaymentFactory):
+    route = factory.SubFactory(Erc20TokenBlockchainPaymentRouteFactory)
+
+
+class EtherPaymentConfirmationFactory(factory.django.DjangoModelFactory):
+    payment = factory.SubFactory(EtherBlockchainPaymentFactory)
+
+    class Meta:
+        model = models.PaymentConfirmation
+
+
+class Erc20TokenPaymentConfirmationFactory(EtherPaymentConfirmationFactory):
+    payment = factory.SubFactory(Erc20TokenBlockchainPaymentFactory)
 
 
 __all__ = [
-    "ETHPaymentOrderFactory",
+    "Erc20TokenBlockchainPaymentRouteFactory",
+    "Erc20TokenBlockchainPaymentFactory",
+    "Erc20TokenPaymentConfirmationFactory",
     "Erc20TokenPaymentOrderFactory",
-    "BlockchainPaymentFactory",
-    "PendingBlockchainPaymentFactory",
+    "EtherBlockchainPaymentRouteFactory",
+    "EtherBlockchainPaymentFactory",
+    "EtherPaymentConfirmationFactory",
+    "EtherPaymentOrderFactory",
 ]

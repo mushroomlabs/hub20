@@ -27,7 +27,7 @@ class KeystoreAccountFactory(factory.django.DjangoModelFactory):
 
 
 class HDWalletFactory(KeystoreAccountFactory):
-    index = factory.Sequence(lambda n: n)
+    index = factory.LazyFunction(lambda: HierarchicalDeterministicWallet.objects.count())
 
     class Meta:
         model = HierarchicalDeterministicWallet

@@ -12,41 +12,27 @@ from hub20.apps.blockchain.signals import (
     ethereum_node_sync_lost,
     ethereum_node_sync_recovered,
 )
-from hub20.apps.ethereum_money import get_ethereum_account_model
-from hub20.apps.ethereum_money.models import EthereumToken
-from hub20.apps.ethereum_money.signals import (
-    account_deposit_received,
-    incoming_transfer_broadcast,
-    outgoing_transfer_mined,
-)
-from hub20.apps.raiden.models import Payment as RaidenNodePayment, Raiden
-from hub20.apps.raiden.signals import raiden_payment_received
-
-from . import tasks
-from .choices import PAYMENT_METHODS
-from .models import (
+from hub20.apps.core import tasks
+from hub20.apps.core.choices import PAYMENT_METHODS
+from hub20.apps.core.models import (
     BlockchainPayment,
     BlockchainPaymentRoute,
-    BlockchainTransferExecution,
     Checkout,
     CheckoutEvents,
-    ExternalTransfer,
     InternalPayment,
-    InternalTransfer,
     Payment,
     PaymentConfirmation,
-    PaymentCredit,
     PaymentOrder,
     RaidenPayment,
     RaidenPaymentRoute,
-    Store,
-    StoreRSAKeyPair,
-    Transfer,
-    TransferConfirmation,
-    TransferFailure,
 )
-from .settings import app_settings
-from .signals import payment_received
+from hub20.apps.core.settings import app_settings
+from hub20.apps.core.signals import payment_received
+from hub20.apps.ethereum_money import get_ethereum_account_model
+from hub20.apps.ethereum_money.models import EthereumToken
+from hub20.apps.ethereum_money.signals import account_deposit_received, incoming_transfer_broadcast
+from hub20.apps.raiden.models import Payment as RaidenNodePayment, Raiden
+from hub20.apps.raiden.signals import raiden_payment_received
 
 logger = logging.getLogger(__name__)
 EthereumAccount = get_ethereum_account_model()
@@ -60,19 +46,7 @@ def _check_for_blockchain_payment_confirmations(block_number):
     )
 
     for payment in unconfirmed_payments:
-        logger.info(f"Confirming {payment}")
         PaymentConfirmation.objects.create(payment=payment)
-
-
-def _check_for_blockchain_transfer_confirmations(block_number):
-    confirmed_block = block_number - app_settings.Transfer.minimum_confirmations
-
-    transfers_to_confirm = ExternalTransfer.unconfirmed.filter(
-        execution__blockchaintransferexecution__transaction__block__number__lte=confirmed_block
-    )
-
-    for transfer in transfers_to_confirm:
-        TransferConfirmation.objects.create(transfer=transfer)
 
 
 @receiver(ethereum_node_disconnected, sender=Chain)
@@ -110,7 +84,10 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
     ).first()
 
     payment = BlockchainPayment.objects.create(
-        route=route, amount=amount.amount, currency=amount.currency, transaction=transaction
+        route=route,
+        amount=amount.amount,
+        currency=amount.currency,
+        transaction=transaction,
     )
     payment_received.send(sender=BlockchainPayment, payment=payment)
 
@@ -141,30 +118,6 @@ def on_incoming_transfer_broadcast_sent_maybe_publish_checkout(sender, **kw):
     )
 
 
-@receiver(outgoing_transfer_mined, sender=Transaction)
-def on_blockchain_transfer_mined_record_execution(sender, **kw):
-    amount = kw["amount"]
-    transaction = kw["transaction"]
-    recipient_address = kw["recipient_address"]
-
-    transfer = ExternalTransfer.objects.filter(
-        execution__isnull=True,
-        amount=amount.amount,
-        currency=amount.currency,
-        recipient_address=recipient_address,
-    ).first()
-
-    if transfer:
-        BlockchainTransferExecution.objects.create(transfer=transfer, transaction=transaction)
-
-
-@receiver(block_sealed, sender=Block)
-def on_block_sealed_check_confirmed_transfers(sender, **kw):
-    block_data = kw["block_data"]
-
-    _check_for_blockchain_transfer_confirmations(block_data.number)
-
-
 @receiver(raiden_payment_received, sender=RaidenNodePayment)
 def on_raiden_payment_received_check_raiden_payments(sender, **kw):
     raiden_payment = kw["payment"]
@@ -193,10 +146,7 @@ def on_order_created_set_blockchain_route(sender, **kw):
 
     order = kw["instance"]
     if order.chain.synced:
-        current_block = order.chain.highest_block
-        expiration_block = current_block + app_settings.Payment.blockchain_route_lifetime
-
-        payment_window = (current_block, expiration_block)
+        payment_window = BlockchainPaymentRoute.calculate_payment_window(order.chain)
 
         available_accounts = EthereumAccount.objects.exclude(
             blockchain_routes__payment_window__overlap=NumericRange(*payment_window)
@@ -225,16 +175,14 @@ def on_order_created_set_raiden_route(sender, **kw):
 @receiver(block_sealed, sender=Block)
 def on_block_sealed_check_confirmed_payments(sender, **kw):
     block_data = kw["block_data"]
-
     _check_for_blockchain_payment_confirmations(block_data.number)
 
 
 @receiver(post_save, sender=Block)
-def on_block_created_check_confirmed_transactions(sender, **kw):
+def on_block_created_check_confirmed_payments(sender, **kw):
     if kw["created"]:
         block = kw["instance"]
         _check_for_blockchain_payment_confirmations(block.number)
-        _check_for_blockchain_transfer_confirmations(block.number)
 
 
 @receiver(post_save, sender=Block)
@@ -243,7 +191,9 @@ def on_block_added_publish_block_created_event(sender, **kw):
 
     for checkout in Checkout.objects.unpaid().with_blockchain_route(block.number):
         tasks.publish_checkout_event.delay(
-            checkout.id, event=CheckoutEvents.BLOCKCHAIN_BLOCK_CREATED.value, block=block.number
+            checkout.id,
+            event=CheckoutEvents.BLOCKCHAIN_BLOCK_CREATED.value,
+            block=block.number,
         )
 
 
@@ -290,22 +240,6 @@ def on_off_chain_payment_create_confirmation(sender, **kw):
 
 
 @receiver(post_save, sender=PaymentConfirmation)
-def on_payment_confirmed_set_credit(sender, **kw):
-    if kw["created"]:
-        confirmation = kw["instance"]
-        payment = confirmation.payment
-
-        PaymentCredit.objects.get_or_create(
-            payment=payment,
-            defaults={
-                "user": payment.route.order.user,
-                "currency": payment.currency,
-                "amount": payment.amount,
-            },
-        )
-
-
-@receiver(post_save, sender=PaymentConfirmation)
 def on_payment_confirmed_publish_checkout(sender, **kw):
     if not kw["created"]:
         return
@@ -337,35 +271,6 @@ def on_payment_confirmed_publish_checkout(sender, **kw):
     )
 
 
-@receiver(post_save, sender=InternalTransfer)
-@receiver(post_save, sender=ExternalTransfer)
-def on_transfer_created_schedule_execution(sender, **kw):
-    transfer = kw["instance"]
-    if kw["created"]:
-        tasks.execute_transfer.delay(transfer.id)
-
-
-@receiver(post_save, sender=TransferFailure)
-@receiver(post_save, sender=TransferConfirmation)
-def on_transfer_finalization_destroy_reserve(sender, **kw):
-    final_event = kw["instance"]
-    if kw["created"]:
-        transfer = final_event.transfer
-        try:
-            transfer.reserve.delete()
-        except Transfer.reserve.RelatedObjectDoesNotExist:
-            pass
-        except Exception as exc:
-            logger.exception(exc)
-
-
-@receiver(post_save, sender=Store)
-def on_store_created_generate_key_pair(sender, **kw):
-    store = kw["instance"]
-    if kw["created"]:
-        StoreRSAKeyPair.generate(store)
-
-
 __all__ = [
     "on_ethereum_node_ok_send_open_checkout_events",
     "on_ethereum_node_error_send_open_checkout_events",
@@ -376,15 +281,9 @@ __all__ = [
     "on_order_created_set_raiden_route",
     "on_block_added_publish_block_created_event",
     "on_block_added_publish_expired_blockchain_routes",
-    "on_block_created_check_confirmed_transactions",
+    "on_block_created_check_confirmed_payments",
     "on_block_sealed_check_confirmed_payments",
-    "on_block_sealed_check_confirmed_transfers",
     "on_blockchain_payment_received_maybe_publish_checkout",
-    "on_blockchain_transfer_mined_record_execution",
     "on_off_chain_payment_create_confirmation",
-    "on_payment_confirmed_set_credit",
     "on_payment_confirmed_publish_checkout",
-    "on_transfer_created_schedule_execution",
-    "on_transfer_finalization_destroy_reserve",
-    "on_store_created_generate_key_pair",
 ]

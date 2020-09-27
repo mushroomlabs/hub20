@@ -93,7 +93,7 @@ class TokenBalanceListView(generics.ListAPIView):
     serializer_class = serializers.TokenBalanceSerializer
 
     def get_queryset(self) -> List[EthereumTokenAmount]:
-        return models.UserAccount(self.request.user).get_balances()
+        return self.request.user.account.get_balances()
 
 
 class TokenBalanceView(generics.RetrieveAPIView):
@@ -101,9 +101,8 @@ class TokenBalanceView(generics.RetrieveAPIView):
     serializer_class = serializers.TokenBalanceSerializer
 
     def get_object(self) -> EthereumTokenAmount:
-        user_account = models.UserAccount(self.request.user)
         token = get_object_or_404(EthereumToken, address=self.kwargs["address"])
-        return user_account.get_balance(token)
+        return self.request.user.account.get_balance(token)
 
 
 class CheckoutViewSet(GenericViewSet, CreateModelMixin, RetrieveModelMixin):
