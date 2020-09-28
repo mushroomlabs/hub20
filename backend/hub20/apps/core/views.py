@@ -46,6 +46,22 @@ class ReadWriteSerializerMixin(generics.GenericAPIView):
         return self.write_serializer_class
 
 
+class AccountCreditEntryList(generics.ListAPIView):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = serializers.BookEntrySerializer
+
+    def get_queryset(self) -> QuerySet:
+        return models.Credit.objects.filter(book__account__user=self.request.user)
+
+
+class AccountDebitEntryList(generics.ListAPIView):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = serializers.BookEntrySerializer
+
+    def get_queryset(self) -> QuerySet:
+        return models.Debit.objects.filter(book__account__user=self.request.user)
+
+
 class BasePaymentOrderView(ReadWriteSerializerMixin):
     read_serializer_class = serializers.PaymentOrderReadSerializer
     write_serializer_class = serializers.PaymentOrderSerializer

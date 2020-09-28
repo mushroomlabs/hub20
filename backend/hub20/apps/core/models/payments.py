@@ -93,13 +93,16 @@ class PaymentOrder(TimeStampedModel, EthereumTokenValueModel):
         return Payment.objects.filter(route__order=self).select_subclasses()
 
     @property
+    def confirmed_payments(self):
+        return self.payments.filter(confirmation__isnull=False)
+
+    @property
     def total_transferred(self):
         return self.payments.aggregate(total=Sum("amount")).get("total") or 0
 
     @property
     def total_confirmed(self):
-        confirmed = self.payments.filter(confirmation__isnull=False).aggregate(total=Sum("amount"))
-        return confirmed.get("total") or 0
+        return self.confirmed_payments.aggregate(total=Sum("amount")).get("total") or 0
 
     @property
     def due_amount(self):

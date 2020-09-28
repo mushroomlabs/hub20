@@ -113,8 +113,26 @@ class TransferSerializer(serializers.ModelSerializer):
         read_only_fields = ("recipient", "status", "target")
 
 
+class TransferExecutionSerializer(serializers.ModelSerializer):
+    token = CurrencyRelatedField(source="transfer.currency")
+    target = serializers.CharField(source="transfer.target", read_only=True)
+    amount = TokenValueField(source="transfer.amount")
+
+    class Meta:
+        model = models.TransferExecution
+        fields = read_only_fields = ("created", "token", "amount", "target")
+
+
 class PaymentRouteSerializer(serializers.ModelSerializer):
     type = serializers.CharField(source="name", read_only=True)
+
+    @staticmethod
+    def get_serializer_class(route):
+        return {
+            models.InternalPaymentRoute: InternalPaymentRouteSerializer,
+            models.BlockchainPaymentRoute: BlockchainPaymentRouteSerializer,
+            models.RaidenPaymentRoute: RaidenPaymentRouteSerializer,
+        }.get(type(route), PaymentRouteSerializer)
 
 
 class InternalPaymentRouteSerializer(PaymentRouteSerializer):
@@ -213,11 +231,8 @@ class PaymentOrderSerializer(serializers.ModelSerializer):
 
     def get_routes(self, obj):
         def get_route_serializer(route):
-            return {
-                models.InternalPaymentRoute: InternalPaymentRouteSerializer,
-                models.BlockchainPaymentRoute: BlockchainPaymentRouteSerializer,
-                models.RaidenPaymentRoute: RaidenPaymentRouteSerializer,
-            }.get(type(route), PaymentRouteSerializer)(route, context=self.context)
+            serializer_class = PaymentRouteSerializer.get_serializer_class(route)
+            return serializer_class(route, context=self.context)
 
         return [get_route_serializer(route).data for route in obj.routes.select_subclasses()]
 
@@ -239,7 +254,21 @@ class PaymentOrderSerializer(serializers.ModelSerializer):
 
 class PaymentOrderReadSerializer(PaymentOrderSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="hub20:payment-order-detail")
-    # currency = EthereumTokenSerializer(read_only=True)
+
+
+class PaymentConfirmationSerializer(serializers.ModelSerializer):
+    token = CurrencyRelatedField(source="payment.currency")
+    amount = TokenValueField(source="payment.amount")
+    route = serializers.SerializerMethodField()
+
+    def get_route(self, obj):
+        route = models.PaymentRoute.objects.get_subclass(id=obj.payment.route_id)
+        serializer_class = PaymentRouteSerializer.get_serializer_class(route)
+        return serializer_class(route, context=self.context).data
+
+    class Meta:
+        model = models.PaymentConfirmation
+        fields = read_only_fields = ("created", "token", "amount", "route")
 
 
 class CheckoutSerializer(PaymentOrderSerializer):
@@ -308,3 +337,44 @@ class StoreSerializer(serializers.ModelSerializer):
         model = models.Store
         fields = ("id", "url", "name", "site_url", "public_key", "accepted_currencies")
         read_only_fields = ("id", "public_key")
+
+
+class BookEntrySerializer(serializers.ModelSerializer):
+    amount = serializers.CharField(source="as_token_amount")
+    summary = serializers.SerializerMethodField()
+    reference = serializers.SerializerMethodField()
+    type = serializers.SerializerMethodField()
+
+    def get_type(self, obj):
+        return obj.__class__.__name__.lower()
+
+    def get_summary(self, obj):
+        return {
+            models.TransferExecution: "transfer sent",
+            models.PaymentConfirmation: "payment received",
+        }.get(type(obj.reference))
+
+    def get_reference(self, obj):
+        params = {
+            models.TransferExecution: lambda: {
+                "viewname": "hub20:transfer-detail",
+                "kwargs": {"pk": obj.reference.transfer.pk},
+            },
+            models.PaymentConfirmation: lambda: {
+                "viewname": "hub20:payments-detail",
+                "kwargs": {"pk": obj.reference.payment.pk},
+            },
+        }.get(type(obj.reference))
+
+        return params and reverse(request=self.context.get("request"), **params())
+
+    class Meta:
+        model = models.BookEntry
+        read_only_fields = fields = (
+            "id",
+            "created",
+            "amount",
+            "type",
+            "summary",
+            "reference",
+        )

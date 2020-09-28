@@ -14,6 +14,8 @@ router.register("checkout", views.CheckoutViewSet, basename="checkout")
 
 
 urlpatterns = [
+    path("credits", views.AccountCreditEntryList.as_view(), name="credit-list"),
+    path("debits", views.AccountDebitEntryList.as_view(), name="debit-list"),
     path("balances", views.TokenBalanceListView.as_view(), name="balance-list"),
     path("balance/<str:address>", views.TokenBalanceView.as_view(), name="balance-detail"),
     path("payment/orders", views.PaymentOrderListView.as_view(), name="payment-order-list"),
