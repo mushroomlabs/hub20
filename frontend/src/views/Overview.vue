@@ -8,7 +8,7 @@
   </div>
 </template>
 <script>
-import {mapGetters, mapActions} from "vuex";
+import {mapGetters} from "vuex";
 import TokenBalanceCard from "@/components/TokenBalanceCard";
 
 export default {
@@ -16,14 +16,7 @@ export default {
   components: {
     TokenBalanceCard
   },
-  computed: {...mapGetters("account", ["openBalances"])},
-  methods: {
-    ...mapActions("account", ["refreshBalances"]),
-  },
-  mounted() {
-    this.refreshBalances()
-  }
-
+  computed: {...mapGetters("account", ["openBalances"])}
 }
 </script>
 <style lang="scss">
