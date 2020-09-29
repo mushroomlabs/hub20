@@ -1,10 +1,10 @@
 import session from './session';
 
 export default {
-  getTokenList() {
+  getList() {
     return session.get('/api/tokens/');
   },
-  getToken(address) {
+  get(address) {
     return session.get(`/api/tokens/token/${address}`);
   },
 };

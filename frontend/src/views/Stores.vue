@@ -1,6 +1,16 @@
 <template>
-  <h1>Stores</h1>
+<div id="stores">
+  <card title="Merchant store Setup">
+    <store-table/>
+  </card>
+</div>
 </template>
 <script>
-  export default {}
+import StoreTable from "@/components/StoreTable";
+
+export default {
+  components: {
+    StoreTable
+  }
+}
 </script>

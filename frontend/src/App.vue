@@ -21,11 +21,14 @@ export default {
     let self = this;
     let refreshStore = function() {
       if (self.isAuthenticated){
-        self.$store.dispatch("account/fetchAll")
+        self.$store.dispatch("tokens/fetchTokens")
+          .then(() => self.$store.dispatch("account/fetchAll"))
+          .then(() => self.$store.dispatch("stores/fetchStores"))
       }
     }
 
-    refreshStore();
+    self.$store.dispatch("stores/initialize")
+      .then(() => refreshStore());
     setInterval(refreshStore, 60 * 1000);
   }
 }

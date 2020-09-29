@@ -39,8 +39,8 @@
     &:active,
     &.active,
     .open > &.dropdown-toggle {
-        background-color: $btn-color;
-        color: $fill-font-color;
+        background-color: transparent !important;
+        color: $btn-color;
         border-color: $btn-color;
         .caret{
             border-top-color: $fill-font-color;
@@ -61,7 +61,7 @@
         &.focus,
         &:active,
         &.active {
-            background-color: $transparent-bg;
+            background-color: transparent !important;
             border-color: $btn-color;
         }
     }
