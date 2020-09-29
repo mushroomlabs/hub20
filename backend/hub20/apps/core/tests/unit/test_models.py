@@ -12,8 +12,8 @@ from hub20.apps.blockchain.tests.mocks import BlockMock
 from hub20.apps.core.choices import TRANSFER_EVENT_TYPES
 from hub20.apps.core.factories import (
     CheckoutFactory,
+    Erc20TokenPaymentConfirmationFactory,
     Erc20TokenPaymentOrderFactory,
-    Erc20TokenUserBalanceEntryFactory,
     ExternalTransferFactory,
     InternalTransferFactory,
     StoreFactory,
@@ -24,7 +24,6 @@ from hub20.apps.core.models import (
     BlockchainTransferExecutor,
     ExternalTransfer,
     RaidenPaymentRoute,
-    UserAccount,
 )
 from hub20.apps.core.settings import app_settings
 from hub20.apps.ethereum_money import get_ethereum_account_model
@@ -97,9 +96,8 @@ class BlockchainPaymentTestCase(BaseTestCase):
         block_data = BlockMock(number=block_number)
         block_sealed.send(sender=Block, block_data=block_data)
 
-        user_account = UserAccount(self.order.user)
-        balance = user_account.get_balance(self.order.currency)
-        self.assertEqual(balance.amount, self.order.amount)
+        balance = self.order.user.account.get_balance(self.order.currency)
+        self.assertEqual(balance, self.order.as_token_amount)
 
 
 class CheckoutTestCase(BaseTestCase):
@@ -160,7 +158,11 @@ class TransferTestCase(BaseTestCase):
         self.receiver_account = UserAccountFactory()
         self.sender = self.sender_account.user
         self.receiver = self.receiver_account.user
-        self.credit = Erc20TokenUserBalanceEntryFactory(user=self.sender)
+
+        self.deposit = Erc20TokenPaymentConfirmationFactory(
+            payment__route__order__user=self.sender
+        )
+        self.credit = self.deposit.payment.as_token_amount
 
 
 class InternalTransferTestCase(TransferTestCase):
@@ -190,7 +192,7 @@ class InternalTransferTestCase(TransferTestCase):
         receiver_balance = self.receiver_account.get_balance(self.credit.currency)
 
         self.assertEqual(sender_balance.amount, 0)
-        self.assertEqual(receiver_balance, self.credit.as_token_amount)
+        self.assertEqual(receiver_balance, self.credit)
 
     def test_transfers_fail_with_low_sender_balance(self):
         transfer = InternalTransferFactory(
@@ -220,7 +222,7 @@ class ExternalTransferTestCase(TransferTestCase):
 
     def test_transfers_can_be_executed_with_enough_balance(self):
         account = EthereumAccountFactory()
-        add_token_to_account(account, self.credit.as_token_amount, self.chain)
+        add_token_to_account(account, self.credit, self.chain)
         add_eth_to_account(account, self.fee_amount, self.chain)
 
         transfer = ExternalTransferFactory(
@@ -234,7 +236,7 @@ class ExternalTransferTestCase(TransferTestCase):
         account = EthereumAccountFactory()
 
         add_eth_to_account(account, self.fee_amount, self.chain)
-        add_token_to_account(account, self.credit.as_token_amount, self.chain)
+        add_token_to_account(account, self.credit, self.chain)
 
         transfer = ExternalTransferFactory(
             sender=self.sender, currency=self.credit.currency, amount=self.credit.amount

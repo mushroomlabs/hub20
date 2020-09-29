@@ -21,8 +21,6 @@ from hub20.apps.raiden.client.node import RaidenClient
 from hub20.apps.raiden.exceptions import RaidenPaymentError
 from hub20.apps.raiden.models import Channel, Raiden
 
-from .accounting import UserAccount, UserReserve
-
 logger = logging.getLogger(__name__)
 
 
@@ -163,14 +161,9 @@ class Transfer(TimeStampedModel, EthereumTokenValueModel):
     def _execute(self):
         pass
 
-    def _make_reserve(self):
-        pass
-
     def verify_conditions(self):
-
         transfer_amount = self.as_token_amount
-        sender_account = UserAccount(self.sender)
-        sender_balance = sender_account.get_balance(self.currency)
+        sender_balance = self.sender.account.get_balance(self.currency)
 
         if sender_balance < transfer_amount:
             raise TransferError("Insufficient balance")
@@ -182,10 +175,9 @@ class Transfer(TimeStampedModel, EthereumTokenValueModel):
 
         try:
             self.verify_conditions()
-            self._make_reserve()
             self._execute()
         except TransferError as exc:
-            logger.info(f"{self} failed: {exc}")
+            logger.info(f"{self} failed: {str(exc)}")
             TransferFailure.objects.create(transfer=self)
         except Exception as exc:
             TransferFailure.objects.create(transfer=self)
@@ -208,8 +200,6 @@ class InternalTransfer(Transfer):
     @transaction.atomic()
     def _execute(self):
         try:
-            self.receiver.balance_entries.create(amount=self.amount, currency=self.currency)
-            self.sender.balance_entries.create(amount=-self.amount, currency=self.currency)
             TransferExecution.objects.create(transfer=self)
             TransferConfirmation.objects.create(transfer=self)
         except Exception as exc:
@@ -234,18 +224,6 @@ class ExternalTransfer(Transfer):
             executor.execute(self)
         except StopIteration:
             raise TransferError("No executor found to complete transfer")
-
-    @transaction.atomic()
-    def _make_reserve(self):
-        self.sender.balance_entries.create(amount=-self.amount, currency=self.currency)
-        self.sender.reserves.update_or_create(
-            usertransferreserve__transfer=self,
-            defaults={"amount": self.amount, "currency": self.currency},
-        )
-
-
-class UserTransferReserve(UserReserve):
-    transfer = models.OneToOneField(Transfer, on_delete=models.CASCADE, related_name="reserve")
 
 
 class TransferExecution(TimeStampedModel):
@@ -284,5 +262,4 @@ __all__ = [
     "InternalTransfer",
     "ExternalTransfer",
     "TransferError",
-    "UserTransferReserve",
 ]

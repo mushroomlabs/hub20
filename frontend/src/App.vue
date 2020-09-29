@@ -16,6 +16,17 @@ export default {
     isAuthenticated() {
       return this.$store.getters["auth/isAuthenticated"];
     }
+  },
+  mounted() {
+    let self = this;
+    let refreshStore = function() {
+      if (self.isAuthenticated){
+        self.$store.dispatch("account/fetchAll")
+      }
+    }
+
+    refreshStore();
+    setInterval(refreshStore, 60 * 1000);
   }
 }
 </script>
