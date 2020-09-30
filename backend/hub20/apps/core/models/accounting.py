@@ -22,10 +22,8 @@ EthereumAccount = get_ethereum_account_model()
 logger = logging.getLogger(__name__)
 
 
-class BookEntry(TimeStampedModel, EthereumTokenValueModel):
-    reference_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    reference_id = models.PositiveIntegerField()
-    reference = GenericForeignKey("reference_type", "reference_id")
+class TokenTransactionMixin:
+    pass
 
 
 class Book(models.Model):
@@ -38,19 +36,28 @@ class Book(models.Model):
         unique_together = ("token", "owner_type", "owner_id")
 
 
-class TokenTransactionMixin:
+class BookEntry(TimeStampedModel, EthereumTokenValueModel):
+    book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="entries")
+    reference_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    reference_id = models.PositiveIntegerField()
+    reference = GenericForeignKey("reference_type", "reference_id")
+
     def clean(self):
         if self.book.token != self.currency:
             raise ValidationError(
                 f"Can not add a {self.currency} entry to a {self.book.token} book"
             )
 
+    class Meta:
+        abstract = True
+        unique_together = ("book", "reference_type", "reference_id")
 
-class Credit(TokenTransactionMixin, BookEntry):
+
+class Credit(BookEntry):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="credits")
 
 
-class Debit(TokenTransactionMixin, BookEntry):
+class Debit(BookEntry):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="debits")
 
 

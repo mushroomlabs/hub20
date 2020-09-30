@@ -188,7 +188,11 @@ class InternalPaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.InternalPayment
         fields = PaymentSerializer.Meta.fields + ("identifier", "user", "memo")
-        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("identifier", "user", "memo")
+        read_only_fields = PaymentSerializer.Meta.read_only_fields + (
+            "identifier",
+            "user",
+            "memo",
+        )
 
 
 class BlockchainPaymentSerializer(PaymentSerializer):
@@ -211,7 +215,10 @@ class RaidenPaymentSerializer(PaymentSerializer):
     class Meta:
         model = models.RaidenPayment
         fields = PaymentSerializer.Meta.fields + ("identifier", "raiden")
-        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("identifier", "raiden")
+        read_only_fields = PaymentSerializer.Meta.read_only_fields + (
+            "identifier",
+            "raiden",
+        )
 
 
 class PaymentOrderSerializer(serializers.ModelSerializer):
@@ -248,7 +255,16 @@ class PaymentOrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.PaymentOrder
-        fields = ("url", "id", "amount", "token", "created", "routes", "payments", "status")
+        fields = (
+            "url",
+            "id",
+            "amount",
+            "token",
+            "created",
+            "routes",
+            "payments",
+            "status",
+        )
         read_only_fields = ("id", "created", "status")
 
 
@@ -369,7 +385,6 @@ class BookEntrySerializer(serializers.ModelSerializer):
         return params and reverse(request=self.context.get("request"), **params())
 
     class Meta:
-        model = models.BookEntry
         read_only_fields = fields = (
             "id",
             "created",
@@ -378,3 +393,35 @@ class BookEntrySerializer(serializers.ModelSerializer):
             "summary",
             "reference",
         )
+
+
+class CreditSerializer(BookEntrySerializer):
+    def get_reference(self, obj):
+        params = {
+            models.PaymentConfirmation: lambda: {
+                "viewname": "hub20:payments-detail",
+                "kwargs": {"pk": obj.reference.payment.pk},
+            },
+        }.get(type(obj.reference))
+
+        return params and reverse(request=self.context.get("request"), **params())
+
+    class Meta:
+        model = models.Credit
+        fields = read_only_fields = BookEntrySerializer.Meta.fields
+
+
+class DebitSerializer(BookEntrySerializer):
+    def get_reference(self, obj):
+        params = {
+            models.TransferExecution: lambda: {
+                "viewname": "hub20:transfer-detail",
+                "kwargs": {"pk": obj.reference.transfer.pk},
+            },
+        }.get(type(obj.reference))
+
+        return params and reverse(request=self.context.get("request"), **params())
+
+    class Meta:
+        model = models.Debit
+        fields = read_only_fields = BookEntrySerializer.Meta.fields
