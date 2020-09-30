@@ -35,9 +35,6 @@ table#merchant-store-data {
 
     th {
         max-width: 20%;
-        align-content: center;
-        text-align: center;
-
         &.public-key {
             min-width: 40%;
         }
