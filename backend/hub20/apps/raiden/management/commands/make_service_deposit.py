@@ -6,19 +6,17 @@ from django.core.management.base import BaseCommand
 from eth_utils import to_checksum_address
 
 from hub20.apps.blockchain.client import get_web3
-from hub20.apps.blockchain.models import Chain
-from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount, KeystoreAccount
-from hub20.apps.raiden.client.blockchain import mint_tokens
+from hub20.apps.ethereum_money.models import EthereumTokenAmount, KeystoreAccount
+from hub20.apps.raiden.client.blockchain import get_service_token, make_service_deposit
 
 logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = "Mints tests tokens"
+    help = "Deposits RDN at Raiden Service Contract"
 
     def add_arguments(self, parser):
         parser.add_argument("-a", "--account", required=True, type=str)
-        parser.add_argument("-t", "--token", required=True, type=str)
         parser.add_argument("--amount", default=1000, type=int)
 
     def handle(self, *args, **options):
@@ -32,15 +30,8 @@ class Command(BaseCommand):
             account = KeystoreAccount(address=address, private_key=private_key)
 
         w3 = get_web3()
-        chain_id = int(w3.net.version)
-        chain = Chain.make(chain_id)
 
-        is_mainnet = chain.id == 1
-        if is_mainnet:
-            logger.error("Can only mint tokens on testnets")
-            return
-
-        token = EthereumToken.make(options["token"], chain)
+        token = get_service_token(w3=w3)
 
         amount = EthereumTokenAmount(amount=options["amount"], currency=token)
-        mint_tokens(w3=w3, account=account, amount=amount)
+        make_service_deposit(w3=w3, account=account, amount=amount)

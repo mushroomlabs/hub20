@@ -22,6 +22,7 @@ from hub20.apps.blockchain.models import Block, Transaction
 from hub20.apps.ethereum_money.abi import EIP20_ABI
 from hub20.apps.ethereum_money.client import get_account_balance, make_token
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
+from hub20.apps.ethereum_money.typing import EthereumAccount_T
 from hub20.apps.raiden import signals
 from hub20.apps.raiden.models import Raiden, TokenNetwork
 
@@ -87,7 +88,7 @@ def get_service_token(w3: Web3) -> EthereumToken:
     return make_token(w3=w3, address=service_token_address)
 
 
-def mint_tokens(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
+def mint_tokens(w3: Web3, account: EthereumAccount_T, amount: EthereumTokenAmount):
     logger.debug(f"Minting {amount.formatted}")
     contract_manager = ContractManager(contracts_precompiled_path())
     token_proxy = w3.eth.contract(
@@ -98,16 +99,16 @@ def mint_tokens(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
     send_transaction(
         w3=w3,
         contract_function=token_proxy.functions.mint,
-        account=raiden,
+        account=account,
         contract_args=(amount.as_wei,),
         gas=GAS_REQUIRED_FOR_MINT,
     )
 
 
-def make_service_deposit(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
+def make_service_deposit(w3: Web3, account: EthereumAccount_T, amount: EthereumTokenAmount):
     token = amount.currency
 
-    on_chain_balance = get_account_balance(w3=w3, token=token, address=raiden.address)
+    on_chain_balance = get_account_balance(w3=w3, token=token, address=account.address)
 
     if amount < on_chain_balance:
         logger.warning(f"Insufficient balance {on_chain_balance.formatted} to make deposit")
@@ -123,17 +124,17 @@ def make_service_deposit(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
 
     token_proxy = w3.eth.contract(address=token.address, abi=EIP20_ABI)
     current_deposit_amount = token.from_wei(
-        deposit_proxy.functions.total_deposit(raiden.address).call()
+        deposit_proxy.functions.total_deposit(account.address).call()
     )
 
     total_deposit = current_deposit_amount + amount
 
-    old_allowance = token_proxy.functions.allowance(raiden.address, deposit_proxy.address).call()
+    old_allowance = token_proxy.functions.allowance(account.address, deposit_proxy.address).call()
     if old_allowance > 0:
         send_transaction(
             w3=w3,
             contract_function=token_proxy.functions.approve,
-            account=raiden,
+            account=account,
             contract_args=(deposit_proxy.address, 0),
             gas=GAS_REQUIRED_FOR_APPROVE,
         )
@@ -141,16 +142,16 @@ def make_service_deposit(w3: Web3, raiden: Raiden, amount: EthereumTokenAmount):
     send_transaction(
         w3=w3,
         contract_function=token_proxy.functions.approve,
-        account=raiden,
+        account=account,
         contract_args=(deposit_proxy.address, total_deposit.as_wei),
         gas=GAS_REQUIRED_FOR_APPROVE,
     )
 
     send_transaction(
         w3=w3,
-        account=raiden,
+        account=account,
         contract_function=deposit_proxy.functions.deposit,
-        contract_args=(raiden.address, total_deposit.as_wei),
+        contract_args=(account.address, total_deposit.as_wei),
         gas=GAS_REQUIRED_FOR_DEPOSIT,
     )
 
