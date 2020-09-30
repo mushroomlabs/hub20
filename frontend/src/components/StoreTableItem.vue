@@ -5,6 +5,7 @@
   <td class="token">
     <span v-for="tokenAddress in store.accepted_currencies" :key="tokenAddress">{{ getToken(tokenAddress).code }}</span>
   </td>
+  <td class="identifier">{{ store.id }}</td>
   <td class="public-key">
     <span @click="copyPublicKey">{{ store.public_key }}</span>
   </td>

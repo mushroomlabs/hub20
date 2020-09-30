@@ -4,6 +4,7 @@
     <th class="name">Name</th>
     <th class="url">Site URL</th>
     <th class="tokens">Accepted Tokens</th>
+    <th class="identifier">Store Identifier</th>
     <th class="public-key">Public Key</th>
   </thead>
   <tbody>
