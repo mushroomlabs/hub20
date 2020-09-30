@@ -15,7 +15,7 @@ from raiden_contracts.constants import CONTRACT_TOKEN_NETWORK
 from raiden_contracts.contract_manager import ContractManager, contracts_precompiled_path
 from web3 import Web3
 
-from hub20.apps.blockchain.fields import EthereumAddressField
+from hub20.apps.blockchain.fields import EthereumAddressField, Uint256Field
 from hub20.apps.blockchain.models import Transaction
 from hub20.apps.ethereum_money.app_settings import TRACKED_TOKENS
 from hub20.apps.ethereum_money.models import (
@@ -66,7 +66,7 @@ class TokenNetworkChannel(models.Model):
     token_network = models.ForeignKey(
         TokenNetwork, on_delete=models.CASCADE, related_name="channels"
     )
-    identifier = models.PositiveIntegerField()
+    identifier = Uint256Field()
     participant_addresses = ArrayField(EthereumAddressField(), size=2)
     objects = models.Manager()
 
@@ -87,10 +87,13 @@ class TokenNetworkChannelStatus(StatusModel):
     def set_status(cls, channel: TokenNetworkChannel):
         last_event = channel.events.last()
         event_name = last_event and last_event.name
-        status = event_name and {
-            "ChannelOpened": CHANNEL_STATUSES.opened,
-            "ChannelClosed": CHANNEL_STATUSES.closed,
-        }.get(event_name)
+        status = (
+            event_name
+            and {
+                "ChannelOpened": CHANNEL_STATUSES.opened,
+                "ChannelClosed": CHANNEL_STATUSES.closed,
+            }.get(event_name)
+        )
         cls.objects.update_or_create(channel=channel, defaults={"status": status})
 
 
@@ -223,7 +226,7 @@ class Payment(models.Model):
     channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="payments")
     amount = EthereumTokenAmountField()
     timestamp = models.DateTimeField()
-    identifier = models.BigIntegerField()
+    identifier = Uint256Field()
     sender_address = EthereumAddressField()
     receiver_address = EthereumAddressField()
     objects = models.Manager()
