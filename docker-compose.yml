@@ -113,5 +113,21 @@ services:
     env_file:
       - ./.env
 
+  # Background command to listen to blockchain and raiden events
+  job_listen_raiden:
+    <<: *hub20_backend
+
+    command: >
+      /bin/bash -c "
+        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+        django-admin sync_raiden
+      "
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - ./.env
+
   frontend:
     <<: *hub20_frontend
