@@ -121,6 +121,18 @@ class Raiden(KeystoreAccount):
     def open_channels(self):
         return self.channels.filter(status=Channel.STATUS.opened)
 
+    @property
+    def payments(self):
+        return Payment.objects.filter(channel__raiden=self)
+
+    @property
+    def payments_received(self):
+        return Payment.received.filter(channel__raiden=self)
+
+    @property
+    def payments_sent(self):
+        return Payment.sent.filter(channel__raiden=self)
+
     @staticmethod
     def get(address: Optional[str] = None) -> Optional[Raiden]:
         if not settings.HUB20_RAIDEN_ENABLED:
