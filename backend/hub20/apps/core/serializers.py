@@ -56,8 +56,8 @@ class TransferSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, data):
-        address = data.get("address")
-        recipient = data.get("recipient")
+        address = data.pop("address", None)
+        recipient = data.pop("recipient", None)
         request = self.context["request"]
 
         if not address and not recipient:
@@ -70,8 +70,6 @@ class TransferSerializer(serializers.ModelSerializer):
             )
 
         transfer_data = copy.copy(data)
-        del transfer_data["address"]
-        del transfer_data["recipient"]
 
         if recipient is not None:
             transfer_class = models.InternalTransfer
@@ -91,7 +89,7 @@ class TransferSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         transfer_class: Union[Type[models.InternalTransfer], Type[models.ExternalTransfer]] = (
-            models.InternalTransfer if "recipient" in validated_data else models.ExternalTransfer
+            models.InternalTransfer if "receiver" in validated_data else models.ExternalTransfer
         )
         request = self.context["request"]
 
