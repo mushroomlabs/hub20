@@ -2,6 +2,8 @@ $sidebar-width: 260px !default;
 $sidebar-retracted-width: 90px;
 $sidebar-open-width: $sidebar-width;
 
+$topbar-height: 75px;
+
 @mixin sidebar-color-scheme($background-color, $base-font-color, $active-color) {
   background-color: $background-color;
   a {
@@ -51,14 +53,12 @@ $sidebar-open-width: $sidebar-width;
   font-weight: 200;
 
   .logo {
-      padding: $padding-small-vertical $padding-zero 16px;
-      margin: 13px 20px 0;
+      padding: 13px 20px 0;
       display: block;
-      font-size: $font-size-base;
-      text-align: center;
       font-weight: $font-weight-bold;
       line-height: 40px;
       text-align: left;
+      height: $topbar-height;
 
       img{
           width: 40px;
@@ -125,8 +125,51 @@ $sidebar-open-width: $sidebar-width;
     border-top: 1px solid rgba(0, 0, 0, 0.1);
   }
 
-  .navbar {
+  nav {
+    background-color: $bg-nude;
+    box-shadow: none;
+    border-bottom: 1px solid $medium-gray;
+
+    display: flex;
+    align-items: center;
+    height: 75px;
+    justify-content: space-between; // space out brand from logo
+    padding: $navbar-padding-y $navbar-padding-x;
     margin-bottom: 0;
+
+    h2 {
+      display: inline-block;
+      font-weight: 600;
+      margin: 5px 0px;
+      padding: 20px 15px;
+      font-size: 14px;
+      text-transform: uppercase;
+    }
+
+    > ul {
+      display: flex;
+      flex-direction: column;
+      padding-left: 0;
+      margin-bottom: 0;
+      list-style: none;
+
+      .nav-item .nav-link{
+        text-align: center;
+
+        color: $dark-gray !important;
+        &:hover, &:focus {
+          color: $light-gray !important;
+        }
+
+        p {
+          display: inline;
+          margin-left: 3px;
+          text-transform: uppercase;
+          font-weight: 600;
+          font-size: $font-size-small;
+        }
+      }
+    }
   }
 }
 
