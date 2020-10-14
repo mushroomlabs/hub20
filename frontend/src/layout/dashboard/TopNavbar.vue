@@ -3,7 +3,7 @@
   <h2>{{ routeName }}</h2>
   <ul>
     <li class="nav-item">
-      <router-link to="logout" class="nav-link">
+      <router-link :to="{'name': 'logout'}" class="nav-link">
         <i class="ti-power-off"></i>
         <p>logout</p>
       </router-link>
