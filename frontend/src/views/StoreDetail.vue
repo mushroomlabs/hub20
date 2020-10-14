@@ -11,11 +11,10 @@ import {mapState} from "vuex"
 
 export default {
   computed: {
-    ...mapState("stores", {store: "editing", stores: "stores"}),
-  },
-  mounted() {
-    let storeId = this.$route.params.id
-    this.$store.commit("stores/STORE_UPDATE_BEGIN", storeId)
+    ...mapState("stores", {stores: "stores"}),
+    store() {
+      return this.stores[this.$route.params.id];
+    }
   }
 }
 </script>

@@ -1,13 +1,13 @@
 <template>
 <div>
   <notifications/>
-  <router-view v-if="isAuthenticated" />
-  <BaseLayout v-if="!isAuthenticated" />
+  <router-view v-if='isAuthenticated' />
+  <BaseLayout v-if='!isAuthenticated' />
 </div>
 </template>
 
 <script>
-import BaseLayout from "@/layout/BaseLayout";
+import BaseLayout from '@/layout/BaseLayout'
 
 export default {
   components: {
@@ -15,30 +15,21 @@ export default {
   },
   computed: {
     isAuthenticated() {
-      return this.$store.getters["auth/isAuthenticated"];
+      return this.$store.getters['auth/isAuthenticated']
     }
   },
   mounted() {
-    let self = this;
-    let refreshStore = function() {
-      if (self.isAuthenticated){
-        self.$store.dispatch("tokens/fetchTokens")
-          .then(() => self.$store.dispatch("account/fetchAll"))
-          .then(() => self.$store.dispatch("stores/fetchStores"))
-      }
-    }
-
-    self.$store.dispatch("stores/initialize")
-      .then(() => refreshStore());
-    setInterval(refreshStore, 60 * 1000);
+    let self = this
+    this.$store.dispatch('initialize')
+    setInterval(function() { self.$store.dispatch('refresh') }, 60 * 1000)
   }
 }
 </script>
 
-<style lang="scss">
+<style lang='scss'>
 @import '../node_modules/bootstrap/scss/bootstrap.scss';
-@import "../node_modules/bootstrap/scss/variables";
-@import "./assets/sass/app.scss";
+@import '../node_modules/bootstrap/scss/variables';
+@import './assets/sass/app.scss';
 
 .vue-notifyjs.notifications {
   .alert {

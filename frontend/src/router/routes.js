@@ -20,7 +20,7 @@ import store from "@/store/index";
 
 
 const requireAuthenticated = (to, from, next) => {
-  store.dispatch("auth/initialize")
+  store.dispatch("initialize")
     .then(() => {
       if (!store.getters["auth/isAuthenticated"]) {
         next("/login");
@@ -31,7 +31,7 @@ const requireAuthenticated = (to, from, next) => {
 };
 
 const requireAnonymous = (to, from, next) => {
-  store.dispatch("auth/initialize")
+  store.dispatch("initialize")
     .then(() => {
       if (store.getters["auth/isAuthenticated"]) {
         next("/");

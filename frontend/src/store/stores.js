@@ -37,6 +37,9 @@ const actions = {
   initialize({ commit, dispatch }) {
     commit(STORE_SETUP_BEGIN)
     dispatch("fetchStores")
+  },
+  refresh({ dispatch }) {
+    dispatch("fetchStores")
   }
 }
 

@@ -58,54 +58,57 @@ const actions = {
     dispatch('fetchDebits')
   },
   initialize({ dispatch }) {
-    dispatch('fetchAll');
+    dispatch('fetchAll')
+  },
+  refresh({ dispatch }) {
+    dispatch('fetchAll')
   }
-};
+}
 
 const mutations = {
   [UPDATE_BALANCES_BEGIN](state) {
-    state.error = null;
+    state.error = null
   },
   [SET_BALANCES](state, balances) {
-    state.balances = balances;
-    state.error = null;
+    state.balances = balances
+    state.error = null
   },
   [UPDATE_BALANCES_SUCCESS](state) {
-    state.error = null;
+    state.error = null
   },
   [UPDATE_BALANCES_FAILURE](state, exc) {
     state.balances = []
-    state.error = exc;
+    state.error = exc
   },
   [UPDATE_CREDITS_BEGIN](state) {
-    state.error = null;
+    state.error = null
   },
   [SET_CREDITS](state, credits) {
-    state.credits = credits;
-    state.error = null;
+    state.credits = credits
+    state.error = null
   },
   [UPDATE_CREDITS_SUCCESS](state) {
-    state.error = null;
+    state.error = null
   },
   [UPDATE_CREDITS_FAILURE](state, exc) {
     state.credits = []
-    state.error = exc;
+    state.error = exc
   },
   [UPDATE_DEBITS_BEGIN](state) {
-    state.error = null;
+    state.error = null
   },
   [SET_DEBITS](state, debits) {
-    state.debits = debits;
-    state.error = null;
+    state.debits = debits
+    state.error = null
   },
   [UPDATE_DEBITS_SUCCESS](state) {
-    state.error = null;
+    state.error = null
   },
   [UPDATE_DEBITS_FAILURE](state, exc) {
     state.debits = []
-    state.error = exc;
+    state.error = exc
   }
-};
+}
 
 export default {
   namespaced: true,

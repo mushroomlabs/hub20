@@ -24,6 +24,9 @@ const actions = {
       .then(() => commit(TOKEN_SETUP_SUCCESS))
       .catch((error) => commit(TOKEN_SETUP_FAILURE, error));
   },
+  initialize({ dispatch }) {
+    dispatch('fetchTokens')
+  }
 };
 
 const mutations = {
