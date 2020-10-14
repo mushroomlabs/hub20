@@ -3,17 +3,16 @@
   <thead>
     <th class="name">Name</th>
     <th class="url">Site URL</th>
-    <th class="tokens">Accepted Tokens</th>
     <th class="identifier">Store Identifier</th>
-    <th class="public-key">Public Key</th>
+    <th class="actions"></th>
   </thead>
   <tbody>
-    <StoreTableItem v-for="store in storesById" :store="store" :key="store.id" />
+    <StoreTableItem v-for="store in stores" :store="store" :key="store.id" />
   </tbody>
 </table>
 </template>
 <script>
-import {mapGetters} from "vuex";
+import {mapState} from "vuex";
 import StoreTableItem from "@/components/StoreTableItem";
 
 export default {
@@ -21,7 +20,7 @@ export default {
     StoreTableItem
   },
   computed: {
-    ...mapGetters("stores", ["storesById"]),
+    ...mapState("stores", ["stores"]),
   },
 }
 </script>

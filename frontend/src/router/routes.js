@@ -13,6 +13,7 @@ import History from "@/views/History";
 import Market from "@/views/Market";
 import Exchange from "@/views/Exchange";
 import Stores from "@/views/Stores";
+import StoreDetail from "@/views/StoreDetail";
 
 // Everything else
 import store from "@/store/index";
@@ -76,6 +77,11 @@ const routes = [
         path: "stores",
         name: "stores",
         component: Stores
+      },
+      {
+        path: "store/:id",
+        name: "store",
+        component: StoreDetail
       }
     ]
   },
