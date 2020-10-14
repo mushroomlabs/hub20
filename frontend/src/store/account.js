@@ -1,7 +1,7 @@
 import Decimal from 'decimal.js-light'
 
-import account from '../api/account';
-import utils from './utils';
+import account from '../api/account'
+import utils from './utils'
 
 import {
   UPDATE_BALANCES_BEGIN,
@@ -23,7 +23,7 @@ const initialState = {
   credits: [],
   debits: [],
   error: null
-};
+}
 
 const getters = {
   openBalances: state => state.balances.filter(balance => Decimal(balance.amount).abs().gt(0)),
@@ -32,21 +32,21 @@ const getters = {
 
 const actions = {
   fetchBalances({ commit }) {
-    commit(UPDATE_BALANCES_BEGIN);
+    commit(UPDATE_BALANCES_BEGIN)
     return account.getBalances()
       .then(({data}) => commit(SET_BALANCES, data))
       .then(() => commit(UPDATE_BALANCES_SUCCESS))
-      .catch((exc) => commit(UPDATE_BALANCES_FAILURE, exc));
+      .catch((exc) => commit(UPDATE_BALANCES_FAILURE, exc))
   },
   fetchCredits({ commit }) {
-    commit(UPDATE_CREDITS_BEGIN);
+    commit(UPDATE_CREDITS_BEGIN)
     return account.getCredits()
       .then(({data}) => commit(SET_CREDITS, data))
       .then(() => commit(UPDATE_CREDITS_SUCCESS))
       .catch((exc) => commit(UPDATE_CREDITS_FAILURE, exc))
   },
   fetchDebits({ commit }) {
-    commit(UPDATE_DEBITS_BEGIN);
+    commit(UPDATE_DEBITS_BEGIN)
     return account.getDebits()
       .then(({data}) => commit(SET_DEBITS, data))
       .then(() => commit(UPDATE_DEBITS_SUCCESS))
@@ -116,4 +116,4 @@ export default {
   getters,
   actions,
   mutations,
-};
+}
