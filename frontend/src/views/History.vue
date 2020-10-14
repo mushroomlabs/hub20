@@ -8,7 +8,7 @@
         <th class="token">Token</th>
       </thead>
       <tbody>
-        <tr v-for="transaction in transactions" :class="transaction.type" :key="transaction.id">
+        <tr v-for="transaction in transactions" :class="transaction.type" :key="transaction.reference">
           <td class="transaction-date">{{ new Date(transaction.created).toLocaleString() }}</td>
           <td class="description">{{ transaction.summary }}</td>
           <td class="amount">{{ transaction.amount }}</td>
