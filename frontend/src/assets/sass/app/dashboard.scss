@@ -12,6 +12,9 @@ $topbar-height: 75px;
 
   .logo {
     border-bottom: 2px solid rgba($base-font-color, .2);
+    span {
+      color: #fff;
+    }
   }
 
   .nav {
