@@ -42,7 +42,7 @@ export default {
     login (username, password) {
       this.$store.dispatch('auth/login', { username, password })
         .then(() => this.$router.push('/'))
-        .catch(err => console.log(err))
+        .catch(err => console.error(err))
     }
   }
 }

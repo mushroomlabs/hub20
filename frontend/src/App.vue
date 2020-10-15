@@ -1,8 +1,8 @@
 <template>
 <div>
-  <notifications/>
-  <router-view v-if='isAuthenticated' />
-  <BaseLayout v-if='!isAuthenticated' />
+  <notifications />
+  <router-view v-if="isAuthenticated" />
+  <BaseLayout v-if="!isAuthenticated" />
 </div>
 </template>
 
@@ -11,22 +11,22 @@ import BaseLayout from '@/layout/BaseLayout'
 
 export default {
   components: {
-    BaseLayout
+    BaseLayout,
   },
   computed: {
     isAuthenticated() {
       return this.$store.getters['auth/isAuthenticated']
-    }
+    },
   },
   mounted() {
     let self = this
     this.$store.dispatch('initialize')
-    setInterval(function() { self.$store.dispatch('refresh') }, 60 * 1000)
-  }
+    setInterval(() => self.$store.dispatch('refresh'), 60 * 1000)
+  },
 }
 </script>
 
-<style lang='scss'>
+<style lang="scss">
 @import '../node_modules/bootstrap/scss/bootstrap.scss';
 @import '../node_modules/bootstrap/scss/variables';
 @import './assets/sass/app.scss';
@@ -58,5 +58,4 @@ export default {
     transform: scale(1.2, 0.7);
   }
 }
-
 </style>
