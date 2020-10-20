@@ -1,7 +1,7 @@
 <template>
   <div id="stores">
     <section class="header">
-      <h1>Store Settings</h1>
+      <h2>Store Settings</h2>
       <router-link :to="{'name': 'store-create'}">Add New</router-link>
     </section>
     <card>
@@ -22,7 +22,7 @@ export default {
 @import '../assets/sass/app.scss';
 
 #stores {
-  a {
+  section.header a {
     @include button($info-color, $info-states-color);
   }
 }
