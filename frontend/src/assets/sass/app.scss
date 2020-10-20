@@ -1,3 +1,7 @@
+// Base Bootstrap
+@import "~bootstrap/scss/bootstrap.scss";
+@import "~bootstrap/scss/_variables.scss";
+
 // theme-specific imports
 @import "./paper/_variables.scss";
 @import "./paper/mixins/_buttons.scss";

@@ -7,6 +7,10 @@ h1, .h1, h2, .h2, h3, .h3, h4, .h4, h5, .h5, h6, .h6, p, .navbar, .brand, a, .td
 h1, .h1, h2, .h2, h3, .h3, h4, .h4 {
   font-weight: $font-weight-normal;
   margin: $margin-large-vertical 0 $margin-base-vertical;
+
+  &:first-child {
+    margin-top: 0 !important;
+  }
 }
 
 h1, .h1 {
