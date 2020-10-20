@@ -5,11 +5,12 @@
   <td class="identifier">{{ store.id }}</td>
   <td class="actions">
     <router-link :to="{'name': 'store', 'params': {'id': store.id} }">Edit</router-link>
+    <p-button name="remove" @click.native="promptRemoval(store)">Remove</p-button>
   </td>
 </tr>
 </template>
 <script>
-import {mapGetters} from "vuex";
+import {mapActions, mapGetters} from "vuex";
 
 export default {
   props: {
@@ -21,8 +22,15 @@ export default {
     ...mapGetters("tokens", ["tokensByAddress"]),
   },
   methods: {
+    ...mapActions("stores", ["removeStore"]),
     getToken(tokenAddress) {
       return this.tokensByAddress[tokenAddress]
+    },
+    promptRemoval(store) {
+      if (confirm(`Are you sure you want to remove ${store.name}?`)){
+        this.removeStore(store)
+          .then(() => this.$notify({message: `${store.name} removed`, type: 'info'}))
+      }
     },
     async copyPublicKey(event) {
 
@@ -49,38 +57,26 @@ export default {
 }
 </script>
 <style lang="scss">
-@import "../assets/sass/paper/_variables";
-@import "../assets/sass/paper/mixins/_buttons";
-
+@import '../assets/sass/app.scss';
 
 td {
     text-align: center;
+    &.actions {
+      text-align: right;
+      align-items: space-around;
 
-    &.public-key {
-        button {
-            @include button-outline(
-                $default-color,
-                $default-states-color,
-                $padding-small-vertical,
-                $padding-small-horizontal,
-                $font-size-large
-            );
-        }
-        span {
-            display: inline-block;
-            max-width: 100%;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: pre-wrap;
-        }
-    }
+      > * {
+        display: inline-block;
+        margin: 0.25vh 1em;
+      }
 
-    &.token {
-        span {
-            display: block;
-            font-size: $font-size-base;
-            padding: $padding-small-vertical $padding-small-horizontal;
-        }
+      a {
+        @include button($info-color, $info-states-color, $font-size: $font-size-small)
+      }
+
+      button[name=remove] {
+        @include button($danger-color, $danger-states-color, $font-size: $font-size-small)
+      }
     }
 }
 </style>
