@@ -13,9 +13,12 @@
 </template>
 <script>
 export default {
+  props: {
+    viewTitle: String
+  },
   computed: {
     title() {
-      return this.$route.name
+      return (this.$route.meta && this.$route.meta.viewTitle) || this.$route.name
     }
   }
 }

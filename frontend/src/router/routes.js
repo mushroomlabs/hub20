@@ -77,6 +77,9 @@ const routes = [
         path: 'store/new',
         name: 'store-create',
         component: StoreDetail,
+        meta: {
+          viewTitle: 'Add Store'
+        }
       },
       {
         path: 'store/:id',
