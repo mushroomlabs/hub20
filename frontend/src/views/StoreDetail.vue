@@ -123,6 +123,7 @@ export default {
       const action = storeData.id ? this.updateStore : this.createStore
 
       action(storeData)
+      .then(() => this.$router.push({'name': 'stores'}))
     }
   },
   mounted() {
