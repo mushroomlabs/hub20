@@ -31,6 +31,7 @@
         <i :class="addonRightIcon" class="input-group-text"></i>
       </span>
     </slot>
+    <span v-if="errorMessage" class="error-message">{{ errorMessage }}</span>
   </div>
 </template>
 <script>
@@ -46,6 +47,7 @@ export default {
     addonRightIcon: String,
     addonLeftIcon: String,
     options: Array,
+    errorMessage: String,
     multiple: {
       type: Boolean,
       default: false
