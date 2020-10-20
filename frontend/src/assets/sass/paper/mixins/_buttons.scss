@@ -4,8 +4,15 @@
 // Mixin for generating new styles
 @mixin btn-styles($btn-color, $btn-states-color) {
   background-color: $btn-color;
+  box-sizing: border-box;
+  border-width: $border-thick;
   border-color: $btn-color;
+  border-style: solid;
   color: $white-color;
+  font-weight: $font-weight-bold;
+  line-height: 1.75;
+  text-transform: uppercase;
+  cursor: pointer;
   @include opacity(1);
 
   &:hover,
@@ -73,9 +80,10 @@
   border: none;
 }
 
-@mixin btn-size($padding-vertical, $padding-horizontal, $font-size) {
+@mixin btn-size($padding-vertical, $padding-horizontal, $font-size: $font-size-small, $border-radius: $default-border-radius) {
   font-size: $font-size;
   padding: $padding-vertical $padding-horizontal;
+  @include border-radius($border-radius, 0);
 }
 
 @mixin button(
