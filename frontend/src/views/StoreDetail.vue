@@ -123,7 +123,9 @@ export default {
       const action = storeData.id ? this.updateStore : this.createStore
 
       action(storeData)
-      .then(() => this.$router.push({'name': 'stores'}))
+        .then(() => this.$notify({message: `${storeData.name} saved successfully`, type: 'success'}))
+        .then(() => this.$router.push({'name': 'stores'}))
+
     }
   },
   mounted() {
