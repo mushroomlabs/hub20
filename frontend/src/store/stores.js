@@ -5,25 +5,26 @@ import {
   STORE_COLLECTION_SET,
   STORE_COLLECTION_SETUP_SUCCESS,
   STORE_COLLECTION_SETUP_FAILURE,
-  STORE_UPDATE_SET_NAME,
-  STORE_UPDATE_SET_URL,
-  STORE_UPDATE_SET_ACCEPTED_TOKENS,
-  STORE_UPDATE_BEGIN,
-  STORE_UPDATE_SUCCESS,
-  STORE_UPDATE_FAILURE,
-  STORE_CREATE_FAILURE,
+  STORE_EDIT_SET_NAME,
+  STORE_EDIT_SET_URL,
+  STORE_EDIT_SET_ACCEPTED_TOKENS,
+  STORE_EDIT_BEGIN,
+  STORE_EDIT_SUCCESS,
+  STORE_EDIT_FAILURE,
 } from './types'
+
+const initialStoreData = {
+  name: '',
+  site_url: '',
+  accepted_currencies: [],
+}
 
 const initialState = {
   collection: {
     data: [],
     error: null,
   },
-  create: {
-    data: null,
-    error: null,
-  },
-  update: {
+  edit: {
     data: null,
     error: null,
   },
@@ -33,8 +34,8 @@ const getters = {
   stores: (state) => state.collection.data,
   storesById: (state) =>
     state.collection.data.reduce((acc, store) => Object.assign({[store.id]: store}, acc), {}),
-  storeEditData: (state) => state.create.data || state.update.data,
-  storeEditError: (state) => state.create.error || state.update.error,
+  storeEditData: (state) => state.edit.data,
+  storeEditError: (state) => state.edit.error,
 }
 
 const actions = {
@@ -47,22 +48,28 @@ const actions = {
   updateStore({commit}, storeData) {
     return stores
       .update(storeData)
-      .then(() => commit(STORE_UPDATE_SUCCESS))
-      .catch((error) => commit(STORE_UPDATE_FAILURE, error.response))
+      .then(() => commit(STORE_EDIT_SUCCESS))
+      .catch((error) => commit(STORE_EDIT_FAILURE, error.response))
   },
   createStore({commit, dispatch}, storeData) {
     return stores
       .create(storeData)
+      .then(() => commit(STORE_EDIT_SUCCESS))
       .then(() => dispatch('fetchStores'))
-      .catch((error) => commit(STORE_CREATE_FAILURE, error))
+      .catch((error) => commit(STORE_EDIT_FAILURE, error))
   },
   editStore({getters, commit}, storeId) {
-    const store = getters.storesById[storeId]
-    const storeDataPromise = store ? Promise.resolve({data: store}) : stores.get(storeId)
+
+    const isCached = storeId in getters.storesById
+    const storeData = storeId ? getters.storesById[storeId] : initialStoreData
+    const storeDataPromise = storeId && !isCached ? stores.get(storeId) : Promise.resolve({data: storeData})
 
     return storeDataPromise
-      .then(({data}) => commit(STORE_UPDATE_BEGIN, data))
-      .catch((error) => commit(STORE_UPDATE_FAILURE, error))
+      .then(({data}) => commit(STORE_EDIT_BEGIN, data))
+      .catch((error) => commit(STORE_EDIT_FAILURE, error))
+  },
+  removeStore({dispatch}, storeData) {
+    return stores.remove(storeData.id).then(() => dispatch('fetchStores'))
   },
   initialize({commit, dispatch}) {
     commit(STORE_INITIALIZE)
@@ -83,35 +90,32 @@ const mutations = {
   [STORE_COLLECTION_SETUP_SUCCESS](state) {
     state.collection.error = null
   },
-  [STORE_UPDATE_BEGIN](state, storeData) {
-    state.update.data = storeData
+  [STORE_EDIT_BEGIN](state, storeData) {
+    state.edit.data = storeData || initialStoreData
   },
-  [STORE_UPDATE_SUCCESS](state) {
-    state.update.error = null
+  [STORE_EDIT_SUCCESS](state) {
+    state.edit.error = null
   },
-  [STORE_UPDATE_FAILURE](state, error) {
-    state.update.error = error.data
+  [STORE_EDIT_FAILURE](state, error) {
+    state.edit.error = error.data
   },
-  [STORE_UPDATE_SET_NAME](state, name) {
-    if (state.update.data) {
-      state.update.data.name = name
+  [STORE_EDIT_SET_NAME](state, name) {
+    if (state.edit.data) {
+      state.edit.data.name = name
     }
   },
-  [STORE_UPDATE_SET_URL](state, siteUrl) {
-    if (state.update.data) {
-      state.update.data.site_url = siteUrl
+  [STORE_EDIT_SET_URL](state, siteUrl) {
+    if (state.edit.data) {
+      state.edit.data.site_url = siteUrl
     }
   },
-  [STORE_UPDATE_SET_ACCEPTED_TOKENS](state, acceptedTokens) {
-    if (state.update.data) {
-      state.update.data.accepted_currencies = acceptedTokens
+  [STORE_EDIT_SET_ACCEPTED_TOKENS](state, acceptedTokens) {
+    if (state.edit.data) {
+      state.edit.data.accepted_currencies = acceptedTokens
     }
   },
   [STORE_COLLECTION_SET](state, data) {
     state.collection.data = data
-  },
-  [STORE_CREATE_FAILURE](state, error) {
-    state.create.error = error.data
   },
 }
 
