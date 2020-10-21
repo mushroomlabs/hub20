@@ -1,6 +1,7 @@
 //Utilities
 @import "mixins/transparency";
 @import "mixins/vendor-prefixes";
+@import "mixins/border-radius";
 //Components
 @import "mixins/buttons";
 @import "mixins/inputs";
@@ -10,4 +11,3 @@
 @import "mixins/icons";
 @import "mixins/cards";
 @import "mixins/chartist";
-@import "mixins/sidebar";

@@ -245,7 +245,11 @@ class EthereumTokenAmount:
 
     @property
     def formatted(self):
-        return f"{self.amount.normalize()} {self.currency.code}"
+        integral = int(self.amount)
+        frac = self.amount % 1
+
+        amount_formatted = str(integral) if not bool(frac) else self.amount.normalize()
+        return f"{amount_formatted} {self.currency.code}"
 
     @property
     def as_wei(self) -> Wei:

@@ -1,38 +1,18 @@
+// Base Bootstrap
+@import "~bootstrap/scss/bootstrap.scss";
+@import "~bootstrap/scss/_variables.scss";
+
+// theme-specific imports
 @import "./paper/_variables.scss";
 @import "./paper/mixins/_buttons.scss";
+@import "./paper/mixins/_vendor-prefixes.scss";
 
-html {
-    background: url("./assets/img/backgrounds/ethereum.jpg") no-repeat center center fixed;
-    -webkit-background-size: cover;
-    -moz-background-size: cover;
-    -o-background-size: cover;
-    background-size: cover;
-}
+// Application base
+@import "./app/app.scss";
 
-body {
-    background-color: rgba($medium-pale-bg, 0.75) !important;
-    backdrop-filter: brightness(1.75) blur(3px) opacity(0.4);
-}
+// Base Views/pages
+@import "./app/registration.scss";
+@import "./app/dashboard.scss";
 
-div.login-screen, div.registration-screen {
-    background-color: transparent !important;
-    box-shadow: none !important;
-    display: grid;
-    min-height: 100vh;
-    max-width: 45rem;
-    padding: 5vh 3em;
-    margin: auto;
-    align-content: center;
-}
-
-div.action-panel div.secondary {
-    a, button {
-        @include button-link(
-            $primary-color,
-            $primary-states-color,
-            $padding-large-vertical,
-            $padding-large-horizontal,
-            $font-size-base
-        );
-    }
-}
+// Application-wide Widgets
+@import "./app/table.scss";

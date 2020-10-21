@@ -1,36 +1,61 @@
 <template>
-  <div>
-    <router-view v-if="isAuthenticated" />
-    <BaseLayout v-if="!isAuthenticated" />
-  </div>
+<div>
+  <notifications />
+  <router-view v-if="isAuthenticated" />
+  <BaseLayout v-if="!isAuthenticated" />
+</div>
 </template>
 
 <script>
-import BaseLayout from "@/layout/BaseLayout";
+import BaseLayout from '@/layout/BaseLayout'
 
 export default {
   components: {
-    BaseLayout
+    BaseLayout,
   },
   computed: {
     isAuthenticated() {
-      return this.$store.getters["auth/isAuthenticated"];
-    }
+      return this.$store.getters['auth/isAuthenticated']
+    },
   },
   mounted() {
-    let self = this;
-    let refreshStore = function() {
-      if (self.isAuthenticated){
-        self.$store.dispatch("account/fetchAll")
-      }
-    }
-
-    refreshStore();
-    setInterval(refreshStore, 60 * 1000);
-  }
+    let self = this
+    this.$store.dispatch('initialize')
+    setInterval(() => self.$store.dispatch('refresh'), 60 * 1000)
+  },
 }
 </script>
 
 <style lang="scss">
-@import "./assets/sass/app.scss";
+@import '../node_modules/bootstrap/scss/bootstrap.scss';
+@import '../node_modules/bootstrap/scss/variables';
+@import './assets/sass/app.scss';
+
+.vue-notifyjs.notifications {
+  .alert {
+    z-index: 10000;
+  }
+  .list-move {
+    transition: transform 0.3s, opacity 0.4s;
+  }
+  .list-item {
+    display: inline-block;
+    margin-right: 10px;
+  }
+  .list-enter-active {
+    transition: transform 0.2s ease-in, opacity 0.4s ease-in;
+  }
+  .list-leave-active {
+    transition: transform 1s ease-out, opacity 0.4s ease-out;
+  }
+
+  .list-enter {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+  .list-leave-to {
+    opacity: 0;
+    transform: scale(1.2, 0.7);
+  }
+}
 </style>

@@ -85,28 +85,6 @@
 /*          Changes for small display      */
 
 @media (max-width: 991px) {
-  .nav-open {
-    .main-panel {
-      position: absolute;
-      left: 0;
-      @include transform-translate-3d(-220px);
-      @include transition (0.5s, cubic-bezier(0.685, 0.0473, 0.346, 1));
-    }
-
-    .wrapper .sidebar {
-      @include transform-translate-3d(10px);
-      @include transition (0.5s, cubic-bezier(0.685, 0.0473, 0.346, 1));
-    }
-  }
-
-  .main-panel {
-    width: 100%;
-    max-height: 100vh;
-    overflow: scroll;
-    @include transform-translate-3d(0px);
-    @include transition (0.5s, cubic-bezier(0.685, 0.0473, 0.346, 1));
-  }
-
   .navbar-transparent {
     padding-top: 15px;
     background-color: rgba(0, 0, 0, 0.45);
@@ -117,6 +95,7 @@
   h6 {
     font-size: 1em;
   }
+
   .wrapper {
     @include transform-translate-x(0px);
     @include transition (0.33s, cubic-bezier(0.685, 0.0473, 0.346, 1));
@@ -269,11 +248,6 @@
   }
   .nav-open .sidebar {
     transition: all .5s cubic-bezier(.685, .0473, .346, 1);
-    // left: -230px;
-  }
-  .nav-open .main-panel {
-    left: 0;
-    @include transform-translate-x(-230px);
   }
   .navbar-toggle .icon-bar {
     display: block;

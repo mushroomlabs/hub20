@@ -1,3 +1,5 @@
+@import "./mixins/defaults";
+
 $font-color: #66615b !default;
 $fill-font-color: rgba(255, 255, 255, 0.7);
 
@@ -103,10 +105,9 @@ $border-radius-btn-small: 26px !default;
 $border-radius-btn-base: 20px !default;
 $border-radius-btn-large: 50px !default;
 
-// Cristina: am schimbat aici si s-au modificat inputurile
 $margin-bottom: 0 0 10px 0 !default;
 $border-radius-small: 3px !default;
-$border-radius-base: 4px !default;
+$border-radius-base: $default-border-radius;
 $border-radius-large: 6px !default;
 $border-radius-extreme: 6px !default;
 
@@ -116,6 +117,8 @@ $border-radius-large-bottom: 0 0 $border-radius-large $border-radius-large !defa
 $btn-round-radius: 30px !default;
 
 $height-base: 40px !default;
+
+$font-family: $default-font-family;
 
 $font-size-base: 14px !default;
 $font-size-xs: 12px !default;
@@ -219,7 +222,6 @@ $select-coordinates: 50% -40px !default;
 
 $padding-zero: 0px !default;
 
-$sidebar-width: calc(100% - 260px) !default;
 $medium-dark-gray: #AAAAAA !default;
 
 //variables used in cards

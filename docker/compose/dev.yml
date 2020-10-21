@@ -89,6 +89,14 @@ services:
     volumes:
       - ./backend:/app
 
+  # Background command to listen to blockchain and raiden events
+  job_listen_raiden:
+    <<: *development_service
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./backend:/app
+
   raiden:
     <<: *development_service
     networks:

@@ -1,0 +1,208 @@
+$sidebar-width: 260px !default;
+$sidebar-retracted-width: 90px;
+$sidebar-open-width: $sidebar-width;
+
+$topbar-height: 75px;
+
+@mixin sidebar-color-scheme($background-color, $base-font-color, $active-color) {
+  background-color: $background-color;
+  a {
+    color: $base-font-color !important;
+  }
+
+  .logo {
+    border-bottom: 2px solid rgba($base-font-color, .2);
+    span {
+      color: #fff;
+    }
+  }
+
+  .nav {
+    .divider {
+      background-color: rgba($base-font-color, .2);
+    }
+
+    a.active.nav-link {
+      color: $active-color !important;
+    }
+  }
+}
+
+
+#dashboard {
+    display: grid;
+    grid-template-columns: $sidebar-open-width auto;
+    grid-template-rows: 100vh;
+
+    .sidebar {
+      transition: all .5s cubic-bezier(.685, .0473, .346, 1);
+    }
+}
+
+
+.sidebar {
+  @include sidebar-color-scheme(black, $font-color, $primary-color);
+
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  background-size: cover;
+  background-position: center center;
+  max-height: 100%;
+  height: 100%;
+  width: $sidebar-width;
+  display: block;
+  font-weight: 200;
+
+  .logo {
+      padding: 13px 20px 0;
+      display: block;
+      font-weight: $font-weight-bold;
+      line-height: 40px;
+      text-align: left;
+      height: $topbar-height;
+
+      img{
+          width: 40px;
+          display: inline-block;
+          height: 40px;
+          margin-left: 0px;
+          margin-right: 10px;
+          background: white;
+          border-radius: 40px;
+          text-align: center;
+      }
+  }
+
+  .nav {
+
+    .nav-item {
+        width: 100%;
+        opacity: .7;
+        height: 66px;
+
+        .nav-link {
+            margin: 10px 0px;
+            padding-left: 25px;
+            padding-right: 25px;
+        }
+
+        &:hover {
+            opacity: 1;
+        }
+    }
+
+    p, i {
+      line-height: 30px;
+    }
+
+    p {
+      margin: 0;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    i {
+      font-size: 24px;
+      float: left;
+      margin-right: 15px;
+      width: 30px;
+      text-align: center;
+    }
+  }
+}
+
+.main-panel {
+  background-color: $bg-nude;
+  z-index: 2;
+  overflow: auto;
+
+  > .content {
+    padding: 30px 15px;
+    min-height: calc(100% - 123px);
+  }
+
+  > .footer {
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+  }
+
+  nav {
+    background-color: $bg-nude;
+    box-shadow: none;
+    border-bottom: 1px solid $medium-gray;
+
+    display: flex;
+    align-items: center;
+    height: 75px;
+    justify-content: space-between; // space out brand from logo
+    padding: $navbar-padding-y $navbar-padding-x;
+    margin-bottom: 0;
+
+    h2 {
+      display: inline-block;
+      font-weight: 600;
+      margin: 5px 0px;
+      padding: 20px 15px;
+      font-size: 14px;
+      text-transform: uppercase;
+    }
+
+    > ul {
+      display: flex;
+      flex-direction: column;
+      padding-left: 0;
+      margin-bottom: 0;
+      list-style: none;
+
+      .nav-item .nav-link{
+        text-align: center;
+
+        color: $dark-gray !important;
+        &:hover, &:focus {
+          color: $light-gray !important;
+        }
+
+        p {
+          display: inline;
+          margin-left: 3px;
+          text-transform: uppercase;
+          font-weight: 600;
+          font-size: $font-size-small;
+        }
+      }
+    }
+  }
+}
+
+.sidebar,
+.main-panel {
+  -webkit-transition-property: top, bottom;
+  transition-property: top, bottom;
+  -webkit-transition-duration: .2s, .2s;
+  transition-duration: .2s, .2s;
+  -webkit-transition-timing-function: linear, linear;
+  transition-timing-function: linear, linear;
+  -webkit-overflow-scrolling: touch;
+}
+
+
+@media (max-width: 991px) {
+  #dashboard {
+    grid-template-columns: $sidebar-retracted-width auto;
+
+    & > div {
+      @include transition (0.5s, cubic-bezier(0.685, 0.0473, 0.346, 1));
+    }
+
+    .sidebar {
+      width: $sidebar-retracted-width;
+
+      p, a.logo span {
+        display: none;
+      }
+    }
+
+  }
+}

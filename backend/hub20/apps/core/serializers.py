@@ -56,8 +56,8 @@ class TransferSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, data):
-        address = data.get("address")
-        recipient = data.get("recipient")
+        address = data.pop("address", None)
+        recipient = data.pop("recipient", None)
         request = self.context["request"]
 
         if not address and not recipient:
@@ -70,8 +70,6 @@ class TransferSerializer(serializers.ModelSerializer):
             )
 
         transfer_data = copy.copy(data)
-        del transfer_data["address"]
-        del transfer_data["recipient"]
 
         if recipient is not None:
             transfer_class = models.InternalTransfer
@@ -91,7 +89,7 @@ class TransferSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         transfer_class: Union[Type[models.InternalTransfer], Type[models.ExternalTransfer]] = (
-            models.InternalTransfer if "recipient" in validated_data else models.ExternalTransfer
+            models.InternalTransfer if "receiver" in validated_data else models.ExternalTransfer
         )
         request = self.context["request"]
 
@@ -188,7 +186,11 @@ class InternalPaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.InternalPayment
         fields = PaymentSerializer.Meta.fields + ("identifier", "user", "memo")
-        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("identifier", "user", "memo")
+        read_only_fields = PaymentSerializer.Meta.read_only_fields + (
+            "identifier",
+            "user",
+            "memo",
+        )
 
 
 class BlockchainPaymentSerializer(PaymentSerializer):
@@ -211,7 +213,10 @@ class RaidenPaymentSerializer(PaymentSerializer):
     class Meta:
         model = models.RaidenPayment
         fields = PaymentSerializer.Meta.fields + ("identifier", "raiden")
-        read_only_fields = PaymentSerializer.Meta.read_only_fields + ("identifier", "raiden")
+        read_only_fields = PaymentSerializer.Meta.read_only_fields + (
+            "identifier",
+            "raiden",
+        )
 
 
 class PaymentOrderSerializer(serializers.ModelSerializer):
@@ -248,7 +253,16 @@ class PaymentOrderSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.PaymentOrder
-        fields = ("url", "id", "amount", "token", "created", "routes", "payments", "status")
+        fields = (
+            "url",
+            "id",
+            "amount",
+            "token",
+            "created",
+            "routes",
+            "payments",
+            "status",
+        )
         read_only_fields = ("id", "created", "status")
 
 
@@ -369,7 +383,6 @@ class BookEntrySerializer(serializers.ModelSerializer):
         return params and reverse(request=self.context.get("request"), **params())
 
     class Meta:
-        model = models.BookEntry
         read_only_fields = fields = (
             "id",
             "created",
@@ -378,3 +391,35 @@ class BookEntrySerializer(serializers.ModelSerializer):
             "summary",
             "reference",
         )
+
+
+class CreditSerializer(BookEntrySerializer):
+    def get_reference(self, obj):
+        params = {
+            models.PaymentConfirmation: lambda: {
+                "viewname": "hub20:payments-detail",
+                "kwargs": {"pk": obj.reference.payment.pk},
+            },
+        }.get(type(obj.reference))
+
+        return params and reverse(request=self.context.get("request"), **params())
+
+    class Meta:
+        model = models.Credit
+        fields = read_only_fields = BookEntrySerializer.Meta.fields
+
+
+class DebitSerializer(BookEntrySerializer):
+    def get_reference(self, obj):
+        params = {
+            models.TransferExecution: lambda: {
+                "viewname": "hub20:transfer-detail",
+                "kwargs": {"pk": obj.reference.transfer.pk},
+            },
+        }.get(type(obj.reference))
+
+        return params and reverse(request=self.context.get("request"), **params())
+
+    class Meta:
+        model = models.Debit
+        fields = read_only_fields = BookEntrySerializer.Meta.fields

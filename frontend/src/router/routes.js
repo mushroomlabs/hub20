@@ -1,102 +1,111 @@
-import DashboardLayout from "@/layout/dashboard/DashboardLayout";
+import DashboardLayout from '@/layout/dashboard/DashboardLayout'
 
 // Pages outside of Dashboard
-import Login from "@/pages/Login";
-import Register from "@/pages/Register";
+import Login from '@/pages/Login'
+import Register from '@/pages/Register'
 
 // GeneralViews
-import NotFound from "@/pages/NotFoundPage";
+import NotFound from '@/pages/NotFoundPage'
 
 // Application Views
-import Overview from "@/views/Overview";
-import History from "@/views/History";
-import Market from "@/views/Market";
-import Exchange from "@/views/Exchange";
-import Stores from "@/views/Stores";
+import Overview from '@/views/Overview'
+import History from '@/views/History'
+import Market from '@/views/Market'
+import Exchange from '@/views/Exchange'
+import Stores from '@/views/Stores'
+import StoreDetail from '@/views/StoreDetail'
 
 // Everything else
-import store from "@/store/index";
-
+import store from '@/store/index'
 
 const requireAuthenticated = (to, from, next) => {
-  store.dispatch("auth/initialize")
-    .then(() => {
-      if (!store.getters["auth/isAuthenticated"]) {
-        next("/login");
-      } else {
-        next();
-      }
-    });
-};
+  store.dispatch('initialize').then(() => {
+    if (!store.getters['auth/isAuthenticated']) {
+      next('/login')
+    } else {
+      next()
+    }
+  })
+}
 
 const requireAnonymous = (to, from, next) => {
-  store.dispatch("auth/initialize")
-    .then(() => {
-      if (store.getters["auth/isAuthenticated"]) {
-        next("/");
-      } else {
-        next();
-      }
-    });
-};
+  store.dispatch('initialize').then(() => {
+    if (store.getters['auth/isAuthenticated']) {
+      next('/')
+    } else {
+      next()
+    }
+  })
+}
 
 const redirectLogout = (to, from, next) => {
-  store.dispatch("auth/logout")
-    .then(() => next("/login"));
-};
-
+  store.dispatch('auth/logout').then(() => next('/login'))
+}
 
 const routes = [
   {
-    path: "/",
+    path: '/',
     component: DashboardLayout,
     beforeEnter: requireAuthenticated,
     children: [
       {
-        path: "",
-        name: "home",
-        component: Overview
+        path: '',
+        name: 'home',
+        component: Overview,
       },
       {
-        path: "history",
-        name: "history",
-        component: History
+        path: 'history',
+        name: 'history',
+        component: History,
       },
       {
-        path: "market",
-        name: "market",
-        component: Market
+        path: 'market',
+        name: 'market',
+        component: Market,
       },
       {
-        path: "exchange",
-        name: "exchange",
-        component: Exchange
+        path: 'exchange',
+        name: 'exchange',
+        component: Exchange,
       },
       {
-        path: "stores",
-        name: "stores",
-        component: Stores
-      }
-    ]
+        path: 'stores',
+        name: 'stores',
+        component: Stores,
+      },
+      {
+        path: 'store/new',
+        name: 'store-create',
+        component: StoreDetail,
+        meta: {
+          viewTitle: 'Add Store'
+        }
+      },
+      {
+        path: 'store/:id',
+        name: 'store',
+        component: StoreDetail,
+      },
+    ],
   },
   {
-    path: "/login",
-    name: "login",
+    path: '/login',
+    name: 'login',
     component: Login,
-    beforeEnter: requireAnonymous
+    beforeEnter: requireAnonymous,
   },
   {
-    path: "/logout",
-    name: "logout",
-    beforeEnter: redirectLogout
+    path: '/logout',
+    name: 'logout',
+    beforeEnter: redirectLogout,
   },
   {
-    path: "/register",
-    name: "register",
+    path: '/register',
+    name: 'register',
     component: Register,
-    beforeEnter: requireAnonymous
+    beforeEnter: requireAnonymous,
   },
-  { path: "*", component: NotFound }
-];
+  {path: '*', component: NotFound},
+]
 
-export default routes;
+export default routes

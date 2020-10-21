@@ -1,5 +1,5 @@
 <template>
-  <div class="form-group" :class="{'input-group': hasIcon}">
+  <div class="form-group" :class="{'input-group': hasIcon, 'has-error': errorMessage}">
     <slot name="label">
       <label v-if="label" class="control-label">
         {{label}}
@@ -22,6 +22,7 @@
         <i :class="addonRightIcon" class="input-group-text"></i>
       </span>
     </slot>
+    <span v-if="errorMessage" class="error-message">{{ errorMessage }}</span>
   </div>
 </template>
 <script>
@@ -32,7 +33,8 @@
       label: String,
       value: [String, Number],
       addonRightIcon: String,
-      addonLeftIcon: String
+      addonLeftIcon: String,
+      errorMessage: String
     },
     computed: {
       hasIcon() {
@@ -42,6 +44,3 @@
     }
   }
 </script>
-<style>
-
-</style>

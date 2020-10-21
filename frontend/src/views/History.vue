@@ -3,14 +3,12 @@
   <card title="Transactions">
     <table class="table">
       <thead>
-        <tr>
-          <td class="transaction-date">Date</td>
-          <td class="description">Description</td>
-          <td class="token">Token</td>
-        </tr>
+        <th class="transaction-date">Date</th>
+        <th class="description">Description</th>
+        <th class="token">Token</th>
       </thead>
       <tbody>
-        <tr v-for="transaction in transactions" :class="transaction.type" :key="transaction.id">
+        <tr v-for="transaction in transactions" :class="transaction.type" :key="transaction.reference">
           <td class="transaction-date">{{ new Date(transaction.created).toLocaleString() }}</td>
           <td class="description">{{ transaction.summary }}</td>
           <td class="amount">{{ transaction.amount }}</td>

@@ -2,7 +2,7 @@
   <div class="sidebar">
     <router-link to="/" class="logo" exact>
       <img src="@/assets/img/logos/ethereum.svg">
-      {{title}}
+      <span>{{title}}</span>
     </router-link>
     <slot></slot>
     <ul class="nav">
