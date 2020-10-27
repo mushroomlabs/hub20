@@ -15,7 +15,7 @@ import {
   UPDATE_DEBITS_FAILURE,
   SET_BALANCES,
   SET_CREDITS,
-  SET_DEBITS,
+  SET_DEBITS
 } from './types'
 
 const initialState = {
@@ -26,41 +26,56 @@ const initialState = {
 }
 
 const getters = {
-  openBalances: state => state.balances.filter(balance => Decimal(balance.amount).abs().gt(0)),
-  transactions: state => utils.sortedByDate(state.credits.concat(state.debits))
+  openBalances: state =>
+    state.balances.filter(balance =>
+      Decimal(balance.amount)
+        .abs()
+        .gt(0)
+    ),
+  balancesByTokenAddress: state =>
+    state.balances.reduce(
+      (acc, balance) =>
+        Object.assign({[balance.currency.address]: Decimal(balance.amount)}, acc),
+      {}
+    ),
+  transactions: state => utils.sortedByDate(state.credits.concat(state.debits)),
+  tokenBalance: (state, getters) => tokenAddress => getters.balancesByTokenAddress[tokenAddress] || Decimal(0)
 }
 
 const actions = {
-  fetchBalances({ commit }) {
+  fetchBalances({commit}) {
     commit(UPDATE_BALANCES_BEGIN)
-    return account.getBalances()
+    return account
+      .getBalances()
       .then(({data}) => commit(SET_BALANCES, data))
       .then(() => commit(UPDATE_BALANCES_SUCCESS))
-      .catch((exc) => commit(UPDATE_BALANCES_FAILURE, exc))
+      .catch(exc => commit(UPDATE_BALANCES_FAILURE, exc))
   },
-  fetchCredits({ commit }) {
+  fetchCredits({commit}) {
     commit(UPDATE_CREDITS_BEGIN)
-    return account.getCredits()
+    return account
+      .getCredits()
       .then(({data}) => commit(SET_CREDITS, data))
       .then(() => commit(UPDATE_CREDITS_SUCCESS))
-      .catch((exc) => commit(UPDATE_CREDITS_FAILURE, exc))
+      .catch(exc => commit(UPDATE_CREDITS_FAILURE, exc))
   },
-  fetchDebits({ commit }) {
+  fetchDebits({commit}) {
     commit(UPDATE_DEBITS_BEGIN)
-    return account.getDebits()
+    return account
+      .getDebits()
       .then(({data}) => commit(SET_DEBITS, data))
       .then(() => commit(UPDATE_DEBITS_SUCCESS))
-      .catch((exc) => commit(UPDATE_DEBITS_FAILURE, exc))
+      .catch(exc => commit(UPDATE_DEBITS_FAILURE, exc))
   },
-  fetchAll({ dispatch }){
+  fetchAll({dispatch}) {
     dispatch('fetchBalances')
     dispatch('fetchCredits')
     dispatch('fetchDebits')
   },
-  initialize({ dispatch }) {
+  initialize({dispatch}) {
     dispatch('fetchAll')
   },
-  refresh({ dispatch }) {
+  refresh({dispatch}) {
     dispatch('fetchAll')
   }
 }
@@ -115,5 +130,5 @@ export default {
   state: initialState,
   getters,
   actions,
-  mutations,
+  mutations
 }
