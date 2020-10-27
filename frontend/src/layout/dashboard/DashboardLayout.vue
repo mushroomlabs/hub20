@@ -4,8 +4,7 @@
       <template slot="links">
         <sidebar-link to="/" name="Overview" icon="ti-dashboard" />
         <sidebar-link to="/history" name="History" icon="ti-receipt" />
-        <sidebar-link to="/market" name="Market" icon="ti-pulse" />
-        <sidebar-link to="/exchange" name="Exchange" icon="ti-exchange-vertical" />
+        <sidebar-link to="/funding" name="Funding" icon="ti-exchange-vertical" />
         <sidebar-link to="/stores" name="Stores" icon="ti-credit-card" />
       </template>
     </side-bar>

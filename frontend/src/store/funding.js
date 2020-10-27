@@ -7,19 +7,23 @@ import {
   FUNDING_DEPOSIT_SUCCESS,
   FUNDING_DEPOSIT_SET_EXPIRED,
   FUNDING_DEPOSIT_FAILURE,
+  FUNDING_TRANSFER_BEGIN,
+  FUNDING_TRANSFER_FAILURE,
 } from './types'
 
 const initialState = {
   depositsById: {},
+  transfersById: {},
   error: null,
 }
 
 const getters = {
-  deposits: (state) => Object.values(state.deposits),
+  deposits: (state) => Object.values(state.depositsById),
+  transfers: (state) => Object.values(state.transfersById),
 }
 
 const actions = {
-  createDeposit({commit}, token, amount) {
+  createDeposit({commit}, {token, amount}) {
     return client
       .createPaymentOrder(token, amount)
       .then(({data}) => commit(FUNDING_DEPOSIT_BEGIN, data))
@@ -37,11 +41,17 @@ const actions = {
       .then(({orderData}) => commit(FUNDING_DEPOSIT_SUCCESS, orderData))
       .catch((error) => commit(FUNDING_DEPOSIT_FAILURE, error.response))
   },
+  createWithdraw({commit}, {token, amount, address}){
+    const memo = 'Withdraw requested'
+    return client.scheduleExternalTransfer(token, amount, address, {memo})
+      .then(({data}) => commit(FUNDING_TRANSFER_BEGIN, data))
+      .catch((error) => commit(FUNDING_TRANSFER_FAILURE, error.response))
+  },
   initialize({commit}) {
     commit(FUNDING_INITIALIZE)
   },
   refresh({state, dispatch}) {
-    Object.keys(state.depositsById).each((orderId) => dispatch('fetchDeposit', orderId))
+    Object.keys(state.depositsById).forEach((orderId) => dispatch('fetchDeposit', orderId))
   },
 }
 
@@ -72,6 +82,13 @@ const mutations = {
     if (order) {
       order.status = 'expired'
     }
+  },
+  [FUNDING_TRANSFER_BEGIN](state, transferData) {
+    state.transfersById[transferData.id] = transferData
+    state.error = null
+  },
+  [FUNDING_TRANSFER_FAILURE](state, error) {
+    state.error = error.data
   },
 }
 

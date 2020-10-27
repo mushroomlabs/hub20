@@ -12,5 +12,14 @@ export default {
   },
   cancelPaymentOrder(orderId) {
     return session.delete(`/api/payment/orders/${orderId}`);
+  },
+  scheduleExternalTransfer(token, amount, address, options) {
+    let payload = {
+      amount: amount,
+      token: token.address,
+      address: address,
+      ...options
+    }
+    return session.post('/api/transfers', payload)
   }
 };
