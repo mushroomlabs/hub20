@@ -20,7 +20,7 @@
         v-for="option in options"
         :key="option.value"
         :value="option.value"
-        :selected="selected.indexOf(option.value) != -1"
+        :selected="Boolean(option && selected) && selected.indexOf(option.value) != -1"
       >
         {{ option.text }}
       </option>
@@ -51,7 +51,7 @@ export default {
     multiple: {
       type: Boolean,
       default: false
-    },
+    }
   },
   data() {
     return {
