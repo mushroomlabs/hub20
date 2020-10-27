@@ -4,17 +4,15 @@
     <td class="balance">{{ balance }}</td>
     <td class="identifier">{{ token.id }}</td>
     <td class="actions">
-      <p-button name="deposit" @click.native="startDeposit()">Deposit</p-button>
-      <p-button name="withdrawal" @click.native="startWithdraw()">Withdraw</p-button>
+      <router-link :to="{'name': 'deposit', params: {'token': token.address} }">Deposit</router-link>
+      <router-link :to="{'name': 'withdraw', params: {'token': token.address} }" :disabled="!hasFunds">Withdraw</router-link>
     </td>
   </tr>
 </template>
 <script>
 import {mapGetters} from 'vuex'
-import TokenMixin from '@/mixins/tokens'
 
 export default {
-  mixins: [TokenMixin],
   props: {
     token: {
       type: Object
@@ -22,7 +20,7 @@ export default {
   },
   methods: {
     startWithdraw() {
-      console.log(this.token.code)
+      console.log(this.token.code, 'withdraw')
     },
     startDeposit() {
       console.log(this.token.code, 'deposit')
@@ -32,6 +30,9 @@ export default {
     ...mapGetters('account', ['tokenBalance']),
     balance() {
       return this.tokenBalance(this.token.address)
+    },
+    hasFunds() {
+      return this.balance.gt(0)
     }
   }
 }
