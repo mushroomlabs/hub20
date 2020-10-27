@@ -53,7 +53,7 @@ services:
       /bin/bash -c "
       while ! nc -w 1 -z db 5432; do sleep 0.5; done;
       while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
-      celery worker -A hub20.api -l info
+      celery -A hub20.api worker -l info
       "
     depends_on:
       - db
