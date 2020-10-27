@@ -19,9 +19,7 @@ export default {
     },
   },
   mounted() {
-    let self = this
-    this.$store.dispatch('initialize')
-    setInterval(() => self.$store.dispatch('refresh'), 60 * 1000)
+    setInterval(() => this.$store.dispatch('refresh'), 60 * 1000)
   },
 }
 </script>
