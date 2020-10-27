@@ -3,3 +3,24 @@ div.action-panel, section.header  {
     justify-content: space-between;
     align-items: center;
 }
+
+div.button-bar {
+  margin: 1vh auto;
+
+  button {
+    @include button-outline($primary-color, $primary-states-color);
+    border-style: solid;
+    border-radius: 0 !important;
+
+    &.active {
+      @include button-outline($primary-bg, $primary-color);
+    }
+
+    &:first-child {
+      border-radius: $border-radius-btn-large 0 0 $border-radius-btn-large !important;
+    }
+    &:last-child {
+      border-radius: 0 $border-radius-btn-large $border-radius-btn-large 0 !important;
+    }
+  }
+}

@@ -15,7 +15,6 @@ import App from "./App"
 import router from "@/router/index"
 import store from '@/store/index'
 
-import "@/assets/sass/toolkit/widgets.scss"
 import PaperDashboard from "./plugins/paperDashboard"
 import "vue-notifyjs/themes/default.css"
 

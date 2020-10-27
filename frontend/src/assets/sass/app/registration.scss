@@ -14,9 +14,6 @@ div.action-panel div.secondary {
         @include button-link(
             $primary-color,
             $primary-states-color,
-            $padding-large-vertical,
-            $padding-large-horizontal,
-            $font-size-base
         );
     }
 }
