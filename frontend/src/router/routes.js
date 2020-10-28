@@ -78,11 +78,11 @@ const routes = [
         component: Deposit
       },
       {
-        path: 'withdraw/:token',
-        name: 'withdraw',
+        path: 'send/:token',
+        name: 'send',
         component: Transfer,
         meta: {
-          viewTitle: 'Withdraw'
+          viewTitle: 'Send'
         }
       },
       {

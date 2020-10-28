@@ -41,9 +41,9 @@ const actions = {
       .then(({orderData}) => commit(FUNDING_DEPOSIT_SUCCESS, orderData))
       .catch((error) => commit(FUNDING_DEPOSIT_FAILURE, error.response))
   },
-  createWithdraw({commit}, {token, amount, address}){
-    const memo = 'Withdraw requested'
-    return client.scheduleExternalTransfer(token, amount, address, {memo})
+  createTransfer({commit}, args){
+    const {token, amount, address, ...params} = args
+    return client.scheduleExternalTransfer(token, amount, address, params)
       .then(({data}) => commit(FUNDING_TRANSFER_BEGIN, data))
       .catch((error) => commit(FUNDING_TRANSFER_FAILURE, error.response))
   },

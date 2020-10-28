@@ -5,7 +5,7 @@
     <td class="identifier">{{ token.id }}</td>
     <td class="actions">
       <router-link :to="{'name': 'deposit', params: {'token': token.address} }">Deposit</router-link>
-      <router-link :to="{'name': 'withdraw', params: {'token': token.address} }" :disabled="!hasFunds">Withdraw</router-link>
+      <router-link :to="{'name': 'send', params: {'token': token.address} }" :disabled="!hasFunds">Send</router-link>
     </td>
   </tr>
 </template>
@@ -16,14 +16,6 @@ export default {
   props: {
     token: {
       type: Object
-    }
-  },
-  methods: {
-    startWithdraw() {
-      console.log(this.token.code, 'withdraw')
-    },
-    startDeposit() {
-      console.log(this.token.code, 'deposit')
     }
   },
   computed: {

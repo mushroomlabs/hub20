@@ -32,9 +32,9 @@
 
     <p-button
       block
-      @click.native="createWithdraw({token, amount, address})"
+      @click.native="createTransfer({token, amount, address})"
       :disabled="!isValid">
-      Withdraw
+      Transfer
     </p-button>
   </card>
 </template>
@@ -61,7 +61,7 @@ export default {
         this.$set(
           this.validationErrors,
           'amount',
-          'Withdraw amount should be greater than zero'
+          'Transfer amount should be greater than zero'
         )
       } else {
         this.$set(this.validationErrors, 'amount', null)
@@ -70,10 +70,10 @@ export default {
   },
   computed: {
     ...mapGetters('account', ['tokenBalance']),
-    ...mapGetters('funding', ['withdraws']),
+    ...mapGetters('funding', ['transfers']),
     ...mapGetters('tokens', ['tokensByAddress']),
     cardTitle() {
-      return this.token && `Withdraw ${this.token.code}`
+      return this.token && `Transfer ${this.token.code}`
     },
     isValid() {
       return this.amount && this.amount > 0
@@ -86,7 +86,7 @@ export default {
     }
   },
   methods: {
-    ...mapActions('funding', ['createWithdraw']),
+    ...mapActions('funding', ['createTransfer']),
     selectAmount(evt) {
       this.amount = evt.target.value
     }
