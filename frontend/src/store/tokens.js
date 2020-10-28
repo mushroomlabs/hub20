@@ -13,7 +13,8 @@ const initialState = {
 };
 
 const getters = {
-  tokensByAddress: state => state.tokens.reduce((acc, token) => Object.assign({[token.address]: token}, acc), {})
+  tokensByAddress: state => state.tokens.reduce((acc, token) => Object.assign({[token.address]: token}, acc), {}),
+  tokensByCode: state => state.tokens.reduce((acc, token) => Object.assign({[token.code]: token}, acc), {})
 };
 
 const actions = {

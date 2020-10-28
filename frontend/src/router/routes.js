@@ -10,8 +10,9 @@ import NotFound from '@/pages/NotFoundPage'
 // Application Views
 import Overview from '@/views/Overview'
 import History from '@/views/History'
-import Market from '@/views/Market'
-import Exchange from '@/views/Exchange'
+import Funding from '@/views/Funding'
+import Deposit from '@/views/Deposit'
+import Transfer from '@/views/Transfer'
 import Stores from '@/views/Stores'
 import StoreDetail from '@/views/StoreDetail'
 
@@ -51,27 +52,51 @@ const routes = [
       {
         path: '',
         name: 'home',
-        component: Overview,
+        component: Overview
       },
       {
         path: 'history',
         name: 'history',
-        component: History,
+        component: History
       },
       {
-        path: 'market',
-        name: 'market',
-        component: Market,
+        path: 'funding',
+        name: 'funding',
+        component: Funding
       },
       {
-        path: 'exchange',
-        name: 'exchange',
-        component: Exchange,
+        path: 'receive/:token',
+        name: 'payment-order',
+        component: Deposit,
+        meta: {
+          viewTitle: 'Request Payment'
+        }
+      },
+      {
+        path: 'deposit/:token',
+        name: 'deposit',
+        component: Deposit
+      },
+      {
+        path: 'send/:token',
+        name: 'send',
+        component: Transfer,
+        meta: {
+          viewTitle: 'Send'
+        }
+      },
+      {
+        path: 'transfer/:token',
+        name: 'send',
+        component: Transfer,
+        meta: {
+          viewTitle: 'Send Payment'
+        }
       },
       {
         path: 'stores',
         name: 'stores',
-        component: Stores,
+        component: Stores
       },
       {
         path: 'store/new',
@@ -84,28 +109,28 @@ const routes = [
       {
         path: 'store/:id',
         name: 'store',
-        component: StoreDetail,
-      },
-    ],
+        component: StoreDetail
+      }
+    ]
   },
   {
     path: '/login',
     name: 'login',
     component: Login,
-    beforeEnter: requireAnonymous,
+    beforeEnter: requireAnonymous
   },
   {
     path: '/logout',
     name: 'logout',
-    beforeEnter: redirectLogout,
+    beforeEnter: redirectLogout
   },
   {
     path: '/register',
     name: 'register',
     component: Register,
-    beforeEnter: requireAnonymous,
+    beforeEnter: requireAnonymous
   },
-  {path: '*', component: NotFound},
+  {path: '*', component: NotFound}
 ]
 
 export default routes

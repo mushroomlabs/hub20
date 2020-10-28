@@ -9,6 +9,7 @@ import password from './password'
 import signup from './signup'
 import stores from './stores'
 import tokens from './tokens'
+import funding from './funding'
 
 import {
   APP_SET_INITIALIZED
@@ -43,6 +44,7 @@ const actions = {
           dispatch('tokens/initialize')
             .then(() => dispatch('account/initialize'))
             .then(() => dispatch('stores/initialize'))
+            .then(() => dispatch('funding/initialize'))
             .then(() => commit(APP_SET_INITIALIZED))
         }
       })
@@ -50,6 +52,7 @@ const actions = {
   refresh({dispatch}) {
     dispatch('account/refresh')
       .then(() => dispatch('stores/refresh'))
+      .then(() => dispatch('funding/refresh'))
   }
 }
 
@@ -58,6 +61,7 @@ export default new Vuex.Store({
   modules: {
     account,
     auth,
+    funding,
     notifications,
     password,
     signup,

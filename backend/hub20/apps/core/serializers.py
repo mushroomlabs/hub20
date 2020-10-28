@@ -98,6 +98,7 @@ class TransferSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Transfer
         fields = (
+            "id",
             "url",
             "address",
             "recipient",
@@ -108,7 +109,7 @@ class TransferSerializer(serializers.ModelSerializer):
             "status",
             "target",
         )
-        read_only_fields = ("recipient", "status", "target")
+        read_only_fields = ("id", "recipient", "status", "target")
 
 
 class TransferExecutionSerializer(serializers.ModelSerializer):

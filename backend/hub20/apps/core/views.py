@@ -1,11 +1,13 @@
 from typing import List, Optional
 
+from django.db.models import ProtectedError
 from django.db.models.query import QuerySet
 from django.http import Http404
 from django.shortcuts import get_object_or_404
-from rest_framework import generics
+from rest_framework import generics, status
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.serializers import Serializer
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
@@ -81,6 +83,15 @@ class PaymentOrderView(BasePaymentOrderView, generics.RetrieveDestroyAPIView):
         return get_object_or_404(
             models.PaymentOrder, pk=self.kwargs.get("pk"), user=self.request.user
         )
+
+    def destroy(self, request, pk=None):
+        try:
+            return super().destroy(request, pk=pk)
+        except ProtectedError:
+            return Response(
+                f"Order has either been paid or has open routes and can not be canceled",
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class TransferListView(generics.ListCreateAPIView):
