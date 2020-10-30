@@ -50,6 +50,12 @@ def _check_for_blockchain_payment_confirmations(block_number):
         PaymentConfirmation.objects.create(payment=payment)
 
 
+@receiver(post_save, sender=Chain)
+def on_chain_updated_check_payment_confirmations(sender, **kw):
+    chain = kw["instance"]
+    _check_for_blockchain_payment_confirmations(chain.highest_block)
+
+
 @receiver(ethereum_node_disconnected, sender=Chain)
 @receiver(ethereum_node_sync_lost, sender=Chain)
 def on_ethereum_node_error_send_open_checkout_events(sender, **kw):
@@ -279,6 +285,7 @@ def on_payment_confirmed_publish_checkout(sender, **kw):
 
 
 __all__ = [
+    "on_chain_updated_check_payment_confirmations",
     "on_ethereum_node_ok_send_open_checkout_events",
     "on_ethereum_node_error_send_open_checkout_events",
     "on_account_deposit_check_blockchain_payments",
