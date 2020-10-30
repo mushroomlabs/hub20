@@ -17,12 +17,12 @@ class BlockchainRouteManager(models.Manager):
     def expired(self, block_number: Optional[int] = None) -> models.QuerySet:
         qs = self.with_expiration()
 
-        at_block = block_number if block_number is not None else F("order__chain__highest_block")
+        at_block = block_number if block_number is not None else F("chain__highest_block")
         return qs.filter(expiration_block__lt=at_block)
 
     def available(self, block_number: Optional[int] = None) -> models.QuerySet:
         qs = self.with_expiration()
-        at_block = block_number if block_number is not None else F("order__chain__highest_block")
+        at_block = block_number if block_number is not None else F("chain__highest_block")
 
         return qs.filter(start_block__lte=at_block, expiration_block__gte=at_block)
 

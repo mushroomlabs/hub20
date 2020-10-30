@@ -230,10 +230,7 @@ class PaymentOrderSerializer(serializers.ModelSerializer):
     def create(self, validated_data: Dict) -> models.PaymentOrder:
         request = self.context["request"]
         with transaction.atomic():
-            chain_id = validated_data["currency"].chain_id
-            return models.PaymentOrder.objects.create(
-                user=request.user, chain_id=chain_id, **validated_data
-            )
+            return models.PaymentOrder.objects.create(user=request.user, **validated_data)
 
     def get_routes(self, obj):
         def get_route_serializer(route):
@@ -302,14 +299,12 @@ class CheckoutSerializer(PaymentOrderSerializer):
         request = self.context.get("request")
         client_ip, _ = get_client_ip(request)
         store = validated_data.pop("store")
-        currency = validated_data["currency"]
 
         with transaction.atomic():
             return models.Checkout.objects.create(
                 store=store,
                 user=store.owner,
                 requester_ip=client_ip,
-                chain=currency.chain,
                 **validated_data,
             )
 

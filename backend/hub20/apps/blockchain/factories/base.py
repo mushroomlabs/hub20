@@ -20,7 +20,7 @@ def find_parent_by_block_number(block):
 
 def make_parent_hash(block):
     parent = find_parent_by_block_number(block)
-    return parent and parent.hash or factory.Faker("hex64").generate()
+    return parent and parent.hash or block.default_parent_hash
 
 
 class ChainFactory(factory.django.DjangoModelFactory):
@@ -57,6 +57,9 @@ class BlockFactory(factory.django.DjangoModelFactory):
     timestamp = factory.LazyAttribute(lambda obj: timezone.now())
     parent_hash = factory.LazyAttribute(lambda obj: make_parent_hash(obj))
     uncle_hashes: List = []
+
+    class Params:
+        default_parent_hash = factory.Faker("hex64")
 
     class Meta:
         model = Block

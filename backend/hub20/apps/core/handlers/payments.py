@@ -19,6 +19,7 @@ from hub20.apps.core.models import (
     BlockchainPaymentRoute,
     Checkout,
     CheckoutEvents,
+    Deposit,
     InternalPayment,
     Payment,
     PaymentConfirmation,
@@ -73,14 +74,14 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
     amount = kw["amount"]
     transaction = kw["transaction"]
 
-    orders = PaymentOrder.objects.with_blockchain_route(transaction.block.number)
-    order = orders.filter(routes__blockchainpaymentroute__account=account).first()
+    deposits = Deposit.objects.with_blockchain_route(transaction.block.number)
+    deposit = deposits.filter(routes__blockchainpaymentroute__account=account).first()
 
-    if not order:
+    if not deposit:
         return
 
     route = BlockchainPaymentRoute.objects.filter(
-        order=order, payment_window__contains=transaction.block.number
+        deposit=deposit, payment_window__contains=transaction.block.number
     ).first()
 
     payment = BlockchainPayment.objects.create(
@@ -137,6 +138,7 @@ def on_raiden_payment_received_check_raiden_payments(sender, **kw):
         )
 
 
+@receiver(post_save, sender=Deposit)
 @receiver(post_save, sender=PaymentOrder)
 @receiver(post_save, sender=Checkout)
 def on_order_created_set_blockchain_route(sender, **kw):
@@ -144,20 +146,25 @@ def on_order_created_set_blockchain_route(sender, **kw):
     if not kw["created"]:
         return
 
-    order = kw["instance"]
-    if order.chain.synced:
-        payment_window = BlockchainPaymentRoute.calculate_payment_window(order.chain)
+    deposit = kw["instance"]
+    chain = deposit.currency.chain
+    chain.refresh_from_db()
+    if chain.synced:
+        payment_window = BlockchainPaymentRoute.calculate_payment_window(chain)
 
         available_accounts = EthereumAccount.objects.exclude(
             blockchain_routes__payment_window__overlap=NumericRange(*payment_window)
         )
 
         account = available_accounts.order_by("?").first() or EthereumAccount.generate()
-        account.blockchain_routes.create(order=order, payment_window=payment_window)
+        account.blockchain_routes.create(
+            deposit=deposit, chain=chain, payment_window=payment_window
+        )
     else:
         logger.warning("Failed to create blockchain route. Chain data not synced")
 
 
+@receiver(post_save, sender=Deposit)
 @receiver(post_save, sender=PaymentOrder)
 @receiver(post_save, sender=Checkout)
 def on_order_created_set_raiden_route(sender, **kw):
@@ -165,11 +172,11 @@ def on_order_created_set_raiden_route(sender, **kw):
     if not kw["created"]:
         return
 
-    order = kw["instance"]
+    deposit = kw["instance"]
     raiden = Raiden.get()
 
-    if raiden and raiden.open_channels.filter(token_network__token=order.currency).exists():
-        raiden.payment_routes.create(order=order)
+    if raiden and raiden.open_channels.filter(token_network__token=deposit.currency).exists():
+        raiden.payment_routes.create(deposit=deposit)
 
 
 @receiver(block_sealed, sender=Block)
@@ -207,7 +214,7 @@ def on_block_added_publish_expired_blockchain_routes(sender, **kw):
 
     for route in expiring_routes:
         tasks.publish_checkout_event.delay(
-            route.order_id,
+            route.deposit_id,
             event=CheckoutEvents.BLOCKCHAIN_ROUTE_EXPIRED.value,
             route=route.account.address,
         )

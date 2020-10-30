@@ -39,8 +39,8 @@ class PaymentOrderManagerTestCase(BaseTestCase):
         self.assertFalse(PaymentOrder.objects.paid().filter(id=self.order.id).exists())
 
     def test_order_with_payment_is_not_open(self):
-        route = BlockchainPaymentRoute.objects.filter(order=self.order).first()
-        add_token_to_account(route.account, self.order.as_token_amount, self.order.chain)
+        route = BlockchainPaymentRoute.objects.filter(deposit=self.order).first()
+        add_token_to_account(route.account, self.order.as_token_amount, route.chain)
         self.assertTrue(PaymentOrder.objects.paid().filter(id=self.order.id).exists())
         self.assertFalse(PaymentOrder.objects.unpaid().filter(id=self.order.id).exists())
 

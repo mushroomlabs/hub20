@@ -32,7 +32,7 @@ class PaymentTransferTestCase(BaseTestCase):
 
         self.assertIsNotNone(route)
 
-        tx = TransactionMock(blockNumber=self.checkout.chain.highest_block, to=self.token.address)
+        tx = TransactionMock(blockNumber=self.token.chain.highest_block, to=self.token.address)
 
         from_address = tx["from"]
         recipient = route.account.address
@@ -54,7 +54,7 @@ class PaymentTransferTestCase(BaseTestCase):
                 with patch.object(
                     self.w3.eth, "waitForTransactionReceipt", return_value=tx_receipt
                 ):
-                    process_latest_transfers(self.w3, self.checkout.chain, self.block_filter)
+                    process_latest_transfers(self.w3, self.token.chain, self.block_filter)
 
         self.assertEqual(self.checkout.status, self.checkout.STATUS.paid)
 

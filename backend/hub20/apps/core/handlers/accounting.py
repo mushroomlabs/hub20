@@ -27,7 +27,7 @@ def on_payment_confirmed_set_user_credit(sender, **kw):
         confirmation = kw["instance"]
         payment = confirmation.payment
 
-        user = payment.route.order.user
+        user = payment.route.deposit.user
         book, _ = user.account.books.get_or_create(token=payment.currency)
 
         book.credits.create(
