@@ -220,17 +220,16 @@ class RaidenPaymentSerializer(PaymentSerializer):
         )
 
 
-class PaymentOrderSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="hub20:payment-order-detail")
-    amount = TokenValueField()
+class DepositSerializer(serializers.ModelSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name="hub20:deposit-detail")
     token = CurrencyRelatedField(source="currency")
     routes = serializers.SerializerMethodField()
     payments = serializers.SerializerMethodField()
 
-    def create(self, validated_data: Dict) -> models.PaymentOrder:
+    def create(self, validated_data: Dict):
         request = self.context["request"]
         with transaction.atomic():
-            return models.PaymentOrder.objects.create(user=request.user, **validated_data)
+            return self.Meta.model.objects.create(user=request.user, **validated_data)
 
     def get_routes(self, obj):
         def get_route_serializer(route):
@@ -250,11 +249,10 @@ class PaymentOrderSerializer(serializers.ModelSerializer):
         return [get_payment_serializer(payment).data for payment in obj.payments]
 
     class Meta:
-        model = models.PaymentOrder
+        model = models.Deposit
         fields = (
             "url",
             "id",
-            "amount",
             "token",
             "created",
             "routes",
@@ -262,6 +260,16 @@ class PaymentOrderSerializer(serializers.ModelSerializer):
             "status",
         )
         read_only_fields = ("id", "created", "status")
+
+
+class PaymentOrderSerializer(DepositSerializer):
+    url = serializers.HyperlinkedIdentityField(view_name="hub20:payment-order-detail")
+    amount = TokenValueField()
+
+    class Meta:
+        model = models.PaymentOrder
+        fields = DepositSerializer.Meta.fields + ("amount",)
+        read_only_fields = DepositSerializer.Meta.read_only_fields
 
 
 class PaymentOrderReadSerializer(PaymentOrderSerializer):

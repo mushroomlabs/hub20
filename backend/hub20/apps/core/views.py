@@ -64,6 +64,21 @@ class AccountDebitEntryList(generics.ListAPIView):
         return models.Debit.objects.filter(book__account__user=self.request.user)
 
 
+class BaseDepositView:
+    permission_classes = (IsAuthenticated,)
+    serializer_class = serializers.DepositSerializer
+
+
+class DepositListView(BaseDepositView, generics.ListCreateAPIView):
+    def get_queryset(self) -> QuerySet:
+        return self.request.user.deposit_set.all()
+
+
+class DepositView(BaseDepositView, generics.RetrieveAPIView):
+    def get_object(self) -> models.Deposit:
+        return get_object_or_404(models.Deposit, pk=self.kwargs.get("pk"), user=self.request.user)
+
+
 class BasePaymentOrderView(ReadWriteSerializerMixin):
     read_serializer_class = serializers.PaymentOrderReadSerializer
     write_serializer_class = serializers.PaymentOrderSerializer
@@ -73,7 +88,7 @@ class PaymentOrderListView(BasePaymentOrderView, generics.ListCreateAPIView):
     permission_classes = (IsAuthenticated,)
 
     def get_queryset(self) -> QuerySet:
-        return self.request.user.paymentorder_set.all()
+        return models.PaymentOrder.objects.filter(user=self.request.user)
 
 
 class PaymentOrderView(BasePaymentOrderView, generics.RetrieveDestroyAPIView):
@@ -89,7 +104,7 @@ class PaymentOrderView(BasePaymentOrderView, generics.RetrieveDestroyAPIView):
             return super().destroy(request, pk=pk)
         except ProtectedError:
             return Response(
-                f"Order has either been paid or has open routes and can not be canceled",
+                "Order has either been paid or has open routes and can not be canceled",
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
