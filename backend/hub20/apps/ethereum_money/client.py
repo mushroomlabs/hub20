@@ -55,6 +55,9 @@ def encode_transfer_data(recipient_address, amount: EthereumTokenAmount):
 def get_transfer_value_by_tx_data(
     w3: Web3, token: EthereumToken, tx_data
 ) -> Optional[EthereumTokenAmount]:
+    if not token.is_ERC20:
+        return token.from_wei(tx_data.value)
+
     args = _decode_transfer_arguments(w3, token, tx_data)
     if args is not None:
         return token.from_wei(args["_value"])
@@ -107,7 +110,6 @@ def make_token(w3: Web3, address) -> EthereumToken:
 
 def sync_token_transfers(w3: Web3, token: EthereumToken, starting_block: int, end_block: int):
     chain_id = int(w3.net.version)
-    chain = Chain.make(chain_id=chain_id)
     accounts_by_address = {a.address: a for a in EthereumAccount.objects.all()}
 
     contract = w3.eth.contract(abi=EIP20_ABI, address=token.address)
@@ -126,7 +128,7 @@ def sync_token_transfers(w3: Web3, token: EthereumToken, starting_block: int, en
 
             if recipient is not None or sender is not None:
                 block_data = w3.eth.getBlock(tx_data.blockHash)
-                block = Block.make(block_data, chain=chain)
+                block = Block.make(block_data, chain_id=chain_id)
                 tx_receipt = w3.eth.getTransactionReceipt(tx_hash)
                 Transaction.make(tx_data, tx_receipt, block)
         except TimeoutError:
@@ -225,6 +227,7 @@ def process_latest_transfers(w3: Web3, chain: Chain, block_filter):
     accounts_by_address = {a.address: a for a in EthereumAccount.objects.all()}
     tokens = EthereumToken.ERC20tokens.filter(chain=chain).select_related("chain")
     tokens_by_address = {token.address: token for token in tokens}
+    ETH = EthereumToken.ETH(chain=chain)
 
     for block_hash in block_filter.get_new_entries():
         block_data = w3.eth.getBlock(block_hash.hex(), full_transactions=True)
@@ -232,6 +235,7 @@ def process_latest_transfers(w3: Web3, chain: Chain, block_filter):
         logger.info(f"Checking block {block_hash.hex()} for relevant transfers")
         for tx_data in block_data.transactions:
             tx_hash = tx_data.hash
+            logger.info(f"Checking Tx {tx_hash.hex()}")
 
             token = tokens_by_address.get(tx_data.to)
             sender_address = tx_data["from"]
@@ -239,8 +243,12 @@ def process_latest_transfers(w3: Web3, chain: Chain, block_filter):
 
             if token:
                 recipient_address = get_transfer_recipient_by_tx_data(w3, token, tx_data)
+                transfer_amount = get_transfer_value_by_tx_data(
+                    w3=w3, token=token, tx_data=tx_data
+                )
             else:
                 recipient_address = tx_data.to
+                transfer_amount = ETH.from_wei(tx_data.value)
 
             recipient_account = accounts_by_address.get(recipient_address)
 
@@ -248,9 +256,7 @@ def process_latest_transfers(w3: Web3, chain: Chain, block_filter):
                 return
 
             try:
-                logger.info(
-                    f"Saving tx {tx_hash.hex()}: {sender_address} -> {recipient_address}"
-                )
+                logger.info(f"Saving tx {tx_hash.hex()}: {sender_address} -> {recipient_address}")
                 tx_receipt = w3.eth.waitForTransactionReceipt(tx_data.hash)
                 block = Block.make(block_data, chain_id=chain.id)
                 tx = Transaction.make(tx_data=tx_data, tx_receipt=tx_receipt, block=block)
@@ -258,7 +264,6 @@ def process_latest_transfers(w3: Web3, chain: Chain, block_filter):
             except TimeExhausted:
                 logger.warning(f"Timeout when waiting for receipt of tx {tx_hash.hex()}")
 
-            transfer_amount = get_transfer_value_by_tx_data(w3=w3, token=token, tx_data=tx_data)
             if sender_account:
                 outgoing_transfer_mined.send(
                     sender=Transaction,

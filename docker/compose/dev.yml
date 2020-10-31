@@ -88,6 +88,10 @@ services:
     tty: true
     volumes:
       - ./backend:/app
+    depends_on:
+      - db
+      - redis
+      - ethereum
 
   # Background command to listen to blockchain and raiden events
   job_listen_raiden:

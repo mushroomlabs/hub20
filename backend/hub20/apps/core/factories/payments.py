@@ -21,7 +21,6 @@ factory.Faker.add_provider(EthereumProvider)
 class PaymentOrderFactory(factory.django.DjangoModelFactory):
     user = factory.SubFactory(UserFactory)
     amount = fuzzy.FuzzyDecimal(0, 10, precision=6)
-    chain = factory.SubFactory(SyncedChainFactory)
 
     class Meta:
         abstract = False
@@ -43,22 +42,23 @@ class Erc20TokenPaymentOrderFactory(PaymentOrderFactory):
 
 
 class EtherBlockchainPaymentRouteFactory(factory.django.DjangoModelFactory):
-    order = factory.SubFactory(EtherPaymentOrderFactory)
+    deposit = factory.SubFactory(EtherPaymentOrderFactory)
     account = factory.SubFactory(EthereumAccountFactory)
+    chain = factory.SubFactory(SyncedChainFactory)
 
     class Meta:
         model = models.BlockchainPaymentRoute
 
 
 class Erc20TokenBlockchainPaymentRouteFactory(EtherBlockchainPaymentRouteFactory):
-    order = factory.SubFactory(Erc20TokenPaymentOrderFactory)
+    deposit = factory.SubFactory(Erc20TokenPaymentOrderFactory)
 
 
 class EtherBlockchainPaymentFactory(factory.django.DjangoModelFactory):
     route = factory.SubFactory(EtherBlockchainPaymentRouteFactory)
     transaction = factory.SubFactory(TransactionFactory)
-    currency = factory.SelfAttribute("route.order.currency")
-    amount = factory.SelfAttribute("route.order.amount")
+    currency = factory.SelfAttribute("route.deposit.currency")
+    amount = fuzzy.FuzzyDecimal(0, 10, precision=6)
 
     class Meta:
         model = models.BlockchainPayment

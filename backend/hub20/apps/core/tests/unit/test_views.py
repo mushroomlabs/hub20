@@ -48,7 +48,7 @@ class CheckoutViewTestCase(TestCase):
     def test_payment_serializer(self):
         checkout = factories.CheckoutFactory(store=self.store)
         route = checkout.routes.select_subclasses().first()
-        add_eth_to_account(route.account, amount=checkout.as_token_amount, chain=checkout.chain)
+        add_eth_to_account(route.account, amount=checkout.as_token_amount, chain=self.token.chain)
 
         url = reverse("hub20:checkout-detail", kwargs={"pk": checkout.pk})
         response = self.client.get(url)

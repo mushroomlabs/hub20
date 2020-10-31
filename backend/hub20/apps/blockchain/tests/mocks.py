@@ -69,12 +69,13 @@ class BlockMock(Web3DataMock):
     sha3Uncles = factory.Faker("hex64")
     timestamp = factory.LazyFunction(lambda: int(datetime.datetime.now().timestamp()))
     transactions = factory.LazyAttribute(
-        lambda obj: [factory.Faker("hex64").generate() for _ in range(obj.total_transactions)]
+        lambda obj: [obj.tx_hash for _ in range(obj.total_transactions)]
     )
     uncles = []
 
     class Params:
         total_transactions = 1
+        tx_hash = factory.Faker("hex64")
 
 
 class BlockWithTransactionDetailsMock(BlockMock):

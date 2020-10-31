@@ -72,24 +72,21 @@ class BaseTestCase(TestCase):
 class BlockchainPaymentTestCase(BaseTestCase):
     def setUp(self):
         self.order = Erc20TokenPaymentOrderFactory()
-        self.blockchain_route = BlockchainPaymentRoute.objects.filter(order=self.order).first()
+        self.blockchain_route = BlockchainPaymentRoute.objects.filter(deposit=self.order).first()
+        self.chain = self.blockchain_route.chain
 
     def test_transaction_sets_payment_as_received(self):
-        add_token_to_account(
-            self.blockchain_route.account, self.order.as_token_amount, self.order.chain
-        )
+        add_token_to_account(self.blockchain_route.account, self.order.as_token_amount, self.chain)
         self.assertTrue(self.order.is_paid)
         self.assertFalse(self.order.is_confirmed)
 
     def test_transaction_creates_blockchain_payment(self):
-        add_token_to_account(
-            self.blockchain_route.account, self.order.as_token_amount, self.order.chain
-        )
+        add_token_to_account(self.blockchain_route.account, self.order.as_token_amount, self.chain)
         self.assertEqual(self.order.payments.count(), 1)
 
     def test_user_balance_is_updated_on_completed_payment(self):
         tx = add_token_to_account(
-            self.blockchain_route.account, self.order.as_token_amount, self.order.chain
+            self.blockchain_route.account, self.order.as_token_amount, self.chain
         )
 
         block_number = tx.block.number + app_settings.Payment.minimum_confirmations
@@ -122,7 +119,7 @@ class RaidenPaymentTestCase(BaseTestCase):
 
         self.channel = ChannelFactory(token_network=token_network)
         self.order = Erc20TokenPaymentOrderFactory(currency=token_network.token)
-        self.raiden_route = RaidenPaymentRoute.objects.filter(order=self.order).first()
+        self.raiden_route = RaidenPaymentRoute.objects.filter(deposit=self.order).first()
 
     def test_order_has_raiden_route(self):
         self.assertIsNotNone(self.raiden_route)
@@ -160,7 +157,7 @@ class TransferTestCase(BaseTestCase):
         self.receiver = self.receiver_account.user
 
         self.deposit = Erc20TokenPaymentConfirmationFactory(
-            payment__route__order__user=self.sender
+            payment__route__deposit__user=self.sender,
         )
         self.credit = self.deposit.payment.as_token_amount
 
