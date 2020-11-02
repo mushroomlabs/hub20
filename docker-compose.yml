@@ -9,6 +9,7 @@ x-frontend: &hub20_frontend
   image: "hub20_frontend:${TAG:-latest}"
   build:
     context: ./frontend
+    dockerfile: apps/web/Dockerfile
 
 services:
   db:

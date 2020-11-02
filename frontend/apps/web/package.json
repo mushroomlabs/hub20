@@ -1,0 +1,59 @@
+{
+  "name": "vue-hub20-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "vue-cli-service build",
+    "e2e": "node test/e2e/runner.js",
+    "lint": "vue-cli-service lint",
+    "lint-fix": "vue-cli-service lint --fix",
+    "serve": "vue-cli-service serve --open",
+    "dev": "npm run serve"
+  },
+  "dependencies": {
+    "axios": "^0.20.0",
+    "bootstrap": "^4.5.2",
+    "bootstrap-scss": "^4.5.2",
+    "chartist": "^0.11.0",
+    "core-js": "^3.6.5",
+    "decimal.js-light": "^2.5.0",
+    "es6-promise": "^4.2.4",
+    "immutable": "^4.0.0-rc.12",
+    "node-sass": "^5.0.0",
+    "vue": "^2.6.11",
+    "vue-clickaway": "^2.1.0",
+    "vue-hub20": "file:../../libs/vue-hub20",
+    "vue-notifyjs": "^0.3.0",
+    "vue-router": "^3.0.1",
+    "vuex": "^3.5.1"
+  },
+  "devDependencies": {
+    "@vue/cli-plugin-babel": "~4.5.0",
+    "@vue/cli-plugin-eslint": "~4.5.0",
+    "@vue/cli-service": "~4.5.0",
+    "babel-eslint": "^10.1.0",
+    "eslint": "^6.7.2",
+    "eslint-plugin-vue": "^6.2.2",
+    "sass-loader": "^6.0.7",
+    "vue-template-compiler": "^2.6.11"
+  },
+  "eslintConfig": {
+    "root": true,
+    "env": {
+      "node": true
+    },
+    "extends": [
+      "plugin:vue/essential",
+      "eslint:recommended"
+    ],
+    "parserOptions": {
+      "parser": "babel-eslint"
+    },
+    "rules": {}
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ]
+}
