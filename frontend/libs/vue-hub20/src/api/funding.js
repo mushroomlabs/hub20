@@ -1,6 +1,11 @@
-import session from './session';
+import session from './session'
 
 export default {
+  createDeposit(token) {
+    return session.post('/api/deposits', {
+      token: token.address
+    })
+  },
   createPaymentOrder(token, amount) {
     return session.post('/api/payment/orders', {
       amount: amount,
@@ -8,10 +13,10 @@ export default {
     })
   },
   getPaymentOrder(orderId) {
-    return session.get(`/api/payment/orders/${orderId}`);
+    return session.get(`/api/payment/orders/${orderId}`)
   },
   cancelPaymentOrder(orderId) {
-    return session.delete(`/api/payment/orders/${orderId}`);
+    return session.delete(`/api/payment/orders/${orderId}`)
   },
   scheduleExternalTransfer(token, amount, address, options) {
     let payload = {
@@ -22,4 +27,4 @@ export default {
     }
     return session.post('/api/transfers', payload)
   }
-};
+}

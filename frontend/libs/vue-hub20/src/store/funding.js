@@ -21,22 +21,22 @@ const getters = {
 }
 
 const actions = {
-  createDeposit({commit}, {token, amount}) {
+  createDeposit({commit}, token) {
     return client
-      .createPaymentOrder(token, amount)
+      .createDeposit(token)
       .then(({data}) => commit(FUNDING_DEPOSIT_BEGIN, data))
       .catch(error => commit(FUNDING_DEPOSIT_FAILURE, error.response))
   },
-  cancelDeposit({commit, dispatch}, orderId) {
+  cancelDeposit({commit, dispatch}, depositId) {
     return client
-      .cancelPaymentOrder(orderId)
-      .then(() => dispatch('fetchDeposit', orderId))
+      .cancelDeposit(depositId)
+      .then(() => dispatch('fetchDeposit', depositId))
       .catch(error => commit(FUNDING_DEPOSIT_FAILURE, error.response))
   },
-  fetchDeposit({commit}, orderId) {
+  fetchDeposit({commit}, depositId) {
     return client
-      .getPaymentOrder(orderId)
-      .then(({orderData}) => commit(FUNDING_DEPOSIT_SUCCESS, orderData))
+      .getDeposit(depositId)
+      .then(({depositData}) => commit(FUNDING_DEPOSIT_SUCCESS, depositData))
       .catch(error => commit(FUNDING_DEPOSIT_FAILURE, error.response))
   },
   createTransfer({commit}, args) {
@@ -50,7 +50,7 @@ const actions = {
     commit(FUNDING_INITIALIZE)
   },
   refresh({state, dispatch}) {
-    Object.keys(state.depositsById).forEach(orderId => dispatch('fetchDeposit', orderId))
+    Object.keys(state.depositsById).forEach(depositId => dispatch('fetchDeposit', depositId))
   }
 }
 
@@ -58,28 +58,28 @@ const mutations = {
   [FUNDING_INITIALIZE](state) {
     Object.assign({...initialState}, state)
   },
-  [FUNDING_DEPOSIT_BEGIN](state, orderData) {
-    state.depositsById[orderData.id] = orderData
+  [FUNDING_DEPOSIT_BEGIN](state, depositData) {
+    state.depositsById[depositData.id] = depositData
     state.error = null
   },
   [FUNDING_DEPOSIT_FAILURE](state, error) {
     state.error = error.data
   },
-  [FUNDING_DEPOSIT_CANCEL](state, orderId) {
-    let order = state.depositsById[orderId]
+  [FUNDING_DEPOSIT_CANCEL](state, depositId) {
+    let deposit = state.depositsById[depositId]
 
-    if (order) {
-      order.status = 'canceled'
+    if (deposit) {
+      deposit.status = 'canceled'
     }
   },
-  [FUNDING_DEPOSIT_SUCCESS](state, orderData) {
-    state.depositsById[orderData.id] = orderData
+  [FUNDING_DEPOSIT_SUCCESS](state, depositData) {
+    state.depositsById[depositData.id] = depositData
   },
-  [FUNDING_DEPOSIT_SET_EXPIRED](state, orderId) {
-    let order = state.depositsById[orderId]
+  [FUNDING_DEPOSIT_SET_EXPIRED](state, depositId) {
+    let deposit = state.depositsById[depositId]
 
-    if (order) {
-      order.status = 'expired'
+    if (deposit) {
+      deposit.status = 'expired'
     }
   },
   [FUNDING_TRANSFER_BEGIN](state, transferData) {
