@@ -122,7 +122,6 @@ services:
         ipv4_address: 10.0.20.80
     volumes:
       - ./frontend:/app
-      - /app/node_modules
     ports:
       - "8081:8080"
 

@@ -11,6 +11,7 @@
     "dev": "npm run serve"
   },
   "dependencies": {
+    "@vue/cli": "^4.5.8",
     "axios": "^0.20.0",
     "bootstrap": "^4.5.2",
     "bootstrap-scss": "^4.5.2",
