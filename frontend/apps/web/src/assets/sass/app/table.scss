@@ -1,10 +1,31 @@
 table {
-    th {
-        align-content: center;
-        text-align: center;
+  th {
+    align-content: center;
+    text-align: center;
+  }
+  .description {
+    font-size: inherit !important;
+    color: inherit !important;
+  }
+
+  td {
+    text-align: center;
+    &.actions {
+      text-align: right;
+      align-items: space-around;
+
+      > * {
+        display: inline-block;
+        margin: 0.25vh 1em;
+      }
+
+      a, button {
+        @include button($info-color, $info-states-color, $font-size: $font-size-small);
+      }
+
+      button.destructive-action {
+        @include button($danger-color, $danger-states-color, $font-size: $font-size-small);
+      }
     }
-    .description {
-        font-size: inherit !important;
-        color: inherit !important;
-    }
+  }
 }

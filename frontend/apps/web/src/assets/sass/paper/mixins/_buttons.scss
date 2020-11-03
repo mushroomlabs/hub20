@@ -25,8 +25,14 @@
     border-color: $btn-states-color;
   }
 
-  .caret {
-    border-top-color: $white-color;
+  &.disabled,
+  &:disabled,
+  &[disabled],
+  fieldset[disabled] {
+    background-color: $default-disabled-color !important;
+    border-color: $default-disabled-color !important;
+    @include opacity(0.5);
+    pointer-events: none;
   }
 
   .caret {
@@ -88,6 +94,21 @@
   &.active,
   .open > &.dropdown-toggle {
     color: $btn-states-color !important;
+  }
+
+  &.disabled,
+  &:disabled,
+  &[disabled],
+  fieldset[disabled] & {
+    &,
+    &:hover,
+    &:focus,
+    &.focus,
+    &:active,
+    &.active {
+      background-color: transparent !important;
+      border-color: $btn-color;
+    }
   }
 }
 

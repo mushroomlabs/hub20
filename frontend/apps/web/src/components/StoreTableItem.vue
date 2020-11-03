@@ -5,7 +5,7 @@
   <td class="identifier">{{ store.id }}</td>
   <td class="actions">
     <router-link :to="{'name': 'store', 'params': {'id': store.id} }">Edit</router-link>
-    <p-button name="remove" @click.native="promptRemoval(store)">Remove</p-button>
+    <button class="destructive-action" name="remove" @click.native="promptRemoval(store)">Remove</button>
   </td>
 </tr>
 </template>
@@ -56,27 +56,3 @@ export default {
   }
 }
 </script>
-<style lang="scss">
-@import '../assets/sass/app.scss';
-
-td {
-    text-align: center;
-    &.actions {
-      text-align: right;
-      align-items: space-around;
-
-      > * {
-        display: inline-block;
-        margin: 0.25vh 1em;
-      }
-
-      a {
-        @include button($info-color, $info-states-color, $font-size: $font-size-small)
-      }
-
-      button[name=remove] {
-        @include button($danger-color, $danger-states-color, $font-size: $font-size-small)
-      }
-    }
-}
-</style>
