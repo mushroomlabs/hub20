@@ -2,6 +2,10 @@
 // Single side border-radius
 
 // Helper function to replace negative values with 0
+
+
+@use './defaults' as defaults;
+
 @function valid-radius($radius) {
   $return: ();
   @each $value in $radius {
@@ -14,7 +18,7 @@
   @return $return;
 }
 
-@mixin border-radius($radius: $border-radius, $fallback-border-radius: false) {
+@mixin border-radius($radius: $border-radius, $fallback-border-radius: false, $enable-rounded: defaults.$enable-rounded) {
   @if $enable-rounded {
     border-radius: valid-radius($radius);
   }

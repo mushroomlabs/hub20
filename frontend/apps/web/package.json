@@ -20,7 +20,7 @@
     "decimal.js-light": "^2.5.0",
     "es6-promise": "^4.2.4",
     "immutable": "^4.0.0-rc.12",
-    "node-sass": "^5.0.0",
+    "sass": "^1.28.0",
     "vue": "^2.6.11",
     "vue-clickaway": "^2.1.0",
     "vue-hub20": "file:../../libs/vue-hub20",
@@ -35,7 +35,7 @@
     "babel-eslint": "^10.1.0",
     "eslint": "^6.7.2",
     "eslint-plugin-vue": "^6.2.2",
-    "sass-loader": "^6.0.7",
+    "sass-loader": "^7.1.0",
     "vue-template-compiler": "^2.6.11"
   },
   "eslintConfig": {

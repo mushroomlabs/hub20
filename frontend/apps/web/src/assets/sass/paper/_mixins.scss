@@ -2,12 +2,14 @@
 @import "mixins/transparency";
 @import "mixins/vendor-prefixes";
 @import "mixins/border-radius";
+@import "mixins/breakpoints";
 //Components
 @import "mixins/buttons";
 @import "mixins/inputs";
 @import "mixins/labels";
 @import "mixins/tabs";
 @import "mixins/navbars";
+@import "mixins/modals";
 @import "mixins/icons";
 @import "mixins/cards";
 @import "mixins/chartist";

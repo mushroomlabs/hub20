@@ -1,8 +1,9 @@
+@use './defaults' as defaults;
 @import './transparency';
-@import './defaults';
+
 
 // Mixin for generating new styles
-@mixin btn-styles($btn-color, $btn-states-color) {
+@mixin btn-styles($btn-color, $btn-states-color, $disabled-color: defaults.$disabled-color) {
   background-color: $btn-color;
   box-sizing: border-box;
   border-width: $border-thick;
@@ -29,8 +30,8 @@
   &:disabled,
   &[disabled],
   fieldset[disabled] {
-    background-color: $default-disabled-color !important;
-    border-color: $default-disabled-color !important;
+    background-color: $disabled-color !important;
+    border-color: $disabled-color !important;
     @include opacity(0.5);
     pointer-events: none;
   }
@@ -116,7 +117,7 @@
   $padding-vertical: $padding-small-vertical,
   $padding-horizontal: $padding-small-horizontal,
   $font-size: $font-size-small,
-  $border-radius: $default-border-radius
+  $border-radius: defaults.$border-radius
 ) {
   font-size: $font-size;
   padding: $padding-vertical $padding-horizontal;
@@ -126,9 +127,9 @@
 @mixin button(
   $btn-color,
   $btn-states-color,
-  $padding-vertical: $default-padding-vertical,
-  $padding-horizontal: $default-padding-horizontal,
-  $font-size: $default-font-size
+  $padding-vertical: defaults.$padding-vertical,
+  $padding-horizontal: defaults.$padding-horizontal,
+  $font-size: defaults.$font-size
 ) {
   @include btn-styles($btn-color, $btn-states-color);
   @include btn-size($padding-vertical, $padding-horizontal, $font-size);
@@ -137,9 +138,9 @@
 @mixin button-outline(
   $btn-color,
   $btn-states-color,
-  $padding-vertical: $default-padding-vertical,
-  $padding-horizontal: $default-padding-horizontal,
-  $font-size: $default-font-size
+  $padding-vertical: defaults.$padding-vertical,
+  $padding-horizontal: defaults.$padding-horizontal,
+  $font-size: defaults.$font-size
 ) {
   @include btn-outline-styles($btn-color, $btn-states-color);
   @include btn-size($padding-vertical, $padding-horizontal, $font-size);
@@ -158,7 +159,7 @@
   $btn-states-color,
   $padding-vertical: $padding-small-vertical,
   $padding-horizontal: $padding-small-horizontal,
-  $font-size: $default-font-size
+  $font-size: defaults.$font-size
 ) {
   @include btn-simple-styles($btn-color, $btn-states-color);
   @include btn-size($padding-vertical, $padding-horizontal, $font-size);

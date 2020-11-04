@@ -1,5 +1,3 @@
-@import "./mixins/defaults";
-
 $font-color: #66615b !default;
 $fill-font-color: rgba(255, 255, 255, 0.7);
 
@@ -107,7 +105,7 @@ $border-radius-btn-large: 50px !default;
 
 $margin-bottom: 0 0 10px 0 !default;
 $border-radius-small: 3px !default;
-$border-radius-base: $default-border-radius;
+$border-radius-base: 4px !default;
 $border-radius-large: 6px !default;
 $border-radius-extreme: 6px !default;
 
@@ -118,7 +116,7 @@ $btn-round-radius: 30px !default;
 
 $height-base: 40px !default;
 
-$font-family: $default-font-family;
+$font-family: 'Muli', "Helvetica", Arial, sans-serif !default;
 
 $font-size-base: 14px !default;
 $font-size-xs: 12px !default;
