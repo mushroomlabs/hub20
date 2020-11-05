@@ -1,20 +1,23 @@
 <template>
-<div role="dialog" :aria-labelledby="label" aria-hidden="{{ hidden }}">
-  <div class="modal-dialog">
-    <div class="header">
-      <button type="button" class="close" aria-hidden="{{ hidden }}">&times;</button>
-      <h4 class="modal-title" id="{{ label }}">{{ title }}</h4>
-    </div>
-    <div class="content">
-      <slot>
-      </slot>
-    </div>
-    <div class="footer">
-      <slot name="footer">
-      </slot>
+  <div
+    role="dialog"
+    :aria-labelledby="label"
+    :aria-hidden="hidden"
+    :class="{fade: fade, show: !hidden, scrollable: scrollable}"
+  >
+    <div class="modal-dialog">
+      <div class="header">
+        <h4 :id="label">{{ title }}</h4>
+        <button type="button" @click="close()" :aria-hidden="hidden">&times;</button>
+      </div>
+      <div class="content">
+        <slot></slot>
+      </div>
+      <div class="footer">
+        <slot name="footer"></slot>
+      </div>
     </div>
   </div>
-</div>
 </template>
 
 <script>
@@ -22,27 +25,73 @@ export default {
   props: {
     id: {
       type: String,
-      default: "modal"
+      default: 'modal'
     },
     label: {
       type: String,
-      default: "label"
+      default: 'label'
     },
     title: {
       type: String,
-      default: ""
-    },
-    dismissMessage: {
-      type: String,
-      default: "Dismiss"
-    },
-    actionMessage: {
-      type: String,
+      default: ''
     },
     hidden: {
       type: Boolean,
       default: true
+    },
+    scrollable: {
+      type: Boolean,
+      default: false
+    },
+    fade: {
+      type: Boolean,
+      default: true
+    }
+  },
+  methods: {
+    close() {
+      this.hidden = true
+    },
+    open() {
+      this.hidden = false
     }
   }
 }
 </script>
+
+<style lang="scss">
+@use "@/assets/sass/paper/mixins/_modals.scss" as modals;
+@use "@/assets/sass/paper/mixins/_close.scss";
+
+div[role='dialog'] {
+  @include modals.modal-container();
+  padding-top: 60px;
+
+  div.modal-dialog {
+    &.fade {
+      @include modals.modal-fade();
+    }
+
+    &.show {
+      @include modals.modal-show();
+    }
+
+    @include modals.modal-content();
+
+    > .header {
+      @include modals.modal-header();
+
+      button {
+        @include close.close-button();
+        background-color: transparent;
+        border: none;
+      }
+
+      h4 {
+        @include modals.modal-title();
+        margin: auto;
+      }
+    }
+  }
+}
+</style>

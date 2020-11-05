@@ -27,7 +27,7 @@
   }
 }
 
-@mixin border-top-radius($radius) {
+@mixin border-top-radius($radius, $enable-rounded: defaults.$enable-rounded) {
   @if $enable-rounded {
     border-top-left-radius: valid-radius($radius);
     border-top-right-radius: valid-radius($radius);

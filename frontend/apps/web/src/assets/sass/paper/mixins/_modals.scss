@@ -1,4 +1,6 @@
 @use "./defaults" as defaults;
+@import './vendor-prefixes';
+@import './border-radius';
 
 @mixin body-with-modal-open() {
   // Kill the scroll on the body
@@ -12,18 +14,19 @@
 
 // Container that the modal scrolls within
 @mixin modal-container(
-  $zindex: $zindex-modal,
-  $margin: $modal-dialog-margin,
-  $static-transform: $modal-scale-transform
+  $zindex: defaults.$zindex-modal,
+  $margin: defaults.$modal-dialog-margin,
+  $static-transform: defaults.$modal-scale-transform
 ) {
   position: fixed;
   top: 0;
   left: 0;
   z-index: $zindex;
-  display: none;
+  display: block;
   width: 100%;
   height: 100%;
   overflow: hidden;
+  background-color: rgba(0, 0, 0, 0.3);
   // Prevent Chrome on Windows from adding a focus outline. For details, see
   // https://github.com/twbs/bootstrap/pull/10951.
   outline: 0;
@@ -32,6 +35,11 @@
   // See also https://github.com/twbs/bootstrap/issues/17695
 
   // Shell div to position the modal with bottom padding
+
+  &:not(.show) {
+    display: none;
+  }
+
   .modal-dialog {
     position: relative;
     width: auto;
@@ -46,21 +54,24 @@
   }
 }
 
-@mixin modal-fade($transition: $modal-transition, $transform: $modal-fade-transform) {
-  @include transition($transition);
+@mixin modal-fade(
+  $transition: defaults.$modal-transition,
+  $transform: defaults.$modal-fade-transform
+) {
+  transition: $transition;
   transform: $transform;
 }
 
-@mixin modal-show($transform: $modal-show-transform) {
+@mixin modal-show($transform: defaults.$modal-show-transform) {
   transform: $transform;
 }
 
-@mixin modal-scrollable($margin: $modal-dialog-margin) {
+@mixin modal-scrollable($margin: defaults.$modal-dialog-margin) {
   display: flex; // IE10/11
   max-height: subtract(100%, $margin * 2);
 
   .content {
-    max-height: subtract(100vh, $modal-dialog-margin * 2); // IE10/11
+    max-height: subtract(100vh, $margin * 2); // IE10/11
     overflow: hidden;
   }
 
@@ -74,15 +85,15 @@
   }
 }
 
-@mixin modal-centered() {
+@mixin modal-centered($margin: defaults.$modal-dialog-margin) {
   display: flex;
   align-items: center;
-  min-height: subtract(100%, $modal-dialog-margin * 2);
+  min-height: subtract(100%, $margin * 2);
 
   // Ensure `modal-dialog-centered` extends the full height of the view (IE10/11)
   &::before {
     display: block; // IE10
-    height: subtract(100vh, $modal-dialog-margin * 2);
+    height: subtract(100vh, $margin * 2);
     height: min-content; // Reset height to 0 except on IE
     content: '';
   }
@@ -104,64 +115,83 @@
 }
 
 // Actual modal
-@mixin modal-content() {
+@mixin modal-content(
+  $color: defaults.$modal-content-color,
+  $background-color: defaults.$modal-content-bg,
+  $border-width: defaults.$modal-content-border-width,
+  $border-color: defaults.$modal-content-border-color,
+  $border-radius: defaults.$modal-content-border-radius,
+  $box-shadow-size: defaults.$modal-content-box-shadow-xs
+) {
   position: relative;
   display: flex;
   flex-direction: column;
   width: 100%; // Ensure `.modal-content` extends the full width of the parent `.modal-dialog`
   // counteract the pointer-events: none; in the .modal-dialog
-  color: $modal-content-color;
+  margin: auto;
+  color: $color;
   pointer-events: auto;
-  background-color: $modal-content-bg;
+  background-color: $background-color;
   background-clip: padding-box;
-  border: $modal-content-border-width solid $modal-content-border-color;
-  @include border-radius($modal-content-border-radius);
-  @include box-shadow($modal-content-box-shadow-xs);
+  border: $border-width solid $border-color;
+  @include border-radius($border-radius);
+  @include box-shadow($box-shadow-size);
   // Remove focus outline from opened modal
   outline: 0;
 }
 
 // Modal background
-@mixin modal-backdrop() {
+@mixin modal-backdrop(
+  $zindex: defaults.$zindex-modal-backdrop,
+  $background-color: defaults.$modal-backdrop-bg,
+  $opacity: defaults.$modal-backdrop-opacity
+) {
   position: fixed;
   top: 0;
   left: 0;
-  z-index: $zindex-modal-backdrop;
+  z-index: $zindex;
   width: 100vw;
   height: 100vh;
-  background-color: $modal-backdrop-bg;
+  background-color: $background-color;
 
   // Fade for backdrop
   &.fade {
     opacity: 0;
   }
   &.show {
-    opacity: $modal-backdrop-opacity;
+    opacity: $opacity;
   }
 }
 
 // Modal header
 // Top section of the modal w/ title and dismiss
-@mixin modal-header() {
+@mixin modal-header(
+  $border-color: defaults.$modal-header-border-color,
+  $border-radius: defaults.$modal-content-inner-border-radius,
+  $border-width: defaults.$modal-header-border-width,
+  $padding: defaults.$modal-header-padding,
+  $padding-x: defaults.$modal-header-padding-x,
+  $padding-y: defaults.$modal-header-padding-y
+) {
   display: flex;
   align-items: flex-start; // so the close btn always stays on the upper right corner
   justify-content: space-between; // Put modal header elements (title and dismiss) on opposite ends
-  padding: $modal-header-padding;
-  border-bottom: $modal-header-border-width solid $modal-header-border-color;
-  @include border-top-radius($modal-content-inner-border-radius);
+  padding: $padding;
+  border-bottom: $border-width solid $border-color;
+  @include border-top-radius($border-radius);
 
   .close {
-    padding: $modal-header-padding;
+    padding: $padding;
     // auto on the left force icon to the right even when there is no .modal-title
-    margin: (-$modal-header-padding-y) (-$modal-header-padding-x) (-$modal-header-padding-y)
+    margin: (-$padding-y) (-$padding-x) (-$padding-y)
       auto;
   }
 }
 
 // Title text within header
-@mixin modal-title() {
+@mixin modal-title($line-height: defaults.$modal-title-line-height) {
   margin-bottom: 0;
-  line-height: $modal-title-line-height;
+  line-height: $line-height;
 }
 
 // Modal body
@@ -199,51 +229,4 @@
   width: 50px;
   height: 50px;
   overflow: scroll;
-}
-
-// Scale up the modal
-@include media-breakpoint-up(sm) {
-  // Automatically set modal's width for larger viewports
-  .modal-dialog {
-    max-width: defaults.$modal-md;
-    margin: defaults.$modal-dialog-margin-y-sm-up auto;
-  }
-
-  .modal-dialog-scrollable {
-    max-height: subtract(100%, defaults.$modal-dialog-margin-y-sm-up * 2);
-
-    .modal-content {
-      max-height: subtract(100vh, defaults.$modal-dialog-margin-y-sm-up * 2);
-    }
-  }
-
-  .modal-dialog-centered {
-    min-height: subtract(100%, defaults.$modal-dialog-margin-y-sm-up * 2);
-
-    &::before {
-      height: subtract(100vh, defaults.$modal-dialog-margin-y-sm-up * 2);
-      height: min-content;
-    }
-  }
-
-  .modal-content {
-    @include box-shadow(defaults.$modal-content-box-shadow-sm-up);
-  }
-
-  .modal-sm {
-    max-width: defaults.$modal-sm;
-  }
-}
-
-@include media-breakpoint-up(lg) {
-  .modal-lg,
-  .modal-xl {
-    max-width: defaults.$modal-lg;
-  }
-}
-
-@include media-breakpoint-up(xl) {
-  .modal-xl {
-    max-width: defaults.$modal-xl;
-  }
 }
