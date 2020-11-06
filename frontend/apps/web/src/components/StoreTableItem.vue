@@ -5,7 +5,7 @@
   <td class="identifier">{{ store.id }}</td>
   <td class="actions">
     <router-link :to="{'name': 'store', 'params': {'id': store.id} }">Edit</router-link>
-    <button class="destructive-action" name="remove" @click.native="promptRemoval(store)">Remove</button>
+    <button class="destructive-action" name="remove" @click="promptRemoval(store)">Remove</button>
   </td>
 </tr>
 </template>
