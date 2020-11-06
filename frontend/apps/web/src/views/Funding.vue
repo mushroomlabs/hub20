@@ -1,15 +1,27 @@
 <template>
-<card title="Current Tokens" subTitle="Tokens listed and managed by your account">
-  <FundingTable />
-</card>
+  <div>
+    <card title="Current Tokens" subTitle="Tokens listed and managed by your account">
+      <FundingTable />
+    </card>
+    <DepositModal v-if="openDeposit" :deposit="openDeposit" />
+  </div>
 </template>
 <script>
-import FundingTable from "@/components/funding/FundingTable"
+import {mapGetters} from 'vuex'
+import FundingTable from '@/components/funding/FundingTable'
+import DepositModal from '@/components/funding/DepositModal'
 
 export default {
-  name: "funding",
+  name: 'funding',
   components: {
-    FundingTable
+    FundingTable,
+    DepositModal
+  },
+  computed: {
+    ...mapGetters('funding', ['openDeposits', 'deposits']),
+    openDeposit() {
+      return this.openDeposits.length > 0 ? this.openDeposits[0] : null
+    }
   }
 }
 </script>

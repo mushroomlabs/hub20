@@ -6,6 +6,9 @@ export default {
       token: token.address
     })
   },
+  getDeposit(depositId) {
+    return session.get(`/api/deposit/${depositId}`)
+  },
   createPaymentOrder(token, amount) {
     return session.post('/api/payment/orders', {
       amount: amount,

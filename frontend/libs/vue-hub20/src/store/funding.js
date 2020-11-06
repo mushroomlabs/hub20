@@ -1,3 +1,5 @@
+import Vue from 'vue'
+
 import client from '../api/funding'
 
 export const FUNDING_INITIALIZE = 'FUNDING_INITIALIZE'
@@ -17,7 +19,8 @@ const initialState = {
 
 const getters = {
   deposits: state => Object.values(state.depositsById),
-  transfers: state => Object.values(state.transfersById)
+  transfers: state => Object.values(state.transfersById),
+  openDeposits: (state, getters) => getters.deposits.filter(deposit => deposit.status == 'open')
 }
 
 const actions = {
@@ -36,7 +39,7 @@ const actions = {
   fetchDeposit({commit}, depositId) {
     return client
       .getDeposit(depositId)
-      .then(({depositData}) => commit(FUNDING_DEPOSIT_SUCCESS, depositData))
+      .then(({data}) => commit(FUNDING_DEPOSIT_SUCCESS, data))
       .catch(error => commit(FUNDING_DEPOSIT_FAILURE, error.response))
   },
   createTransfer({commit}, args) {
@@ -59,7 +62,7 @@ const mutations = {
     Object.assign({...initialState}, state)
   },
   [FUNDING_DEPOSIT_BEGIN](state, depositData) {
-    state.depositsById[depositData.id] = depositData
+    Vue.set(state.depositsById, depositData.id, depositData)
     state.error = null
   },
   [FUNDING_DEPOSIT_FAILURE](state, error) {
@@ -70,20 +73,22 @@ const mutations = {
 
     if (deposit) {
       deposit.status = 'canceled'
+      Vue.set(state.depositsById, depositId, deposit)
     }
   },
   [FUNDING_DEPOSIT_SUCCESS](state, depositData) {
-    state.depositsById[depositData.id] = depositData
+    Vue.set(state.depositsById, depositData.id, depositData)
   },
   [FUNDING_DEPOSIT_SET_EXPIRED](state, depositId) {
     let deposit = state.depositsById[depositId]
 
     if (deposit) {
       deposit.status = 'expired'
+      Vue.set(state.depositsById, depositId, deposit)
     }
   },
   [FUNDING_TRANSFER_BEGIN](state, transferData) {
-    state.transfersById[transferData.id] = transferData
+    Vue.set(state.transfersById, transferData.id, transferData)
     state.error = null
   },
   [FUNDING_TRANSFER_FAILURE](state, error) {
