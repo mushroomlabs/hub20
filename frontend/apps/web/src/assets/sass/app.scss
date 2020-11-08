@@ -17,4 +17,8 @@
 // Application-wide Widgets
 @import "./app/table.scss";
 
-@import "./toolkit/widgets.scss"
+@import "./toolkit/widgets.scss";
+
+// Custom style of components
+
+@import "./app/components/funding.scss";

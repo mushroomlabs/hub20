@@ -5,7 +5,7 @@
         type="button"
         v-for="route in paymentRequest.routes"
         :value="route.type"
-        :class="{active: route.type == (selectedRoute && selectedroute.type)}"
+        :class="{active: route.type == (selectedRoute && selectedRoute.type)}"
         @click="selectRoute(route)"
         :key="route.type"
       >
@@ -19,6 +19,7 @@
       :token="token"
       :amount="paymentRequest.amount"
       :key="route.type"
+      :selected="route == selectedRoute"
     />
     <PaymentTracker :paymentRequest="paymentRequest" />
   </div>
@@ -39,10 +40,11 @@ export default {
   props: {
     paymentRequest: {
       type: Object
-    },
-    selectedRoute: {
-      type: Object,
-      default: null
+    }
+  },
+  data(){
+    return {
+      selectedRoute: this.paymentRequest.routes && this.paymentRequest.routes[0]
     }
   },
   computed: {
@@ -56,9 +58,8 @@ export default {
   methods: {
     routeDisplayName(route) {
       return {
-        internal: 'From hub20 account',
-        blockchain: 'Ethereum On-Chain',
-        raiden: 'Raiden Payment Network'
+        blockchain: 'On-Chain',
+        raiden: 'Raiden'
       }[route.type]
     },
     selectRoute(route) {

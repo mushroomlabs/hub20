@@ -28,11 +28,6 @@ export default {
         this.openModal(this.deposit.id)
       }
     }
-  },
-  mounted() {
-    let depositId = "de869a07-9425-47c3-aa56-60b765336578"
-    this.$store.dispatch("funding/fetchDeposit", depositId)
-      .then(() => this.openModal(depositId))
   }
 }
 </script>

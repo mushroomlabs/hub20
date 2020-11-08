@@ -1,0 +1,28 @@
+$_qrcode_size: 35vw !important;
+$_qrcode_max_size: 250px !important;
+
+div.payment-request {
+
+  div.button-bar, canvas.qr-code {
+    text-align: center;
+  }
+
+  div.payment-route {
+    &:not(.selected) {
+      display: none;
+    }
+
+    &.selected {
+      display: block;
+    }
+  }
+
+  canvas.qr-code {
+    display: block;
+    margin: auto;
+    width: $_qrcode_size;
+    height: $_qrcode_size;
+    max-width: $_qrcode_max_size;
+    max-height: $_qrcode_max_size;
+  }
+}
