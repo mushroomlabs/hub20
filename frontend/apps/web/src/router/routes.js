@@ -79,7 +79,7 @@ const routes = [
       },
       {
         path: 'send/:token',
-        name: 'send',
+        name: 'withdraw',
         component: Transfer,
         meta: {
           viewTitle: 'Send'
@@ -87,7 +87,7 @@ const routes = [
       },
       {
         path: 'transfer/:token',
-        name: 'send',
+        name: 'transfer',
         component: Transfer,
         meta: {
           viewTitle: 'Send Payment'

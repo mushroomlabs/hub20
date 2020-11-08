@@ -5,7 +5,7 @@
     <td class="identifier">{{ token.id }}</td>
     <td class="actions">
       <button @click="createDeposit(token)">Deposit</button>
-      <router-link :to="{name: 'send', params: {token: token.address}}" :disabled="!hasFunds"
+      <router-link :to="{name: 'withdraw', params: {token: token.address}}" :disabled="!hasFunds"
         >Send</router-link
       >
     </td>
