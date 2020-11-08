@@ -10,13 +10,13 @@
 * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
 
-import Vue from "vue"
-import App from "./App"
-import router from "@/router/index"
-import store from '@/store/index'
+import Vue from 'vue'
+import App from './App'
+import router from '@/router/index'
+import store from '@/store'
 
-import PaperDashboard from "./plugins/paperDashboard"
-import "vue-notifyjs/themes/default.css"
+import PaperDashboard from './plugins/paperDashboard'
+import 'vue-notifyjs/themes/default.css'
 
 Vue.use(PaperDashboard)
 
@@ -25,4 +25,4 @@ new Vue({
   router,
   store,
   render: h => h(App)
-}).$mount("#app")
+}).$mount('#app')
