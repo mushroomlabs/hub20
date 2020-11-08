@@ -4,7 +4,7 @@
     <td class="balance">{{ balance }}</td>
     <td class="identifier">{{ token.id }}</td>
     <td class="actions">
-      <button @click="createDeposit(token)">Deposit</button>
+      <button @click="requestDeposit(token)">Deposit</button>
       <router-link :to="{name: 'withdraw', params: {token: token.address}}" :disabled="!hasFunds"
         >Send</router-link
       >
@@ -12,7 +12,7 @@
   </tr>
 </template>
 <script>
-import {mapGetters, mapActions} from 'vuex'
+import {mapActions, mapGetters} from 'vuex'
 
 export default {
   props: {
@@ -29,6 +29,12 @@ export default {
       return this.balance.gt(0)
     }
   },
-  methods: {...mapActions('funding', ['createDeposit'])}
+  methods: {
+    ...mapActions('funding', ['createDeposit']),
+    requestDeposit(token) {
+      this.createDeposit(token)
+        .then(() => this.$emit('depositRequested', token))
+    }
+  }
 }
 </script>

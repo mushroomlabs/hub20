@@ -6,7 +6,7 @@
     <th class="actions"></th>
   </thead>
   <tbody>
-    <FundingTableItem v-for="(token, address) in tokensByAddress" :token="token" :key="address" />
+    <FundingTableItem v-for="(token, address) in tokensByAddress" :token="token" :key="address" v-on="$listeners"/>
   </tbody>
 </table>
 </template>
