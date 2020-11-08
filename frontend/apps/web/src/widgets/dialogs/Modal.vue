@@ -35,10 +35,6 @@ export default {
       type: String,
       default: ''
     },
-    hidden: {
-      type: Boolean,
-      default: true
-    },
     scrollable: {
       type: Boolean,
       default: false
@@ -46,6 +42,11 @@ export default {
     fade: {
       type: Boolean,
       default: true
+    }
+  },
+  data() {
+    return {
+      hidden: false
     }
   },
   methods: {

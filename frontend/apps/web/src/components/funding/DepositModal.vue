@@ -1,5 +1,5 @@
 <template>
-  <Modal :title="title" :hidden="false" :id="modalId" label="deposit-modal">
+  <Modal :title="title" :id="modalId" label="deposit-modal">
     <template>
       <PaymentRequest :paymentRequest='deposit' />
     </template>
@@ -34,7 +34,7 @@ export default {
     },
     modalId() {
       return `modal-${this.deposit.id}`
-    }
+    },
   }
 }
 </script>
