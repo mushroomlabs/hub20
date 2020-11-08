@@ -8,11 +8,11 @@
 
 <script>
 import {mapGetters} from 'vuex'
-import {components} from 'vue-hub20'
+import {default as hub20lib} from 'vue-hub20'
 
 import Modal from '@/widgets/dialogs/Modal'
 
-const {PaymentRequest} = components
+const {PaymentRequest} = hub20lib.components
 
 export default {
   components: {

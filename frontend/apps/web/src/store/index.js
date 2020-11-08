@@ -2,9 +2,7 @@ import Vue from 'vue'
 import Vuex from 'vuex'
 import createLogger from 'vuex/dist/logger'
 
-import {store} from 'vue-hub20'
-
-const {auth, account, notifications, password, signup, stores, tokens, funding} = store
+import {default as hub20lib} from 'vue-hub20'
 
 import {APP_SET_INITIALIZED} from './types'
 
@@ -46,16 +44,7 @@ const actions = {
 }
 
 export default new Vuex.Store({
-  modules: {
-    account,
-    auth,
-    funding,
-    notifications,
-    password,
-    signup,
-    stores,
-    tokens
-  },
+  modules: hub20lib.store,
   state: initialState,
   strict: debug,
   plugins: debug ? [createLogger()] : [],
