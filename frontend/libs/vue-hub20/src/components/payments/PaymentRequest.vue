@@ -13,16 +13,25 @@
       </button>
     </div>
 
-    <PaymentRoute v-for="route in paymentRequest.routes" :route="route" :key="route.type" />
+    <PaymentRoute
+      v-for="route in paymentRequest.routes"
+      :route="route"
+      :token="token"
+      :amount="paymentRequest.amount"
+      :key="route.type"
+    />
     <PaymentTracker :paymentRequest="paymentRequest" />
   </div>
 </template>
 
 <script>
+import mixins from '../../mixins'
+
 import PaymentRoute from './PaymentRoute'
 import PaymentTracker from './PaymentTracker'
 
 export default {
+  mixins: [mixins.TokenMixin],
   components: {
     PaymentRoute,
     PaymentTracker
@@ -38,7 +47,10 @@ export default {
   },
   computed: {
     hasMultipleRoutes() {
-      return this.paymentRequest.routes.length > 1;
+      return this.paymentRequest.routes.length > 1
+    },
+    token() {
+      return this.getToken(this.paymentRequest.token)
     }
   },
   methods: {
