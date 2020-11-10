@@ -3,6 +3,8 @@ import logging
 from asgiref.sync import async_to_sync
 from celery import shared_task
 from channels.layers import get_channel_layer
+from django.contrib.sessions.models import Session
+from django.utils import timezone
 
 from .consumers import CheckoutConsumer
 from .models import Transfer
@@ -29,3 +31,8 @@ def publish_checkout_event(checkout_id, event="checkout.event", **event_data):
     event_data.update({"type": "checkout_event", "event_name": event})
 
     async_to_sync(layer.group_send)(channel_group_name, event_data)
+
+
+@shared_task
+def clear_expired_sessions():
+    Session.objects.filter(expire_date__lte=timezone.now()).delete()

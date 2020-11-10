@@ -13,7 +13,11 @@ class Hub20CeleryConfig:
         "sync-token-network-events": {
             "task": "hub20.apps.raiden.tasks.sync_token_network_events",
             "schedule": crontab(minute="*/10"),
-        }
+        },
+        "clear-expired-sessions": {
+            "task": "hub20.apps.core.tasks.clear_expired_sessions",
+            "schedule": crontab(minute="*/30"),
+        },
     }
     task_always_eager = "HUB20_TEST" in os.environ
     task_eager_propagates = "HUB20_TEST" in os.environ
