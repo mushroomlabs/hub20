@@ -1,5 +1,6 @@
 import account from './account'
 import auth from './auth'
+import events from './events'
 import funding from './funding'
 import notifications from './notifications'
 import password from './password'
@@ -11,6 +12,7 @@ import web3 from './web3'
 export default {
   account,
   auth,
+  events,
   funding,
   notifications,
   password,

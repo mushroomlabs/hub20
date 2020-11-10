@@ -11,6 +11,7 @@ const debug = process.env.NODE_ENV !== 'production'
 Vue.use(Vuex)
 
 const initialState = {
+  serverUrl: window.origin,
   ready: false
 }
 
@@ -25,13 +26,15 @@ const mutations = {
 }
 
 const actions = {
-  initialize({commit, getters, dispatch}) {
+  initialize({commit, dispatch, getters, state}) {
     dispatch('auth/initialize').then(() => {
       if (getters['auth/isAuthenticated']) {
         dispatch('tokens/initialize')
           .then(() => dispatch('account/initialize'))
           .then(() => dispatch('stores/initialize'))
           .then(() => dispatch('funding/initialize'))
+          .then(() => dispatch('events/initialize', {serverUrl: state.serverUrl}))
+          .then(() => dispatch('events/openWebSocket'))
           .then(() => commit(APP_SET_INITIALIZED))
       }
     })
