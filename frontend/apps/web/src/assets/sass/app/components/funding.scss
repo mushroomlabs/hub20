@@ -30,4 +30,13 @@ div.payment-request {
   button.web3-transfer {
     margin: 1vh auto;
   }
+
+  div.payment-route-details {
+    margin: 1vh auto;
+    > span {
+      display: block;
+      text-align: start;
+      margin: 0.5em 3rem;
+    }
+  }
 }

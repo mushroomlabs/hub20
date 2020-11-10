@@ -13,6 +13,10 @@ body {
 }
 
 // Generic elements (defined by design system)
+button {
+  @include button($primary-color, $primary-states-color)
+}
+
 .form-group {
   .error-message {
     color: $danger-states-color;
@@ -22,6 +26,24 @@ body {
   }
 }
 
-button {
-  @include button($primary-color, $primary-states-color)
+div.modal-dialog {
+  > div.header {
+    display: flex;
+    justify-content: space-between;
+
+    &::before {
+      content: '';
+      flex: 1;
+    }
+
+    button {
+      text-align: right;
+      flex: 1;
+    }
+
+    h4 {
+      margin-bottom: 0;
+    }
+
+  }
 }
