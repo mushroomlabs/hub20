@@ -1,11 +1,12 @@
-import auth from './auth'
 import account from './account'
+import auth from './auth'
+import funding from './funding'
 import notifications from './notifications'
 import password from './password'
 import signup from './signup'
 import stores from './stores'
 import tokens from './tokens'
-import funding from './funding'
+import web3 from './web3'
 
 export default {
   account,
@@ -15,5 +16,6 @@ export default {
   password,
   signup,
   stores,
-  tokens
+  tokens,
+  web3
 }

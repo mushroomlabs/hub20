@@ -10,21 +10,26 @@
       <ClipboardCopier :value="route.address">Address: {{ route.address }}</ClipboardCopier>
       <ClipboardCopier v-if="isRaidenRoute" :value="route.identifier">Payment Identifier: {{ route.identifier }}</ClipboardCopier>
     </div>
+    <Web3TransferButton v-if="isBlockchainRoute" :token="token" :amount="amount" :recipientAddress="route.address" />
   </div>
 </template>
 
 <script>
 import {toWei} from '../../filters'
 
+import ClipboardCopier from '../ClipboardCopier'
+import Web3TransferButton from '../web3/Web3TransferButton'
+
 import QrCode from './QrCode'
 import PaymentRouteBlockchainTimer from './PaymentRouteBlockchainTimer'
-import ClipboardCopier from '../ClipboardCopier'
+
 
 export default {
   components: {
     ClipboardCopier,
     PaymentRouteBlockchainTimer,
     QrCode,
+    Web3TransferButton
   },
   props: {
     route: {

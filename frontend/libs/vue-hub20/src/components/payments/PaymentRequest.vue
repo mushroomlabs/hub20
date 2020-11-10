@@ -31,6 +31,7 @@ import mixins from '../../mixins'
 import PaymentRoute from './PaymentRoute'
 import PaymentTracker from './PaymentTracker'
 
+
 export default {
   mixins: [mixins.TokenMixin],
   components: {
