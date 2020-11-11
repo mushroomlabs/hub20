@@ -8,10 +8,11 @@ import {APP_SET_INITIALIZED} from './types'
 
 const debug = process.env.NODE_ENV !== 'production'
 
+const SERVER_URL = window.origin
+
 Vue.use(Vuex)
 
 const initialState = {
-  serverUrl: window.origin,
   ready: false
 }
 
@@ -26,15 +27,29 @@ const mutations = {
 }
 
 const actions = {
-  initialize({commit, dispatch, getters, state}) {
+  initialize({commit, dispatch, getters}) {
+    const eventHandler = evt => {
+      let eventTypes = hub20lib.store.EVENT_TYPES
+      const eventData = JSON.parse(evt.data)
+      switch (eventData.event) {
+        case eventTypes.BLOCKCHAIN_BLOCK_CREATED:
+          commit('server/SERVER_SET_ETHEREUM_NODE_CURRENT_BLOCK', eventData.block_data.number)
+          break
+        default:
+          console.log(evt)
+      }
+    }
+
+    commit('server/SERVER_SET_URL', SERVER_URL)
+
     dispatch('auth/initialize').then(() => {
       if (getters['auth/isAuthenticated']) {
         dispatch('tokens/initialize')
           .then(() => dispatch('account/initialize'))
           .then(() => dispatch('stores/initialize'))
           .then(() => dispatch('funding/initialize'))
-          .then(() => dispatch('events/initialize', {serverUrl: state.serverUrl}))
-          .then(() => dispatch('events/openWebSocket'))
+          .then(() => dispatch('events/initialize', SERVER_URL))
+          .then(() => dispatch('events/setEventHandler', eventHandler))
           .then(() => commit(APP_SET_INITIALIZED))
       }
     })

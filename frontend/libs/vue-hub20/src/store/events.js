@@ -1,7 +1,6 @@
-export const NOTIFICATION_SET_SERVER = 'NOTIFICATION_SET_SERVER'
-export const NOTIFICATION_WEBSOCKET_OPEN = 'NOTIFICATION_WEBSOCKET_OPEN'
-export const NOTIFICATION_WEBSOCKET_CLOSE = 'NOTIFICATION_WEBSOCKET_CLOSE'
-export const NOTIFICATION_WEBSOCKET_EVENT_RECEIVED = 'NOTIFICATION_WEBSOCKET_EVENT_RECEIVED'
+export const EVENT_WEBSOCKET_OPEN = 'EVENT_WEBSOCKET_OPEN'
+export const EVENT_WEBSOCKET_CLOSE = 'EVENT_WEBSOCKET_CLOSE'
+export const EVENT_WEBSOCKET_SET_HANDLER = 'EVENT_WEBSOCKET_SET_HANDLER'
 
 function makeWebSocketUrl(httpUrl) {
   if (!httpUrl) {
@@ -17,43 +16,39 @@ function makeWebSocketUrl(httpUrl) {
 const ENDPOINT = '/ws/events'
 
 const initialState = {
-  serverUrl: null,
   websocket: null,
-  events: new Array()
+  messageHandler: null
 }
 
 const getters = {
-  endpoint: (state, getters) =>
-    getters.websocketRootUrl && `${getters.websocketRootUrl}${ENDPOINT}`,
-  isConnected: state => state.websocket !== null,
-  websocketRootUrl: state => makeWebSocketUrl(state.serverUrl)
+  endpoint: state => state.websocket && state.websocket.url,
+  isConnected: state => state.websocket && state.websocket.readyState == 1
 }
 
 const actions = {
-  initialize({commit}, {serverUrl}) {
-    commit(NOTIFICATION_SET_SERVER, serverUrl)
+  initialize({commit}, serverUrl) {
+    const url = `${makeWebSocketUrl(serverUrl)}${ENDPOINT}`
+    const ws = new WebSocket(url)
+    commit(EVENT_WEBSOCKET_OPEN, ws)
   },
-  openWebSocket({commit, getters}) {
-    if (getters.endpoint) {
-      let ws = new WebSocket(getters.endpoint)
-      ws.onmessage = evt => commit(NOTIFICATION_WEBSOCKET_EVENT_RECEIVED, JSON.parse(evt.data))
-      commit(NOTIFICATION_WEBSOCKET_OPEN, ws)
+  setEventHandler({commit, state}, messageHandler) {
+    if (state.websocket) {
+      state.websocket.onmessage = messageHandler
     }
+
+    commit(EVENT_WEBSOCKET_SET_HANDLER, messageHandler)
   }
 }
 
 const mutations = {
-  [NOTIFICATION_SET_SERVER](state, serverUrl) {
-    state.serverUrl = serverUrl
-  },
-  [NOTIFICATION_WEBSOCKET_OPEN](state, websocket) {
+  [EVENT_WEBSOCKET_OPEN](state, websocket) {
     state.websocket = websocket
   },
-  [NOTIFICATION_WEBSOCKET_CLOSE](state) {
+  [EVENT_WEBSOCKET_CLOSE](state) {
     state.websocket = null
   },
-  [NOTIFICATION_WEBSOCKET_EVENT_RECEIVED](state, eventData) {
-    state.events.push(eventData)
+  [EVENT_WEBSOCKET_SET_HANDLER](state, handler) {
+    state.messageHandler = handler
   }
 }
 

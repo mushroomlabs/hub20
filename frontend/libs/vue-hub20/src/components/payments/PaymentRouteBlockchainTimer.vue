@@ -1,12 +1,14 @@
 <template>
   <div class="blockchain-timer" :class="{synced, online}">
     <span class="start-value">{{ created_on }}</span>
-    <span class="current-value">{{ current }}</span>
+    <span class="current-value">{{ currentBlock }}</span>
     <span class="expiration-value">{{ expires_on }}</span>
   </div>
 </template>
 
 <script>
+import {mapGetters} from 'vuex'
+
 export default {
   props: {
     created_on: {
@@ -16,12 +18,12 @@ export default {
       type: Number
     }
   },
-  data() {
-    return {
-      current: this.$props.created_on,
-      synced: false,
-      online: false
-    }
+  computed: {
+    ...mapGetters('server', {
+      synced: 'ethereumSynced',
+      online: 'ethereumOnline',
+      currentBlock: 'currentBlock'
+    }),
   }
 }
 </script>
