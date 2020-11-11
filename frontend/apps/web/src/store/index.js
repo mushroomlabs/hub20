@@ -33,7 +33,7 @@ const actions = {
       const eventData = JSON.parse(evt.data)
       switch (eventData.event) {
         case eventTypes.BLOCKCHAIN_BLOCK_CREATED:
-          commit('server/SERVER_SET_ETHEREUM_NODE_CURRENT_BLOCK', eventData.block_data.number)
+          commit('server/SERVER_SET_ETHEREUM_CURRENT_BLOCK', eventData.block_data.number)
           break
         default:
           console.log(evt)
@@ -48,6 +48,7 @@ const actions = {
           .then(() => dispatch('account/initialize'))
           .then(() => dispatch('stores/initialize'))
           .then(() => dispatch('funding/initialize'))
+          .then(() => dispatch('server/initialize'))
           .then(() => dispatch('events/initialize', SERVER_URL))
           .then(() => dispatch('events/setEventHandler', eventHandler))
           .then(() => commit(APP_SET_INITIALIZED))
