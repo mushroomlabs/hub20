@@ -1,5 +1,5 @@
 <template>
-  <div class="blockchain-timer" :class="{synced, online}">
+  <div class="blockchain-timer" :class="{synced, online, expired}">
     <span class="start-value">{{ created_on }}</span>
     <span class="current-value">{{ currentBlock }}</span>
     <span class="expiration-value">{{ expires_on }}</span>
@@ -22,8 +22,11 @@ export default {
     ...mapGetters('server', {
       synced: 'ethereumSynced',
       online: 'ethereumOnline',
-      currentBlock: 'currentBlock'
+      currentBlock: 'currentBlock',
     }),
+    expired() {
+      return this.currentBlock > this.expires_on
+    },
   }
 }
 </script>
