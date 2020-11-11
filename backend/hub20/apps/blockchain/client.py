@@ -181,6 +181,18 @@ def run_backfill(w3: Web3, start: int, end: int):
         get_block_by_number(w3=w3, block_number=block_number)
 
 
+def run_ethereum_node_connection_check(w3: Web3):
+    chain = Chain.make(chain_id=int(w3.net.version))
+    is_online = w3.net.listening
+
+    if is_online and not chain.online:
+        signals.ethereum_node_connected.send(sender=Chain, chain=chain)
+    elif chain.online and not is_online:
+        signals.ethereum_node_disconnected.send(sender=Chain, chain=chain)
+    else:
+        logger.info(f"Ethereum node connected: {is_online}")
+
+
 async def download_all_chain(w3: Web3):
     start = 0
     highest = w3.eth.blockNumber
@@ -212,4 +224,10 @@ async def sync_chain(w3: Web3):
             current_block=w3.eth.blockNumber,
             synced=bool(not w3.eth.syncing),
         )
+        await asyncio.sleep(BLOCK_CREATION_INTERVAL)
+
+
+async def run_heartbeat(w3: Web3):
+    while True:
+        await sync_to_async(run_ethereum_node_connection_check)(w3=w3)
         await asyncio.sleep(BLOCK_CREATION_INTERVAL)

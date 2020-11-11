@@ -30,15 +30,14 @@ def _get_logged_user_ids():
 
 @receiver(block_sealed, sender=Block)
 def on_block_sealed_send_notification(sender, **kw):
-    logger.info("Block sealed event")
     block_data = kw.get("block_data")
     event_data = {
         "event": Events.BLOCKCHAIN_BLOCK_CREATED.value,
         "block_data": json.loads(Web3.toJSON(block_data)),
     }
 
-    logger.info(f"Block sealed event: {event_data}")
     for user_id in _get_logged_user_ids():
+        logger.info(f"Publishing block {block_data.number} update to user_id {user_id}")
         tasks.send_event_notification.delay(user_id, **event_data)
 
 

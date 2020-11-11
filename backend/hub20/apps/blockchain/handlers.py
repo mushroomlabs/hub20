@@ -79,9 +79,27 @@ def on_sync_recovered_update_chain(sender, **kw):
     chain.save()
 
 
+@receiver(signals.ethereum_node_connected, sender=Chain)
+def on_ethereum_node_connected_update_online_status(sender, **kw):
+    chain = kw["chain"]
+    logger.warning(f"Client {chain.provider_hostname} online")
+    chain.online = True
+    chain.save()
+
+
+@receiver(signals.ethereum_node_disconnected, sender=Chain)
+def on_ethereum_node_disconnected_update_online_status(sender, **kw):
+    chain = kw["chain"]
+    logger.warning(f"Client {chain.provider_hostname} offline")
+    chain.online = False
+    chain.save()
+
+
 __all__ = [
     "on_sync_lost_update_chain",
     "on_sync_recovered_update_chain",
     "on_chain_status_synced_update_database",
     "on_chain_reorganization_clear_blocks",
+    "on_ethereum_node_connected_update_online_status",
+    "on_ethereum_node_disconnected_update_online_status",
 ]

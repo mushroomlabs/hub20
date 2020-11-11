@@ -14,8 +14,18 @@ from .constants import (
     SIGNATURE_V_MAX_VALUE,
     SIGNATURE_V_MIN_VALUE,
 )
+from .models import Chain
 
 logger = logging.getLogger(__name__)
+
+
+class ChainSerializer(serializers.ModelSerializer):
+    network = serializers.IntegerField(source="id", read_only=True)
+    height = serializers.IntegerField(source="highest_block", read_only=True)
+
+    class Meta:
+        model = Chain
+        fields = read_only_fields = ("network", "height", "synced", "online")
 
 
 # ================================================ #

@@ -9,8 +9,11 @@ from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveMode
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.serializers import Serializer
+from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
+from hub20.apps.blockchain.models import Chain
+from hub20.apps.blockchain.serializers import ChainSerializer
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
 
 from . import models, serializers
@@ -200,3 +203,12 @@ class StoreViewSet(ModelViewSet):
 
     def get_object(self, *args, **kw):
         return get_object_or_404(models.Store, id=self.kwargs["pk"])
+
+
+class StatusView(APIView):
+    permission_classes = (IsAuthenticated,)
+
+    def get(self, request, **kw):
+        chain = Chain.make()
+
+        return Response({"ethereum": ChainSerializer(chain).data})

@@ -41,6 +41,7 @@ class Chain(models.Model):
     )
     provider_url = models.URLField(unique=True)
     synced = models.BooleanField()
+    online = models.BooleanField(default=False)
     highest_block = models.PositiveIntegerField()
 
     @property

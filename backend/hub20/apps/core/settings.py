@@ -23,6 +23,7 @@ class AppSettings:
     class Web3:
         event_listeners = [
             "hub20.apps.blockchain.client.listen_new_blocks",
+            "hub20.apps.blockchain.client.run_heartbeat",
             "hub20.apps.ethereum_money.client.listen_latest_transfers",
             "hub20.apps.ethereum_money.client.listen_pending_transfers",
             "hub20.apps.ethereum_money.client.download_all_token_transfers",
