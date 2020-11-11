@@ -3,12 +3,14 @@ import logging
 from asgiref.sync import async_to_sync
 from celery import shared_task
 from channels.layers import get_channel_layer
+from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
 from django.utils import timezone
 
-from .consumers import CheckoutConsumer
+from .consumers import CheckoutConsumer, NotificationConsumer
 from .models import Transfer
 
+User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
@@ -19,6 +21,18 @@ def execute_transfer(transfer_id):
         transfer.execute()
     except Transfer.DoesNotExist:
         logger.warning(f"Transfer {transfer_id} not found")
+
+
+@shared_task
+def send_event_notification(user_id, **event_data):
+    try:
+        user = User.objects.get(id=user_id)
+        layer = get_channel_layer()
+        channel_group_name = NotificationConsumer.get_group_name(user)
+        event_data.update({"type": "notify_event"})
+        async_to_sync(layer.group_send)(channel_group_name, event_data)
+    except User.DoesNotExist:
+        logger.warning(f"User {user_id} not found on database")
 
 
 @shared_task

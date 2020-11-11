@@ -1,6 +1,5 @@
 import datetime
 import uuid
-from enum import Enum
 from typing import Optional
 
 import jwt
@@ -12,17 +11,6 @@ from django.db import models
 from hub20.apps.ethereum_money.models import EthereumToken
 
 from .payments import PaymentOrder
-
-
-class CheckoutEvents(Enum):
-    BLOCKCHAIN_BLOCK_CREATED = "blockchain.block.created"
-    BLOCKCHAIN_TRANSFER_BROADCAST = "blockchain.transfer.broadcast"
-    BLOCKCHAIN_TRANSFER_RECEIVED = "blockchain.transfer.received"
-    BLOCKCHAIN_ROUTE_EXPIRED = "blockchain.payment_route.expired"
-    ETHEREUM_NODE_UNAVAILABLE = "ethereum_node.unavailable"
-    ETHEREUM_NODE_OK = "ethereum_node.ok"
-    RAIDEN_ROUTE_EXPIRED = "raiden.payment_route.expired"
-    RAIDEN_TRANSFER_RECEIVED = "raiden.transfer.received"
 
 
 class Store(models.Model):
@@ -97,4 +85,4 @@ class Checkout(PaymentOrder):
         return jwt.encode(data, private_key, algorithm="RS256").decode()
 
 
-__all__ = ["Store", "StoreRSAKeyPair", "Checkout", "CheckoutEvents"]
+__all__ = ["Store", "StoreRSAKeyPair", "Checkout"]

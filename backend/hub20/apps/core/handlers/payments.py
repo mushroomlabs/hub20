@@ -14,11 +14,11 @@ from hub20.apps.blockchain.signals import (
 )
 from hub20.apps.core import tasks
 from hub20.apps.core.choices import PAYMENT_METHODS
+from hub20.apps.core.consumers import Events
 from hub20.apps.core.models import (
     BlockchainPayment,
     BlockchainPaymentRoute,
     Checkout,
-    CheckoutEvents,
     Deposit,
     InternalPayment,
     Payment,
@@ -62,7 +62,7 @@ def on_ethereum_node_error_send_open_checkout_events(sender, **kw):
     chain = kw["chain"]
     for checkout in Checkout.objects.filter(chain=chain).unpaid().with_blockchain_route():
         tasks.publish_checkout_event(
-            checkout.id, event_data=CheckoutEvents.ETHEREUM_NODE_UNAVAILABLE.value
+            checkout.id, event_data=Events.ETHEREUM_NODE_UNAVAILABLE.value
         )
 
 
@@ -71,7 +71,7 @@ def on_ethereum_node_error_send_open_checkout_events(sender, **kw):
 def on_ethereum_node_ok_send_open_checkout_events(sender, **kw):
     chain = kw["chain"]
     for checkout in Checkout.objects.filter(chain=chain).unpaid().with_blockchain_route():
-        tasks.publish_checkout_event(checkout.id, event_data=CheckoutEvents.ETHEREUM_NODE_OK.value)
+        tasks.publish_checkout_event(checkout.id, event_data=Events.ETHEREUM_NODE_OK.value)
 
 
 @receiver(account_deposit_received, sender=Transaction)
@@ -117,7 +117,7 @@ def on_incoming_transfer_broadcast_sent_maybe_publish_checkout(sender, **kw):
 
     tasks.publish_checkout_event.delay(
         checkout.pk,
-        event=CheckoutEvents.BLOCKCHAIN_TRANSFER_BROADCAST.value,
+        event=Events.BLOCKCHAIN_TRANSFER_BROADCAST.value,
         amount=payment_amount.amount,
         token=payment_amount.currency.address,
         identifier=tx_hash,
@@ -205,7 +205,7 @@ def on_block_added_publish_block_created_event(sender, **kw):
     for checkout in Checkout.objects.unpaid().with_blockchain_route(block.number):
         tasks.publish_checkout_event.delay(
             checkout.id,
-            event=CheckoutEvents.BLOCKCHAIN_BLOCK_CREATED.value,
+            event=Events.BLOCKCHAIN_BLOCK_CREATED.value,
             block=block.number,
         )
 
@@ -221,7 +221,7 @@ def on_block_added_publish_expired_blockchain_routes(sender, **kw):
     for route in expiring_routes:
         tasks.publish_checkout_event.delay(
             route.deposit_id,
-            event=CheckoutEvents.BLOCKCHAIN_ROUTE_EXPIRED.value,
+            event=Events.BLOCKCHAIN_ROUTE_EXPIRED.value,
             route=route.account.address,
         )
 

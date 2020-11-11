@@ -196,8 +196,10 @@ async def listen_new_blocks(w3: Web3):
     block_filter = w3.eth.filter("latest")
     while True:
         await asyncio.sleep(BLOCK_CREATION_INTERVAL)
+        logger.info("Checking for new blocks...")
         for event in block_filter.get_new_entries():
             block_hash = event.hex()
+            logger.info(f"New block: {block_hash}")
             block_data = w3.eth.getBlock(block_hash, full_transactions=True)
             await sync_to_async(signals.block_sealed.send)(sender=Block, block_data=block_data)
 

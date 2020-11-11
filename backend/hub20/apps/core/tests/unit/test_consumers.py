@@ -6,8 +6,8 @@ from eth_utils import is_0x_prefixed
 
 from hub20.apps.blockchain.factories import TransactionFactory
 from hub20.apps.core.api import consumer_patterns
+from hub20.apps.core.consumers import Events
 from hub20.apps.core.factories import CheckoutFactory
-from hub20.apps.core.models import CheckoutEvents
 from hub20.apps.ethereum_money.models import EthereumToken
 from hub20.apps.ethereum_money.signals import incoming_transfer_broadcast
 
@@ -44,7 +44,7 @@ async def test_checkout_consumer():
         messages.append(await communicator.receive_json_from())
 
     assert len(messages) != 0, "we should have received something here"
-    payment_sent_event = CheckoutEvents.BLOCKCHAIN_TRANSFER_BROADCAST.value
+    payment_sent_event = Events.BLOCKCHAIN_TRANSFER_BROADCAST.value
 
     payment_sent_messages = [msg for msg in messages if msg["event"] == payment_sent_event]
     assert len(payment_sent_messages) == 1, "we should have received one payment received message"
