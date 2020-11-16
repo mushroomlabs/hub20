@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.sessions.models import Session
 from django.utils import timezone
 
-from .consumers import CheckoutConsumer, NotificationConsumer
+from .consumers import CheckoutConsumer, SessionEventsConsumer
 from .models import Transfer
 
 User = get_user_model()
@@ -24,15 +24,11 @@ def execute_transfer(transfer_id):
 
 
 @shared_task
-def send_event_notification(user_id, **event_data):
-    try:
-        user = User.objects.get(id=user_id)
-        layer = get_channel_layer()
-        channel_group_name = NotificationConsumer.get_group_name(user)
-        event_data.update({"type": "notify_event"})
-        async_to_sync(layer.group_send)(channel_group_name, event_data)
-    except User.DoesNotExist:
-        logger.warning(f"User {user_id} not found on database")
+def send_session_event(session_key, **event_data):
+    layer = get_channel_layer()
+    channel_group_name = SessionEventsConsumer.get_group_name(session_key)
+    event_data.update({"type": "notify_event"})
+    async_to_sync(layer.group_send)(channel_group_name, event_data)
 
 
 @shared_task

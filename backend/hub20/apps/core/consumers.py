@@ -31,23 +31,21 @@ def accept_subprotocol(consumer):
         consumer.accept()
 
 
-class NotificationConsumer(JsonWebsocketConsumer):
+class SessionEventsConsumer(JsonWebsocketConsumer):
     @classmethod
-    def get_group_name(cls, user):
-        return f"notifications.{user.username}"
+    def get_group_name(cls, session_key: str) -> str:
+        return f"events.{session_key}"
 
     def connect(self):
         accept_subprotocol(self)
-        user = async_to_sync(get_user)(self.scope)
-        if not user.is_authenticated:
-            self.close()
-
-        group_name = self.__class__.get_group_name(user)
+        session = self.scope["session"]
+        group_name = self.__class__.get_group_name(session.session_key)
         async_to_sync(self.channel_layer.group_add)(group_name, self.channel_name)
+        logger.debug(f"Session Event consumer {group_name} connected")
 
     def notify_event(self, message):
         message.pop("type", None)
-        logger.info(f"Sending event notification... {message}")
+        logger.debug(f"Sending event notification... {message}")
         self.send_json(message)
 
 
