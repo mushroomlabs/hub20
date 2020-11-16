@@ -5,13 +5,7 @@ from django.dispatch import receiver
 from psycopg2.extras import NumericRange
 
 from hub20.apps.blockchain.models import Block, Chain, Transaction
-from hub20.apps.blockchain.signals import (
-    block_sealed,
-    ethereum_node_connected,
-    ethereum_node_disconnected,
-    ethereum_node_sync_lost,
-    ethereum_node_sync_recovered,
-)
+from hub20.apps.blockchain.signals import block_sealed
 from hub20.apps.core import tasks
 from hub20.apps.core.choices import PAYMENT_METHODS
 from hub20.apps.core.consumers import Events
@@ -54,24 +48,6 @@ def _check_for_blockchain_payment_confirmations(block_number):
 def on_chain_updated_check_payment_confirmations(sender, **kw):
     chain = kw["instance"]
     _check_for_blockchain_payment_confirmations(chain.highest_block)
-
-
-@receiver(ethereum_node_disconnected, sender=Chain)
-@receiver(ethereum_node_sync_lost, sender=Chain)
-def on_ethereum_node_error_send_open_checkout_events(sender, **kw):
-    chain = kw["chain"]
-    for checkout in Checkout.objects.filter(chain=chain).unpaid().with_blockchain_route():
-        tasks.publish_checkout_event(
-            checkout.id, event_data=Events.ETHEREUM_NODE_UNAVAILABLE.value
-        )
-
-
-@receiver(ethereum_node_connected, sender=Chain)
-@receiver(ethereum_node_sync_recovered, sender=Chain)
-def on_ethereum_node_ok_send_open_checkout_events(sender, **kw):
-    chain = kw["chain"]
-    for checkout in Checkout.objects.filter(chain=chain).unpaid().with_blockchain_route():
-        tasks.publish_checkout_event(checkout.id, event_data=Events.ETHEREUM_NODE_OK.value)
 
 
 @receiver(account_deposit_received, sender=Transaction)
@@ -286,8 +262,6 @@ def on_payment_confirmed_publish_checkout(sender, **kw):
 
 __all__ = [
     "on_chain_updated_check_payment_confirmations",
-    "on_ethereum_node_ok_send_open_checkout_events",
-    "on_ethereum_node_error_send_open_checkout_events",
     "on_account_deposit_check_blockchain_payments",
     "on_incoming_transfer_broadcast_sent_maybe_publish_checkout",
     "on_raiden_payment_received_check_raiden_payments",
