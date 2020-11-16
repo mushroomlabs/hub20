@@ -17,10 +17,12 @@ div.button-bar {
     }
 
     &:first-child {
-      border-radius: $border-radius-btn-large 0 0 $border-radius-btn-large !important;
+      border-top-left-radius: $border-radius-btn-small !important;
+      border-bottom-left-radius: $border-radius-btn-small !important;
     }
     &:last-child {
-      border-radius: 0 $border-radius-btn-large $border-radius-btn-large 0 !important;
+      border-top-right-radius: $border-radius-btn-small !important;
+      border-bottom-right-radius: $border-radius-btn-small !important;
     }
   }
 }

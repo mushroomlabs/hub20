@@ -3,9 +3,9 @@
     <div class="button-bar" v-if="hasMultipleRoutes">
       <button
         type="button"
-        v-for="route in paymentRequest.routes"
+        v-for="route in openRoutes"
         :value="route.type"
-        :class="{active: route.type == (selectedRoute && selectedRoute.type)}"
+        :class="{active: !hasMultipleRoutes || (route.type == (selectedRoute && selectedRoute.type))}"
         @click="selectRoute(route)"
         :key="route.type"
       >
@@ -14,18 +14,20 @@
     </div>
 
     <PaymentRoute
-      v-for="route in paymentRequest.routes"
+      v-for="route in openRoutes"
       :route="route"
       :token="token"
       :amount="paymentRequest.amount"
       :key="route.type"
-      :selected="route == selectedRoute"
+      :selected="!hasMultipleRoutes || (route == selectedRoute)"
     />
     <PaymentTracker :paymentRequest="paymentRequest" />
   </div>
 </template>
 
 <script>
+import {mapGetters} from 'vuex'
+
 import mixins from '../../mixins'
 
 import PaymentRoute from './PaymentRoute'
@@ -45,15 +47,19 @@ export default {
   },
   data(){
     return {
-      selectedRoute: this.paymentRequest.routes && this.paymentRequest.routes[0]
+      selectedRoute: null
     }
   },
   computed: {
+    ...mapGetters('server', ['currentBlock']),
     hasMultipleRoutes() {
-      return this.paymentRequest.routes.length > 1
+      return this.openRoutes.length > 1
     },
     token() {
       return this.getToken(this.paymentRequest.token)
+    },
+    openRoutes() {
+      return this.paymentRequest.routes.filter(route => this.isOpenRoute(route))
     }
   },
   methods: {
@@ -65,7 +71,16 @@ export default {
     },
     selectRoute(route) {
       this.selectedRoute = route
+    },
+    isOpenRoute(route) {
+      if (route.type == 'blockchain'){
+        return this.currentBlock <= route.expiration_block
+      }
+      return true
     }
+  },
+  mounted() {
+    this.selectRoute(this.openRoutes.length >= 1 ? this.openRoutes[0] : null)
   }
 }
 </script>
