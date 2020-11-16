@@ -20,11 +20,6 @@ const initialState = {
   messageHandler: null
 }
 
-const getters = {
-  endpoint: state => state.websocket && state.websocket.url,
-  isConnected: state => state.websocket && state.websocket.readyState == 1
-}
-
 const actions = {
   initialize({commit}, serverUrl) {
     const url = `${makeWebSocketUrl(serverUrl)}${ENDPOINT}`
@@ -56,6 +51,5 @@ export default {
   namespaced: true,
   state: initialState,
   actions,
-  getters,
   mutations
 }
