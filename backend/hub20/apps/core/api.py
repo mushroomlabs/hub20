@@ -2,7 +2,7 @@ from django.urls import path
 from rest_framework.routers import SimpleRouter
 
 from . import views
-from .consumers import CheckoutConsumer, NotificationConsumer
+from .consumers import CheckoutConsumer, SessionEventsConsumer
 
 app_name = "hub20"
 
@@ -30,5 +30,5 @@ urlpatterns = [
 
 consumer_patterns = [
     path("checkout/<uuid:pk>", CheckoutConsumer),
-    path("events", NotificationConsumer),
+    path("events", SessionEventsConsumer),
 ]

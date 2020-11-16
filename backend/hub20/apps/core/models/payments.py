@@ -92,6 +92,7 @@ class Deposit(TimeStampedModel):
 
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    session_key = models.SlugField(null=True)
     currency = models.ForeignKey(EthereumToken, on_delete=models.PROTECT)
     objects = DepositQuerySet.as_manager()
 

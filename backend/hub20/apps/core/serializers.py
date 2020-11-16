@@ -229,7 +229,9 @@ class DepositSerializer(serializers.ModelSerializer):
     def create(self, validated_data: Dict):
         request = self.context["request"]
         with transaction.atomic():
-            return self.Meta.model.objects.create(user=request.user, **validated_data)
+            return self.Meta.model.objects.create(
+                user=request.user, session_key=request.session.session_key, **validated_data
+            )
 
     def get_routes(self, obj):
         def get_route_serializer(route):
@@ -312,6 +314,7 @@ class CheckoutSerializer(PaymentOrderSerializer):
             return models.Checkout.objects.create(
                 store=store,
                 user=store.owner,
+                session_key=request.session.session_key,
                 requester_ip=client_ip,
                 **validated_data,
             )
