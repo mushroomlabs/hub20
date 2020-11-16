@@ -1,5 +1,5 @@
 <template>
-  <div class="payment-route" :class="{'selected': selected}">
+  <div class="payment-route" :class="{selected, expired}">
     <PaymentRouteBlockchainTimer
       v-if="isBlockchainRoute"
       :created_on="route.start_block"
@@ -15,6 +15,8 @@
 </template>
 
 <script>
+import {mapGetters} from 'vuex'
+
 import {toWei} from '../../filters'
 
 import ClipboardCopier from '../ClipboardCopier'
@@ -48,7 +50,15 @@ export default {
       default: false
     }
   },
+  watch: {
+    expired(isExpired) {
+      if (isExpired) {
+        this.$emit('routeExpired', this.route)
+      }
+    }
+  },
   computed: {
+    ...mapGetters('server', ['currentBlock']),
     QrCodeMessage() {
       let protocol = {
         blockchain: "ethereum",
@@ -62,6 +72,12 @@ export default {
         text.concat(`&value=${weiAmount}`)
       }
       return text
+    },
+    expired() {
+      if (this.isBlockchainRoute) {
+        return this.currentBlock > this.route.expiration_block
+      }
+      return false
     },
     isBlockchainRoute() {
       return this.route.type == 'blockchain'
