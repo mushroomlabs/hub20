@@ -4,7 +4,6 @@ from enum import Enum
 from typing import Union
 
 from asgiref.sync import async_to_sync
-from channels.auth import get_user
 from channels.generic.websocket import JsonWebsocketConsumer
 
 from . import models
@@ -14,13 +13,14 @@ logger = logging.getLogger(__name__)
 
 class Events(Enum):
     BLOCKCHAIN_BLOCK_CREATED = "blockchain.block.created"
-    BLOCKCHAIN_TRANSFER_BROADCAST = "blockchain.transfer.broadcast"
-    BLOCKCHAIN_TRANSFER_RECEIVED = "blockchain.transfer.received"
+    BLOCKCHAIN_DEPOSIT_RECEIVED = "blockchain.deposit.received"
+    BLOCKCHAIN_DEPOSIT_BROADCAST = "blockchain.deposit.broadcast"
+    BLOCKCHAIN_DEPOSIT_CONFIRMED = "blockchain.deposit.confirmed"
     BLOCKCHAIN_ROUTE_EXPIRED = "blockchain.payment_route.expired"
     ETHEREUM_NODE_UNAVAILABLE = "ethereum_node.unavailable"
     ETHEREUM_NODE_OK = "ethereum_node.ok"
     RAIDEN_ROUTE_EXPIRED = "raiden.payment_route.expired"
-    RAIDEN_TRANSFER_RECEIVED = "raiden.transfer.received"
+    RAIDEN_DEPOSIT_RECEIVED = "raiden.deposit.received"
 
 
 def accept_subprotocol(consumer):
@@ -37,16 +37,19 @@ class SessionEventsConsumer(JsonWebsocketConsumer):
         return f"events.{session_key}"
 
     def connect(self):
-        accept_subprotocol(self)
         session = self.scope["session"]
+        session.save()
+        accept_subprotocol(self)
         group_name = self.__class__.get_group_name(session.session_key)
         async_to_sync(self.channel_layer.group_add)(group_name, self.channel_name)
         logger.debug(f"Session Event consumer {group_name} connected")
 
     def notify_event(self, message):
         message.pop("type", None)
-        logger.debug(f"Sending event notification... {message}")
-        self.send_json(message)
+        event = message.pop("event", "notification")
+        logger.debug(f"Sending {event} notification... {message}")
+
+        self.send_json({"event": event, "data": message})
 
 
 class CheckoutConsumer(JsonWebsocketConsumer):

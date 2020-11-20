@@ -1,7 +1,10 @@
 import logging
+from typing import Optional
 
+from django.contrib.sessions.models import Session
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 from psycopg2.extras import NumericRange
 
 from hub20.apps.blockchain.models import Block, Chain, Transaction
@@ -31,6 +34,19 @@ from hub20.apps.raiden.signals import raiden_payment_received
 
 logger = logging.getLogger(__name__)
 EthereumAccount = get_ethereum_account_model()
+
+
+def _get_user_id(session: Session) -> Optional[int]:
+    try:
+        return int(session.get_decoded()["_auth_user_id"])
+    except (KeyError, ValueError, TypeError):
+        return None
+
+
+def _get_user_session_keys(user_id):
+    now = timezone.now()
+    sessions = Session.objects.filter(expire_date__gt=now)
+    return [s.session_key for s in sessions if _get_user_id(s) == user_id]
 
 
 def _check_for_blockchain_payment_confirmations(block_number):
@@ -76,7 +92,7 @@ def on_account_deposit_check_blockchain_payments(sender, **kw):
 
 
 @receiver(incoming_transfer_broadcast, sender=EthereumToken)
-def on_incoming_transfer_broadcast_sent_maybe_publish_checkout(sender, **kw):
+def on_incoming_transfer_broadcast_send_notification(sender, **kw):
     recipient = kw["account"]
     payment_amount = kw["amount"]
     tx_hash = kw["transaction_hash"]
@@ -86,19 +102,19 @@ def on_incoming_transfer_broadcast_sent_maybe_publish_checkout(sender, **kw):
     if not route:
         return
 
-    checkout = Checkout.objects.unpaid().with_blockchain_route().filter(routes=route).first()
+    deposit = Deposit.objects.with_blockchain_route().filter(routes=route).first()
 
-    if not checkout:
-        return
-
-    tasks.publish_checkout_event.delay(
-        checkout.pk,
-        event=Events.BLOCKCHAIN_TRANSFER_BROADCAST.value,
-        amount=payment_amount.amount,
-        token=payment_amount.currency.address,
-        identifier=tx_hash,
-        payment_route=route.name,
-    )
+    if deposit and deposit.session_key:
+        tasks.send_session_event.delay(
+            deposit.session_key,
+            event=Events.BLOCKCHAIN_DEPOSIT_BROADCAST.value,
+            payment_data={
+                "deposit_id": deposit.id,
+                "amount": payment_amount.amount,
+                "token": payment_amount.currency.address,
+                "transaction": tx_hash,
+            },
+        )
 
 
 @receiver(raiden_payment_received, sender=RaidenNodePayment)
@@ -203,22 +219,22 @@ def on_block_added_publish_expired_blockchain_routes(sender, **kw):
 
 
 @receiver(payment_received, sender=BlockchainPayment)
-def on_blockchain_payment_received_maybe_publish_checkout(sender, **kw):
+def on_blockchain_payment_received_send_notification(sender, **kw):
     payment = kw["payment"]
 
-    checkout = Checkout.objects.filter(routes__payment=payment).first()
+    deposit = Deposit.objects.filter(routes__payment=payment).first()
 
-    if not checkout:
-        return
-
-    tasks.publish_checkout_event.delay(
-        checkout.id,
-        amount=payment.amount,
-        token=payment.currency.address,
-        identifier=payment.transaction.hash_hex,
-        payment_method=PAYMENT_METHODS.blockchain,
-        event="payment.received",
-    )
+    if deposit and deposit.session_key:
+        tasks.send_session_event.delay(
+            session_key=deposit.session_key,
+            event=Events.BLOCKCHAIN_DEPOSIT_RECEIVED.value,
+            payment_data={
+                "deposit_id": payment.route.deposit.id,
+                "amount": payment.amount,
+                "token": payment.currency.address,
+                "transaction": payment.transaction.hash_hex,
+            },
+        )
 
 
 @receiver(post_save, sender=RaidenPayment)
@@ -263,7 +279,7 @@ def on_payment_confirmed_publish_checkout(sender, **kw):
 __all__ = [
     "on_chain_updated_check_payment_confirmations",
     "on_account_deposit_check_blockchain_payments",
-    "on_incoming_transfer_broadcast_sent_maybe_publish_checkout",
+    "on_incoming_transfer_broadcast_send_notification",
     "on_raiden_payment_received_check_raiden_payments",
     "on_order_created_set_blockchain_route",
     "on_order_created_set_raiden_route",
@@ -271,7 +287,7 @@ __all__ = [
     "on_block_added_publish_expired_blockchain_routes",
     "on_block_created_check_confirmed_payments",
     "on_block_sealed_check_confirmed_payments",
-    "on_blockchain_payment_received_maybe_publish_checkout",
+    "on_blockchain_payment_received_send_notification",
     "on_off_chain_payment_create_confirmation",
     "on_payment_confirmed_publish_checkout",
 ]

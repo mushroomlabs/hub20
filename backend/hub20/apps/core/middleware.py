@@ -1,7 +1,12 @@
+import logging
+
 from channels.auth import AuthMiddlewareStack
+from channels.sessions import SessionMiddlewareStack
 from django.contrib.auth.models import AnonymousUser
 from django.db import close_old_connections
 from rest_framework.authtoken.models import Token
+
+logger = logging.getLogger(__name__)
 
 
 class TokenAuthMiddleware:
@@ -26,4 +31,6 @@ class TokenAuthMiddleware:
         return self.inner(scope)
 
 
-TokenAuthMiddlewareStack = lambda inner: TokenAuthMiddleware(AuthMiddlewareStack(inner))
+TokenAuthMiddlewareStack = lambda inner: TokenAuthMiddleware(
+    AuthMiddlewareStack(SessionMiddlewareStack(inner))
+)
