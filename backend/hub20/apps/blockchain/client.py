@@ -209,20 +209,25 @@ async def listen_new_blocks(w3: Web3):
     while True:
         await asyncio.sleep(BLOCK_CREATION_INTERVAL)
         logger.info("Checking for new blocks...")
-        for event in block_filter.get_new_entries():
-            block_hash = event.hex()
-            logger.info(f"New block: {block_hash}")
-            block_data = w3.eth.getBlock(block_hash, full_transactions=True)
-            await sync_to_async(signals.block_sealed.send)(sender=Block, block_data=block_data)
+        try:
+            for event in block_filter.get_new_entries():
+                block_hash = event.hex()
+                logger.info(f"New block: {block_hash}")
+                block_data = w3.eth.getBlock(block_hash, full_transactions=True)
+                await sync_to_async(signals.block_sealed.send)(sender=Block, block_data=block_data)
+        except Exception as exc:
+            logger.exception(exc)
 
 
 async def sync_chain(w3: Web3):
     while True:
+        has_peers = w3.net.peer_count > 0
+        is_synced = bool(not w3.eth.syncing)
         await sync_to_async(signals.chain_status_synced.send)(
             sender=Chain,
             chain_id=int(w3.net.version),
             current_block=w3.eth.blockNumber,
-            synced=bool(not w3.eth.syncing),
+            synced=is_synced and has_peers,
         )
         await asyncio.sleep(BLOCK_CREATION_INTERVAL)
 
