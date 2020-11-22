@@ -30,10 +30,14 @@ const actions = {
   initialize({commit, dispatch, getters}) {
     const eventHandler = evt => {
       let eventTypes = hub20lib.store.EVENT_TYPES
-      const eventData = JSON.parse(evt.data)
-      switch (eventData.event) {
+      const message = JSON.parse(evt.data)
+      const eventData = message.data
+      switch (message.event) {
         case eventTypes.BLOCKCHAIN_BLOCK_CREATED:
-          commit('server/SERVER_SET_ETHEREUM_CURRENT_BLOCK', eventData.block_data.number)
+          commit('server/SERVER_SET_ETHEREUM_CURRENT_BLOCK', eventData.number)
+          break
+        case eventTypes.BLOCKCHAIN_DEPOSIT_RECEIVED:
+          dispatch('funding/fetchDeposit', eventData.depositId)
           break
         default:
           console.log(evt)
