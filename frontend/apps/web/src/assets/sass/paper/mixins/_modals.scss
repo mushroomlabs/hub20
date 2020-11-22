@@ -15,8 +15,10 @@
 // Container that the modal scrolls within
 @mixin modal-container(
   $zindex: defaults.$zindex-modal,
-  $margin: defaults.$modal-dialog-margin,
-  $static-transform: defaults.$modal-scale-transform
+  $dialog-margin: defaults.$modal-dialog-margin,
+  $static-transform: defaults.$modal-scale-transform,
+  $margin-content: defaults.$modal-content-margin
+
 ) {
   position: fixed;
   top: 0;
@@ -43,13 +45,17 @@
   .modal-dialog {
     position: relative;
     width: auto;
-    margin: $margin;
+    margin: $dialog-margin;
     // allow clicks to pass through for custom click handling to close modal
     pointer-events: none;
 
     // When trying to close, animate focus to scale
     .modal.modal-static & {
       transform: $static-transform;
+    }
+
+    .content {
+      margin: $margin-content;
     }
   }
 }
