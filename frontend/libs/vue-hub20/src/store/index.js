@@ -2,6 +2,7 @@ import account from './account'
 import auth from './auth'
 import events from './events'
 import funding from './funding'
+import notifications from './notifications'
 import password from './password'
 import server from './server'
 import signup from './signup'
@@ -25,6 +26,7 @@ export default {
   auth,
   events,
   funding,
+  notifications,
   password,
   server,
   signup,
