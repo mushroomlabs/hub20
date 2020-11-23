@@ -65,9 +65,9 @@ async def test_session_consumer():
     assert len(payment_sent_messages) == 1, "we should have received one payment received message"
 
     payment_sent_message = payment_sent_messages[0]
-    assert "payment_data" in payment_sent_message
+    assert "data" in payment_sent_message
 
-    payment_data = payment_sent_message["payment_data"]
+    payment_data = payment_sent_message["data"]
     assert is_0x_prefixed(payment_data["transaction"])
 
 

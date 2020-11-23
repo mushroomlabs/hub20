@@ -108,12 +108,10 @@ def on_incoming_transfer_broadcast_send_notification(sender, **kw):
         tasks.send_session_event.delay(
             deposit.session_key,
             event=Events.BLOCKCHAIN_DEPOSIT_BROADCAST.value,
-            payment_data={
-                "deposit_id": deposit.id,
-                "amount": payment_amount.amount,
-                "token": payment_amount.currency.address,
-                "transaction": tx_hash,
-            },
+            deposit_id=deposit.id,
+            amount=payment_amount.amount,
+            token=payment_amount.currency.address,
+            transaction=tx_hash,
         )
 
 
@@ -228,12 +226,10 @@ def on_blockchain_payment_received_send_notification(sender, **kw):
         tasks.send_session_event.delay(
             session_key=deposit.session_key,
             event=Events.BLOCKCHAIN_DEPOSIT_RECEIVED.value,
-            payment_data={
-                "deposit_id": payment.route.deposit.id,
-                "amount": payment.amount,
-                "token": payment.currency.address,
-                "transaction": payment.transaction.hash_hex,
-            },
+            deposit_id=payment.route.deposit.id,
+            amount=payment.amount,
+            token=payment.currency.address,
+            transaction=payment.transaction.hash_hex,
         )
 
 
