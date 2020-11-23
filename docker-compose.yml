@@ -38,7 +38,7 @@ services:
         while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
         django-admin migrate;
         django-admin collectstatic --noinput
-        uvicorn hub20.api.routing:application --port 80 --host 0.0.0.0 --reload --reload-dir /app/hub20
+        uvicorn hub20.api.asgi:application --port 80 --host 0.0.0.0 --reload --reload-dir /app/hub20
       "
     depends_on:
       - db

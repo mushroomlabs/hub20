@@ -29,5 +29,5 @@ urlpatterns = [
 
 
 consumer_patterns = [
-    path("events", SessionEventsConsumer),
+    path("events", SessionEventsConsumer.as_asgi()),
 ]

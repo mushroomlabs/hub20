@@ -1,7 +1,6 @@
 import logging
 
 from channels.auth import AuthMiddlewareStack
-from channels.sessions import SessionMiddlewareStack
 from django.contrib.auth.models import AnonymousUser
 from django.db import close_old_connections
 from rest_framework.authtoken.models import Token
@@ -17,7 +16,7 @@ class TokenAuthMiddleware:
     def __init__(self, inner):
         self.inner = inner
 
-    def __call__(self, scope):
+    async def __call__(self, scope, receive, send):
         headers = dict(scope["headers"])
         authorization_header = "authorization".encode()
         if authorization_header in headers:
@@ -28,9 +27,7 @@ class TokenAuthMiddleware:
                 close_old_connections()
             else:
                 scope["user"] = AnonymousUser()
-        return self.inner(scope)
+        return await self.inner(scope, receive, send)
 
 
-TokenAuthMiddlewareStack = lambda inner: TokenAuthMiddleware(
-    AuthMiddlewareStack(SessionMiddlewareStack(inner))
-)
+TokenAuthMiddlewareStack = lambda inner: TokenAuthMiddleware(AuthMiddlewareStack(inner))
