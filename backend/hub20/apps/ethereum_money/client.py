@@ -332,7 +332,10 @@ async def listen_latest_transfers(w3: Web3):
     while True:
         chain = await sync_to_async(Chain.make)(chain_id=chain_id)
         await asyncio.sleep(BLOCK_CREATION_INTERVAL)
-        await sync_to_async(process_latest_transfers)(w3, chain, block_filter)
+        try:
+            await sync_to_async(process_latest_transfers)(w3, chain, block_filter)
+        except Exception as exc:
+            logger.exception(exc)
 
 
 async def listen_pending_transfers(w3: Web3):

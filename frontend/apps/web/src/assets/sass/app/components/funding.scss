@@ -36,7 +36,38 @@ div.payment-request {
     > span {
       display: block;
       text-align: start;
-      margin: 0.5em 3rem;
+    }
+  }
+
+  div.payments {
+    margin-top: 2vh;
+    text-align: start;
+
+    ul {
+      padding-inline-start: 0;
+
+      li {
+        align-items: center;
+        vertical-align: middle;
+
+        &.confirmed {
+          @include icon-before("check")
+        }
+
+        &:not(.confirmed) {
+          @include icon-before("reload")
+        }
+
+        span.identifier {
+          float: right;
+          display: inline-block;
+          max-width: 8rem;
+          overflow-x: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+
+      }
     }
   }
 }

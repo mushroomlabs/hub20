@@ -24,10 +24,10 @@ def execute_transfer(transfer_id):
 
 
 @shared_task
-def send_session_event(session_key, **event_data):
+def send_session_event(session_key, event, **event_data):
     layer = get_channel_layer()
     channel_group_name = SessionEventsConsumer.get_group_name(session_key)
-    event_data.update({"type": "notify_event"})
+    event_data.update({"type": "notify_event", "event": event})
     async_to_sync(layer.group_send)(channel_group_name, event_data)
 
 

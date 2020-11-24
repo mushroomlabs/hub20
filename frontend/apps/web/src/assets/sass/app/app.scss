@@ -13,6 +13,10 @@ body {
 }
 
 // Generic elements (defined by design system)
+ul {
+  list-style: outside none none;
+}
+
 button {
   @include button($primary-color, $primary-states-color)
 }

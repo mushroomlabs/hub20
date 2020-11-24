@@ -30,10 +30,44 @@ const actions = {
   initialize({commit, dispatch, getters}) {
     const eventHandler = evt => {
       let eventTypes = hub20lib.store.EVENT_TYPES
-      const eventData = JSON.parse(evt.data)
-      switch (eventData.event) {
+      const message = JSON.parse(evt.data)
+      const eventData = message.data
+      switch (message.event) {
         case eventTypes.BLOCKCHAIN_BLOCK_CREATED:
-          commit('server/SERVER_SET_ETHEREUM_CURRENT_BLOCK', eventData.block_data.number)
+          commit('server/SERVER_SET_ETHEREUM_CURRENT_BLOCK', eventData.number)
+          break
+        case eventTypes.BLOCKCHAIN_DEPOSIT_BROADCAST:
+          commit('notifications/ADD_NOTIFICATION', {
+            message: 'Blockchain transaction sent',
+            type: 'info'
+          })
+          break
+        case eventTypes.RAIDEN_ROUTE_EXPIRED:
+        case eventTypes.BLOCKCHAIN_ROUTE_EXPIRED:
+          commit('notifications/ADD_NOTIFICATION', {
+            message:
+              'Payment route is expired. Any payment received now will may not be credited to your account',
+            type: 'warning'
+          })
+          break
+        case eventTypes.ETHEREUM_NODE_UNAVAILABLE:
+          commit('notifications/ADD_NOTIFICATION', {
+            message: 'Server reported loss of connection with ethereum network',
+            type: 'danger'
+          })
+          break
+        case eventTypes.ETHEREUM_NODE_OK:
+          commit('notifications/ADD_NOTIFICATION', {
+            message: 'Server connection with ethereum network established',
+            type: 'success'
+          })
+          break
+        case eventTypes.BLOCKCHAIN_DEPOSIT_RECEIVED:
+          dispatch('funding/fetchDeposit', eventData.depositId)
+          commit('notifications/ADD_NOTIFICATION', {
+            message: 'Deposit received via blockchain',
+            type: 'success'
+          })
           break
         default:
           console.log(evt)

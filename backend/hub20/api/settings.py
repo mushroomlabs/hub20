@@ -56,7 +56,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "hub20.api.urls"
-ASGI_APPLICATION = "hub20.api.routing.application"
+ASGI_APPLICATION = "hub20.api.asgi.application"
 
 
 TEMPLATES = [

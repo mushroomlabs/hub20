@@ -32,30 +32,33 @@ def on_block_sealed_send_notification(sender, **kw):
     # We are converting a AttributeDict from Web3 into a standard python dict
     # so that it can be serialized for celery
     block_data = json.loads(Web3.toJSON(kw.get("block_data")))
-    event_data = dict(event=Events.BLOCKCHAIN_BLOCK_CREATED.value, block_data=block_data)
 
     block_number = block_data.get("number")
     for session_key in _get_open_session_keys():
         logger.info(f"Publishing block {block_number} update for session {session_key}")
-        tasks.send_session_event.delay(session_key, **event_data)
+        tasks.send_session_event.delay(
+            session_key, event=Events.BLOCKCHAIN_BLOCK_CREATED.value, **block_data
+        )
 
 
 @receiver(ethereum_node_disconnected, sender=Chain)
 @receiver(ethereum_node_sync_lost, sender=Chain)
 def on_ethereum_node_error_send_notification(sender, **kw):
     chain = kw["chain"]
-    event_data = dict(chain_id=chain.id, event=Events.ETHEREUM_NODE_UNAVAILABLE.value)
     for session_key in _get_open_session_keys():
-        tasks.send_session_event.delay(session_key, **event_data)
+        tasks.send_session_event.delay(
+            session_key, event=Events.ETHEREUM_NODE_UNAVAILABLE.value, chain_id=chain.id
+        )
 
 
 @receiver(ethereum_node_connected, sender=Chain)
 @receiver(ethereum_node_sync_recovered, sender=Chain)
 def on_ethereum_node_ok_send_notification(sender, **kw):
     chain = kw["chain"]
-    event_data = dict(chain_id=chain.id, event=Events.ETHEREUM_NODE_OK.value)
     for session_key in _get_open_session_keys():
-        tasks.send_session_event.delay(session_key, **event_data)
+        tasks.send_session_event.delay(
+            session_key, event=Events.ETHEREUM_NODE_OK.value, chain_id=chain.id
+        )
 
 
 __all__ = [

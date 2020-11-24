@@ -20,6 +20,12 @@ export default {
   },
   mounted() {
     setInterval(() => this.$store.dispatch('refresh'), 60 * 1000)
+    this.$store.subscribe(mutation => {
+      switch (mutation.type) {
+      case 'notifications/ADD_NOTIFICATION':
+        this.$notify(mutation.payload)
+      }
+    })
   },
 }
 </script>

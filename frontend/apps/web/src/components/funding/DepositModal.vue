@@ -37,9 +37,9 @@ export default {
     },
   },
   methods: {
-    ...mapMutations('funding', {cancelDeposit: 'FUNDING_DEPOSIT_SET_CLOSED'}),
+    ...mapMutations('funding', {closeDeposit: 'FUNDING_DEPOSIT_SET_CLOSED'}),
     onClose() {
-      this.cancelDeposit(this.deposit.id)
+      this.closeDeposit(this.deposit.id)
     }
   }
 }
