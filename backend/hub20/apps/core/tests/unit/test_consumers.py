@@ -5,6 +5,7 @@ from asgiref.sync import sync_to_async
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.testing import WebsocketCommunicator
 from django.contrib.sessions.models import Session
+from django.core.asgi import get_asgi_application
 from eth_utils import is_0x_prefixed
 
 from hub20.apps.blockchain.factories import TransactionFactory
@@ -17,7 +18,10 @@ from hub20.apps.ethereum_money.signals import incoming_transfer_broadcast
 
 logger = logging.getLogger(__name__)
 application = ProtocolTypeRouter(
-    {"websocket": TokenAuthMiddlewareStack(URLRouter(consumer_patterns))}
+    {
+        "http": get_asgi_application(),
+        "websocket": TokenAuthMiddlewareStack(URLRouter(consumer_patterns)),
+    }
 )
 
 
