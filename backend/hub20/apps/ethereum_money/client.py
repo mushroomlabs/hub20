@@ -10,7 +10,12 @@ from ethereum.abi import ContractTranslator
 from web3 import Web3
 from web3.exceptions import TimeExhausted, TransactionNotFound
 
-from hub20.apps.blockchain.client import BLOCK_CREATION_INTERVAL, BLOCK_SCAN_RANGE, get_web3
+from hub20.apps.blockchain.client import (
+    BLOCK_CREATION_INTERVAL,
+    BLOCK_SCAN_RANGE,
+    get_web3,
+    wait_for_connection,
+)
 from hub20.apps.blockchain.models import Block, Chain, Transaction
 from hub20.apps.ethereum_money import get_ethereum_account_model
 
@@ -109,6 +114,7 @@ def make_token(w3: Web3, address) -> EthereumToken:
 
 
 def sync_token_transfers(w3: Web3, token: EthereumToken, starting_block: int, end_block: int):
+    wait_for_connection(w3)
     chain_id = int(w3.net.version)
     accounts_by_address = {a.address: a for a in EthereumAccount.objects.all()}
 
@@ -167,6 +173,7 @@ def sync_account_transactions(
 
 
 def process_pending_transfers(w3: Web3, chain: Chain, tx_filter):
+    wait_for_connection(w3)
     chain.refresh_from_db()
 
     # Convert the querysets to lists of addresses
@@ -222,6 +229,7 @@ def process_pending_transfers(w3: Web3, chain: Chain, tx_filter):
 
 
 def process_latest_transfers(w3: Web3, chain: Chain, block_filter):
+    wait_for_connection(w3)
     chain.refresh_from_db()
 
     accounts_by_address = {a.address: a for a in EthereumAccount.objects.all()}
@@ -326,19 +334,18 @@ class EthereumClient:
 
 
 async def listen_latest_transfers(w3: Web3):
+    await sync_to_async(wait_for_connection)(w3)
     block_filter = w3.eth.filter("latest")
     chain_id = int(w3.net.version)
 
     while True:
         chain = await sync_to_async(Chain.make)(chain_id=chain_id)
         await asyncio.sleep(BLOCK_CREATION_INTERVAL)
-        try:
-            await sync_to_async(process_latest_transfers)(w3, chain, block_filter)
-        except Exception as exc:
-            logger.exception(exc)
+        await sync_to_async(process_latest_transfers)(w3, chain, block_filter)
 
 
 async def listen_pending_transfers(w3: Web3):
+    await sync_to_async(wait_for_connection)(w3)
     tx_filter = w3.eth.filter("pending")
     chain_id = int(w3.net.version)
 
@@ -349,6 +356,7 @@ async def listen_pending_transfers(w3: Web3):
 
 
 async def download_all_token_transfers(w3: Web3):
+    await sync_to_async(wait_for_connection)(w3)
     chain_id = int(w3.net.version)
     chain = await sync_to_async(Chain.make)(chain_id=chain_id)
 
@@ -370,6 +378,7 @@ async def download_all_token_transfers(w3: Web3):
 
 
 async def download_all_account_transactions(w3: Web3):
+    await sync_to_async(wait_for_connection)(w3)
     chain_id = int(w3.net.version)
     chain = await sync_to_async(Chain.make)(chain_id=chain_id)
 

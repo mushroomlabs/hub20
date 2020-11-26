@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import time
 from typing import Dict, Optional, Tuple
 from urllib.parse import urlparse
 
@@ -109,6 +110,7 @@ def get_web3(provider_url: Optional[str] = None, force_new: bool = False) -> Web
         w3 = make_web3(provider_url)
         WEB3_CLIENTS[provider_url] = w3
 
+    wait_for_connection(w3)
     client_network_id = int(w3.net.version)
     app_network_id = settings.BLOCKCHAIN_NETWORK_ID
     if client_network_id != app_network_id:
@@ -169,6 +171,16 @@ def get_block_by_number(w3: Web3, block_number: int) -> Optional[Block]:
         return block
 
 
+def fetch_new_block_entries(w3: Web3, block_filter):
+    wait_for_connection(w3)
+    logger.info("Checking for new blocks...")
+    for event in block_filter.get_new_entries():
+        block_hash = event.hex()
+        logger.info(f"New block: {block_hash}")
+        block_data = w3.eth.getBlock(block_hash, full_transactions=True)
+        signals.block_sealed.send(sender=Block, block_data=block_data)
+
+
 def run_backfill(w3: Web3, start: int, end: int):
     chain_id = int(w3.net.version)
     block_range = (start, end)
@@ -183,17 +195,26 @@ def run_backfill(w3: Web3, start: int, end: int):
 
 def run_ethereum_node_connection_check(w3: Web3):
     chain = Chain.make(chain_id=int(w3.net.version))
-    is_online = w3.net.listening
+    is_connected = w3.isConnected()
 
-    if is_online and not chain.online:
-        signals.ethereum_node_connected.send(sender=Chain, chain=chain)
-    elif chain.online and not is_online:
-        signals.ethereum_node_disconnected.send(sender=Chain, chain=chain)
+    if is_connected and not chain.online:
+        signals.ethereum_node_connected.send(sender=Chain, chain_id=chain.id)
+    elif chain.online and not is_connected:
+        signals.ethereum_node_disconnected.send(sender=Chain, chain_id=chain.id)
     else:
-        logger.info(f"Ethereum node connected: {is_online}")
+        logger.debug(f"Ethereum node connected: {is_connected}")
+
+    return is_connected
+
+
+def wait_for_connection(w3: Web3):
+    while not w3.isConnected():
+        logger.info("Not connected. Waiting for reconnection...")
+        time.sleep(BLOCK_CREATION_INTERVAL / 2)
 
 
 async def download_all_chain(w3: Web3):
+    await sync_to_async(wait_for_connection)(w3)
     start = 0
     highest = w3.eth.blockNumber
     while start < highest:
@@ -205,22 +226,17 @@ async def download_all_chain(w3: Web3):
 
 
 async def listen_new_blocks(w3: Web3):
+    await sync_to_async(wait_for_connection)(w3)
     block_filter = w3.eth.filter("latest")
     while True:
+        await sync_to_async(wait_for_connection)(w3)
+        await sync_to_async(fetch_new_block_entries)(w3=w3, block_filter=block_filter)
         await asyncio.sleep(BLOCK_CREATION_INTERVAL)
-        logger.info("Checking for new blocks...")
-        try:
-            for event in block_filter.get_new_entries():
-                block_hash = event.hex()
-                logger.info(f"New block: {block_hash}")
-                block_data = w3.eth.getBlock(block_hash, full_transactions=True)
-                await sync_to_async(signals.block_sealed.send)(sender=Block, block_data=block_data)
-        except Exception as exc:
-            logger.exception(exc)
 
 
 async def sync_chain(w3: Web3):
     while True:
+        await sync_to_async(wait_for_connection)(w3)
         has_peers = w3.net.peer_count > 0
         is_synced = bool(not w3.eth.syncing)
         await sync_to_async(signals.chain_status_synced.send)(

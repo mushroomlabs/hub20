@@ -28,7 +28,7 @@ class Command(BaseCommand):
                 listener = import_string(listener_dotted_name)
                 tasks.append(listener(make_web3(settings.WEB3_PROVIDER_URI)))
 
-            # No matter the user settings, we always want to run the routing to
+            # No matter the user settings, we always want to run the routine to
             # update the chain status
             tasks.append(sync_chain(make_web3(settings.WEB3_PROVIDER_URI)))
 

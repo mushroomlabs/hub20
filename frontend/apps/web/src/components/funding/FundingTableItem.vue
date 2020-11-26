@@ -4,8 +4,10 @@
     <td class="balance">{{ balance }}</td>
     <td class="identifier">{{ token.id }}</td>
     <td class="actions">
-      <button @click="requestDeposit(token)">Deposit</button>
-      <router-link :to="{name: 'withdraw', params: {token: token.address}}" :disabled="!hasFunds"
+      <button @click="requestDeposit(token)" :disabled="!ethereumNodeOk">Deposit</button>
+      <router-link
+        :to="{name: 'withdraw', params: {token: token.address}}"
+        :disabled="!ethereumNodeOk || !hasFunds"
         >Send</router-link
       >
     </td>
@@ -22,6 +24,7 @@ export default {
   },
   computed: {
     ...mapGetters('account', ['tokenBalance']),
+    ...mapGetters('server', ['ethereumNodeOk']),
     balance() {
       return this.tokenBalance(this.token.address)
     },
@@ -32,8 +35,7 @@ export default {
   methods: {
     ...mapActions('funding', ['createDeposit']),
     requestDeposit(token) {
-      this.createDeposit(token)
-        .then(() => this.$emit('depositRequested', token))
+      this.createDeposit(token).then(() => this.$emit('depositRequested', token))
     }
   }
 }

@@ -27,18 +27,18 @@ def on_chain_status_synced_update_database(sender, **kw):
 
     with transaction.atomic():
         if chain.synced and not synced:
-            signals.ethereum_node_sync_lost.send(sender=Chain, chain=chain)
+            signals.ethereum_node_sync_lost.send(sender=Chain, chain_id=chain_id)
             chain.refresh_from_db()
 
         if synced and not chain.synced:
             signals.ethereum_node_sync_recovered.send(
-                sender=Chain, chain=chain, block_height=current_block
+                sender=Chain, chain_id=chain_id, block_height=current_block
             )
             chain.refresh_from_db()
 
             if synced and chain.highest_block > current_block:
                 signals.chain_reorganization_detected.send(
-                    sender=Chain, chain=chain, new_block_height=current_block
+                    sender=Chain, chain_id=chain_id, new_block_height=current_block
                 )
             chain.refresh_from_db()
 
@@ -55,51 +55,20 @@ def on_chain_status_synced_update_database(sender, **kw):
 
 @receiver(signals.chain_reorganization_detected, sender=Chain)
 def on_chain_reorganization_clear_blocks(sender, **kw):
-    chain = kw["chain"]
+    chain_id = kw["chain_id"]
     block_number = kw["new_block_height"]
+
+    chain = Chain.objects.filter(id=chain_id).first()
+
+    if not chain:
+        logger.warning(f"Chain #{chain_id} not created yet")
+        return
 
     logger.warning(f"Re-org detected. Rewinding to block #{block_number}")
     chain.blocks.filter(number__gt=block_number).delete()
 
 
-@receiver(signals.ethereum_node_sync_lost, sender=Chain)
-def on_sync_lost_update_chain(sender, **kw):
-    chain = kw["chain"]
-    logger.warning(f"Client {chain.provider_url} lost sync")
-    chain.synced = False
-    chain.save()
-
-
-@receiver(signals.ethereum_node_sync_recovered, sender=Chain)
-def on_sync_recovered_update_chain(sender, **kw):
-    chain = kw["chain"]
-    logger.warning(f"Client {chain.provider_hostname} back in sync")
-    chain.synced = True
-    chain.highest_block = kw["block_height"]
-    chain.save()
-
-
-@receiver(signals.ethereum_node_connected, sender=Chain)
-def on_ethereum_node_connected_update_online_status(sender, **kw):
-    chain = kw["chain"]
-    logger.warning(f"Client {chain.provider_hostname} online")
-    chain.online = True
-    chain.save()
-
-
-@receiver(signals.ethereum_node_disconnected, sender=Chain)
-def on_ethereum_node_disconnected_update_online_status(sender, **kw):
-    chain = kw["chain"]
-    logger.warning(f"Client {chain.provider_hostname} offline")
-    chain.online = False
-    chain.save()
-
-
 __all__ = [
-    "on_sync_lost_update_chain",
-    "on_sync_recovered_update_chain",
     "on_chain_status_synced_update_database",
     "on_chain_reorganization_clear_blocks",
-    "on_ethereum_node_connected_update_online_status",
-    "on_ethereum_node_disconnected_update_online_status",
 ]

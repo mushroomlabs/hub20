@@ -44,20 +44,20 @@ def on_block_sealed_send_notification(sender, **kw):
 @receiver(ethereum_node_disconnected, sender=Chain)
 @receiver(ethereum_node_sync_lost, sender=Chain)
 def on_ethereum_node_error_send_notification(sender, **kw):
-    chain = kw["chain"]
+    chain_id = kw["chain_id"]
     for session_key in _get_open_session_keys():
         tasks.send_session_event.delay(
-            session_key, event=Events.ETHEREUM_NODE_UNAVAILABLE.value, chain_id=chain.id
+            session_key, event=Events.ETHEREUM_NODE_UNAVAILABLE.value, chain_id=chain_id
         )
 
 
 @receiver(ethereum_node_connected, sender=Chain)
 @receiver(ethereum_node_sync_recovered, sender=Chain)
 def on_ethereum_node_ok_send_notification(sender, **kw):
-    chain = kw["chain"]
+    chain_id = kw["chain_id"]
     for session_key in _get_open_session_keys():
         tasks.send_session_event.delay(
-            session_key, event=Events.ETHEREUM_NODE_OK.value, chain_id=chain.id
+            session_key, event=Events.ETHEREUM_NODE_OK.value, chain_id=chain_id
         )
 
 
