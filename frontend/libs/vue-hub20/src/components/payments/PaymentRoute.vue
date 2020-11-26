@@ -1,15 +1,15 @@
 <template>
   <div class="payment-route" :class="{selected, expired}">
-    <PaymentRouteBlockchainTimer
-      v-if="isBlockchainRoute"
-      :created_on="route.start_block"
-      :expires_on="route.expiration_block"
-    />
     <QrCode :message="QrCodeMessage" />
     <div class="payment-route-details">
       <ClipboardCopier :value="route.address">Address: {{ route.address }}</ClipboardCopier>
       <ClipboardCopier v-if="isRaidenRoute" :value="route.identifier">Payment Identifier: {{ route.identifier }}</ClipboardCopier>
     </div>
+    <PaymentRouteBlockchainTimer
+      v-if="isBlockchainRoute"
+      :created_on="route.start_block"
+      :expires_on="route.expiration_block"
+    />
     <Web3TransferButton v-if="isBlockchainRoute" :token="token" :amount="amount" :recipientAddress="route.address" />
   </div>
 </template>

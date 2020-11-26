@@ -1,0 +1,22 @@
+@use "../../paper/variables";
+@use "../../themify-icons" as icons;
+
+div.blockchain-timer {
+  text-align: right;
+
+  &.synced.online {
+    color: variables.$success-color;
+
+    @include icons.icon-after("link")
+  }
+
+  &:not(.synced), &:not(.online) {
+    color: variables.$danger-color !important;
+  }
+
+  span.start-value, span.expiration-value {
+    display: none;
+  }
+
+  font-size: variables.$font-size-xs;
+}
