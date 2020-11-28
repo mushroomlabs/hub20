@@ -1,9 +1,11 @@
 from typing import List, Optional
 
-from django.db.models import ProtectedError
+from django.contrib.auth import get_user_model
+from django.db.models import ProtectedError, Q
 from django.db.models.query import QuerySet
 from django.http import Http404
 from django.shortcuts import get_object_or_404
+from django_filters import rest_framework as filters
 from rest_framework import generics, status
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin
 from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated
@@ -17,6 +19,23 @@ from hub20.apps.blockchain.serializers import ChainSerializer
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
 
 from . import models, serializers
+
+User = get_user_model()
+
+
+class UserFilter(filters.FilterSet):
+    search = filters.CharFilter(label="search", method="user_suggestion")
+
+    def user_suggestion(self, queryset, name, value):
+        q_username = Q(username__istartswith=value)
+        q_first_name = Q(first_name__istartswith=value)
+        q_last_name = Q(last_name__istartswith=value)
+        q_email = Q(email__istartswith=value)
+        return self.Meta.model.objects.filter(q_username | q_first_name | q_last_name | q_email)
+
+    class Meta:
+        model = User
+        fields = ("search",)
 
 
 class ReadWriteSerializerMixin(generics.GenericAPIView):
@@ -203,6 +222,20 @@ class StoreViewSet(ModelViewSet):
 
     def get_object(self, *args, **kw):
         return get_object_or_404(models.Store, id=self.kwargs["pk"])
+
+
+class UserViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
+    permission_classes = (IsAuthenticated,)
+    serializer_class = serializers.UserSerializer
+    filterset_class = UserFilter
+    filter_backends = (filters.DjangoFilterBackend,)
+    lookup_field = "username"
+
+    def get_queryset(self) -> QuerySet:
+        return User.objects.filter(is_active=True, is_superuser=False, is_staff=False)
+
+    def get_object(self, *args, **kw):
+        return get_object_or_404(User, username=self.kwargs["username"])
 
 
 class StatusView(APIView):

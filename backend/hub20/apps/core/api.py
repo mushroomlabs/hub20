@@ -11,6 +11,7 @@ router = SimpleRouter(trailing_slash=False)
 router.register("checkout", views.CheckoutViewSet, basename="checkout")
 router.register("payments", views.PaymentViewSet, basename="payments")
 router.register("stores", views.StoreViewSet, basename="store")
+router.register("users", views.UserViewSet, basename="users")
 
 
 urlpatterns = [
