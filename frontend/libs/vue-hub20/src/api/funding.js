@@ -6,6 +6,9 @@ export default {
       token: token.address
     })
   },
+  getDeposits() {
+    return session.get(`/api/deposits`)
+  },
   getDeposit(depositId) {
     return session.get(`/api/deposit/${depositId}`)
   },

@@ -1,5 +1,5 @@
 <template>
-  <Modal :title="title" :id="modalId" label="deposit-modal" @modalClosed="onClose()">
+  <Modal :title="title" :id="modalId" label="deposit-modal" v-on="$listeners">
     <template>
       <PaymentRequest :paymentRequest='deposit' />
     </template>
@@ -7,7 +7,7 @@
 </template>
 
 <script>
-import {mapGetters, mapMutations} from 'vuex'
+import {mapGetters} from 'vuex'
 import {default as hub20lib} from 'vue-hub20'
 
 import Modal from '@/widgets/dialogs/Modal'
@@ -34,12 +34,6 @@ export default {
     },
     modalId() {
       return `modal-${this.deposit.id}`
-    },
-  },
-  methods: {
-    ...mapMutations('funding', {closeDeposit: 'FUNDING_DEPOSIT_SET_CLOSED'}),
-    onClose() {
-      this.closeDeposit(this.deposit.id)
     }
   }
 }
