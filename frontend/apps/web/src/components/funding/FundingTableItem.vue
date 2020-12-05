@@ -5,22 +5,35 @@
     <td class="identifier">{{ token.id }}</td>
     <td class="actions">
       <button @click="openDepositModal()" :disabled="!ethereumNodeOk">Receive</button>
-      <button @click="openTransferModal()" :disabled="!ethereumNodeOk || !hasFunds">Send</button>
+      <button @click="openTransferModal()" :disabled="!ethereumNodeOk || !hasFunds">
+        Send
+      </button>
     </td>
-    <DepositModal v-if="currentDeposit" :deposit="currentDeposit" @modalClosed="onDepositClosed()"/>
-    <TransferModal :token="token" :hidden="!hasOpenTransfer" @modalClosed="onTransferClosed()"/>
+    <Modal
+      label="funding-modal"
+      :title="modalTitle"
+      :id="modalId"
+      :hidden="!isModalOpen"
+      @modalClosed="onModalClosed()"
+    >
+      <DepositTracker :token="token" v-if="hasOpenDeposit" />
+      <TransferForm :token="token" v-if="hasOpenTransfer" @transferFormSubmitted="onTransferSubmitted()" />
+    </Modal>
   </tr>
 </template>
 <script>
-import {mapActions, mapGetters} from 'vuex'
+import {mapGetters} from 'vuex'
 
-import DepositModal from './DepositModal'
-import TransferModal from './TransferModal'
+import Modal from '@/widgets/dialogs/Modal'
+
+import DepositTracker from './DepositTracker'
+import TransferForm from './TransferForm'
 
 export default {
   components: {
-    DepositModal,
-    TransferModal
+    Modal,
+    DepositTracker,
+    TransferForm
   },
   props: {
     token: {
@@ -29,48 +42,44 @@ export default {
   },
   data() {
     return {
-      currentDeposit: null,
-      hasOpenTransfer: false,
+      hasOpenDeposit: false,
+      hasOpenTransfer: false
     }
   },
   computed: {
     ...mapGetters('account', ['tokenBalance']),
     ...mapGetters('server', ['ethereumNodeOk']),
-    ...mapGetters('funding', ['openDepositsByToken']),
     balance() {
       return this.tokenBalance(this.token.address)
     },
     hasFunds() {
       return this.balance.gt(0)
     },
-    hasOpenDeposits() {
-      return this.openDeposits.length > 0
+    modalTitle() {
+      const action = this.hasOpenDeposit ? 'Deposit' : 'Transfer'
+      return `${action} ${this.token.code}`
     },
-    openDeposits() {
-      return this.openDepositsByToken(this.token)
+    modalId() {
+      return `modal-funding-${this.token.address}`
     },
+    isModalOpen() {
+      return this.hasOpenDeposit || this.hasOpenTransfer
+    }
   },
   methods: {
-    ...mapActions('funding', ['createDeposit']),
     openDepositModal() {
-      if (!this.hasOpenDeposits) {
-        this.createDeposit(this.token).then(depositData => {
-          this.currentDeposit = depositData
-        })
-      }
-      else {
-        this.currentDeposit = this.openDeposits[0]
-      }
+      this.hasOpenDeposit = true
     },
     openTransferModal() {
-      this.hasOpenTransfer = true;
+      this.hasOpenTransfer = true
     },
-    onDepositClosed() {
-      this.currentDeposit = null
-    },
-    onTransferClosed() {
+    onModalClosed() {
+      this.hasOpenDeposit = false
       this.hasOpenTransfer = false
     },
+    onTransferSubmitted() {
+      this.hasOpenTransfer = false
+    }
   }
 }
 </script>

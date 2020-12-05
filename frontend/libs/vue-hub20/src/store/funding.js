@@ -4,25 +4,25 @@ import client from '../api/funding'
 
 export const FUNDING_INITIALIZE = 'FUNDING_INITIALIZE'
 export const FUNDING_DEPOSIT_FAILURE = 'FUNDING_DEPOSIT_FAILURE'
-export const FUNDING_DEPOSIT_SUCCESS = 'FUNDING_DEPOSIT_SUCCESS'
+export const FUNDING_DEPOSIT_LOADED = 'FUNDING_DEPOSIT_LOADED'
 export const FUNDING_DEPOSIT_CREATED = 'FUNDING_DEPOSIT_CREATED'
+export const FUNDING_DEPOSIT_LIST_LOADED = 'FUNDING_DEPOSIT_LIST_LOADED'
 
-export const FUNDING_TRANSFER_SUCCESS = 'FUNDING_TRANSFER_SUCCESS'
+export const FUNDING_TRANSFER_CREATED = 'FUNDING_TRANSFER_CREATED'
+export const FUNDING_TRANSFER_LOADED = 'FUNDING_TRANSFER_LOADED'
 export const FUNDING_TRANSFER_FAILURE = 'FUNDING_TRANSFER_FAILURE'
+export const FUNDING_TRANSFER_LIST_LOADED = 'FUNDING_TRANSFER_LIST_LOADED'
 
 const initialState = {
-  depositsById: {},
-  transfersById: {},
+  deposits: [],
+  transfers: [],
   error: null
 }
 
 const getters = {
-  deposits: state => Object.values(state.depositsById),
-  depositsByToken: (state, getters) => token =>
-    getters.deposits.filter(deposit => deposit.token == token.address),
-  transfers: state => Object.values(state.transfersById),
-  openDeposits: (state, getters) =>
-    getters.deposits.filter(deposit => deposit.status == 'open'),
+  depositsByToken: state => token =>
+    state.deposits.filter(deposit => deposit.token == token.address),
+  openDeposits: state => state.deposits.filter(deposit => deposit.status == 'open'),
   openDepositsByToken: (state, getters) => token =>
     getters.openDeposits.filter(deposit => deposit.token == token.address)
 }
@@ -40,33 +40,36 @@ const actions = {
   fetchDeposit({commit}, depositId) {
     return client
       .getDeposit(depositId)
-      .then(({data}) => commit(FUNDING_DEPOSIT_SUCCESS, data))
+      .then(({data}) => commit(FUNDING_DEPOSIT_LOADED, data))
       .catch(error => commit(FUNDING_DEPOSIT_FAILURE, error.response))
   },
   fetchDeposits({commit}) {
     return client
       .getDeposits()
-      .then(({data}) =>
-        data.forEach(depositData => commit(FUNDING_DEPOSIT_SUCCESS, depositData))
-      )
+      .then(({data}) => commit(FUNDING_DEPOSIT_LIST_LOADED, data))
       .catch(error => commit(FUNDING_DEPOSIT_FAILURE, error.response))
   },
   createTransfer({commit}, payload) {
     const {token, amount, ...params} = payload
     return client
       .scheduleTransfer(token, amount, params)
-      .then(({data}) => commit(FUNDING_TRANSFER_SUCCESS, data))
+      .then(({data}) => commit(FUNDING_TRANSFER_CREATED, data))
+      .catch(error => commit(FUNDING_TRANSFER_FAILURE, error.response))
+  },
+  fetchTransfers({commit}) {
+    return client
+      .getTransfers()
+      .then(({data}) => commit(FUNDING_TRANSFER_LIST_LOADED, data))
       .catch(error => commit(FUNDING_TRANSFER_FAILURE, error.response))
   },
   initialize({commit, dispatch}) {
     commit(FUNDING_INITIALIZE)
     dispatch('fetchDeposits')
+    dispatch('fetchTransfers')
   },
-  refresh({state, dispatch}) {
+  refresh({dispatch}) {
     dispatch('fetchDeposits')
-    Object.keys(state.transfersById).forEach(transferId =>
-      dispatch('fetchTransfer', transferId)
-    )
+    dispatch('fetchTransfers')
   }
 }
 
@@ -75,20 +78,28 @@ const mutations = {
     Object.assign({...initialState}, state)
   },
   [FUNDING_DEPOSIT_CREATED](state, depositData) {
-    Vue.set(state.depositsById, depositData.id, depositData)
+    state.deposits.push(depositData)
   },
-  [FUNDING_DEPOSIT_SUCCESS](state, depositData) {
+  [FUNDING_DEPOSIT_LOADED](state, depositData) {
     Vue.set(state.depositsById, depositData.id, depositData)
   },
   [FUNDING_DEPOSIT_FAILURE](state, error) {
     state.error = error.data
   },
-  [FUNDING_TRANSFER_SUCCESS](state, transferData) {
-    Vue.set(state.transfersById, transferData.id, transferData)
-    state.error = null
+  [FUNDING_DEPOSIT_LIST_LOADED](state, depositList) {
+    state.deposits = depositList
+  },
+  [FUNDING_TRANSFER_CREATED](state, transferData) {
+    state.transfers.push(transferData)
+  },
+  [FUNDING_TRANSFER_LOADED](state, transferData) {
+    state.transfers.push(transferData)
   },
   [FUNDING_TRANSFER_FAILURE](state, error) {
     state.error = error.data
+  },
+  [FUNDING_TRANSFER_LIST_LOADED](state, transferList) {
+    state.transfers = transferList
   }
 }
 

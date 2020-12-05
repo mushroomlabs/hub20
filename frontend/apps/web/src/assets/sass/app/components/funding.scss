@@ -1,10 +1,16 @@
 $_qrcode_size: 35vw !important;
 $_qrcode_max_size: 250px !important;
 
+div.payment-request, form[name='transfer'] {
+  div.button-bar {
+    text-align: center;
+  }
+}
+
 div.payment-request {
   text-align: center;
 
-  div.button-bar, canvas.qr-code {
+  canvas.qr-code {
     text-align: center;
   }
 

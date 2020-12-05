@@ -1,5 +1,5 @@
 <template>
-  <div class="payment-request">
+<div class="payment-request">
     <div class="button-bar" v-if="hasMultipleRoutes">
       <button
         type="button"
@@ -28,14 +28,14 @@
 <script>
 import {mapGetters} from 'vuex'
 
-import mixins from '../../mixins'
-
 import PaymentRoute from './PaymentRoute'
 import PaymentTracker from './PaymentTracker'
 
+import TokenMixin from '../../mixins/tokens'
+
 
 export default {
-  mixins: [mixins.TokenMixin],
+  mixins: [TokenMixin],
   components: {
     PaymentRoute,
     PaymentTracker
@@ -59,7 +59,7 @@ export default {
       return this.getToken(this.paymentRequest.token)
     },
     openRoutes() {
-      return this.paymentRequest.routes.filter(route => this.isOpenRoute(route))
+      return this.paymentRequest ? this.paymentRequest.routes.filter(route => this.isOpenRoute(route)) : []
     }
   },
   methods: {

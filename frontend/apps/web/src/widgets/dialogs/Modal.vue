@@ -51,11 +51,9 @@ export default {
   },
   methods: {
     close() {
-      this.hidden = true
       this.$emit('modalClosed')
     },
     open() {
-      this.hidden = false
       this.$emit('modalOpened')
     }
   }

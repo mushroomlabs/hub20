@@ -7,7 +7,7 @@ export default {
     })
   },
   getDeposits() {
-    return session.get(`/api/deposits`)
+    return session.get('/api/deposits')
   },
   getDeposit(depositId) {
     return session.get(`/api/deposit/${depositId}`)
@@ -24,11 +24,13 @@ export default {
   cancelPaymentOrder(orderId) {
     return session.delete(`/api/payment/orders/${orderId}`)
   },
-  scheduleExternalTransfer(token, amount, address, options) {
+  getTransfers() {
+    return session.get('/api/transfers')
+  },
+  scheduleTransfer(token, amount, options) {
     let payload = {
       amount: amount,
       token: token.address,
-      address: address,
       ...options
     }
     return session.post('/api/transfers', payload)
