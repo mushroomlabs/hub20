@@ -19,6 +19,7 @@
     "core-js": "^3.6.5",
     "decimal.js-light": "^2.5.0",
     "es6-promise": "^4.2.4",
+    "ethers": "^5.0.23",
     "immutable": "^4.0.0-rc.12",
     "sass": "^1.28.0",
     "vue": "^2.6.11",
