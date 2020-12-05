@@ -83,6 +83,7 @@ const actions = {
           .then(() => dispatch('stores/initialize'))
           .then(() => dispatch('funding/initialize'))
           .then(() => dispatch('server/initialize'))
+          .then(() => dispatch('users/initialize'))
           .then(() => dispatch('events/initialize', SERVER_URL))
           .then(() => dispatch('events/setEventHandler', eventHandler))
           .then(() => commit(APP_SET_INITIALIZED))

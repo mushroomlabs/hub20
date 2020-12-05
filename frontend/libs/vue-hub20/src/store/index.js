@@ -8,6 +8,7 @@ import server from './server'
 import signup from './signup'
 import stores from './stores'
 import tokens from './tokens'
+import users from './users'
 import web3 from './web3'
 
 export const EVENT_TYPES = {
@@ -32,6 +33,7 @@ export default {
   signup,
   stores,
   tokens,
+  users,
   web3,
   EVENT_TYPES
 }
