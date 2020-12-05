@@ -4,6 +4,7 @@ import funding from './funding'
 import session from './session'
 import stores from './stores'
 import tokens from './tokens'
+import users from './users'
 
 export default {
   account,
@@ -11,5 +12,6 @@ export default {
   funding,
   session,
   stores,
-  tokens
+  tokens,
+  users
 }

@@ -4,22 +4,46 @@
     <td class="balance">{{ balance }}</td>
     <td class="identifier">{{ token.id }}</td>
     <td class="actions">
-      <button @click="requestDeposit(token)" :disabled="!ethereumNodeOk">Deposit</button>
-      <router-link
-        :to="{name: 'withdraw', params: {token: token.address}}"
-        :disabled="!ethereumNodeOk || !hasFunds"
-        >Send</router-link
-      >
+      <button @click="openDepositModal()" :disabled="!ethereumNodeOk">Receive</button>
+      <button @click="openTransferModal()" :disabled="!ethereumNodeOk || !hasFunds">
+        Send
+      </button>
     </td>
+    <Modal
+      label="funding-modal"
+      :title="modalTitle"
+      :id="modalId"
+      :hidden="!isModalOpen"
+      @modalClosed="onModalClosed()"
+    >
+      <DepositTracker :token="token" v-if="hasOpenDeposit" />
+      <TransferForm :token="token" v-if="hasOpenTransfer" @transferFormSubmitted="onTransferSubmitted()" />
+    </Modal>
   </tr>
 </template>
 <script>
-import {mapActions, mapGetters} from 'vuex'
+import {mapGetters} from 'vuex'
+
+import Modal from '@/widgets/dialogs/Modal'
+
+import DepositTracker from './DepositTracker'
+import TransferForm from './TransferForm'
 
 export default {
+  components: {
+    Modal,
+    DepositTracker,
+    TransferForm
+  },
   props: {
     token: {
       type: Object
+    }
+  },
+  data() {
+    return {
+      hasOpenDeposit: false,
+      hasOpenTransfer: false
     }
   },
   computed: {
@@ -30,12 +54,31 @@ export default {
     },
     hasFunds() {
       return this.balance.gt(0)
+    },
+    modalTitle() {
+      const action = this.hasOpenDeposit ? 'Deposit' : 'Transfer'
+      return `${action} ${this.token.code}`
+    },
+    modalId() {
+      return `modal-funding-${this.token.address}`
+    },
+    isModalOpen() {
+      return this.hasOpenDeposit || this.hasOpenTransfer
     }
   },
   methods: {
-    ...mapActions('funding', ['createDeposit']),
-    requestDeposit(token) {
-      this.createDeposit(token).then(() => this.$emit('depositRequested', token))
+    openDepositModal() {
+      this.hasOpenDeposit = true
+    },
+    openTransferModal() {
+      this.hasOpenTransfer = true
+    },
+    onModalClosed() {
+      this.hasOpenDeposit = false
+      this.hasOpenTransfer = false
+    },
+    onTransferSubmitted() {
+      this.hasOpenTransfer = false
     }
   }
 }

@@ -28,6 +28,7 @@ THIRD_PARTY_APPS = [
     "allauth.socialaccount",
     "channels",
     "corsheaders",
+    "django_filters",
     "djmoney",
     "rest_framework",
     "rest_framework.authtoken",
@@ -164,6 +165,17 @@ USE_TZ = True
 
 SITE_ID = 1
 HUB20_SITE_DOMAIN = os.getenv("HUB20_SITE_DOMAIN")
+
+
+# Rest Framework settings
+REST_RENDERERS = ("BrowsableAPIRenderer", "JSONRenderer") if DEBUG else ("JSONRenderer",)
+REST_FRAMEWORK = {
+    "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
+    "DEFAULT_RENDERER_CLASSES": [
+        f"rest_framework.renderers.{renderer}" for renderer in REST_RENDERERS
+    ],
+}
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.9/howto/static-files/

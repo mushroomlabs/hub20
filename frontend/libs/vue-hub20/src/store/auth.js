@@ -1,24 +1,29 @@
 import auth from '../api/auth'
 import session from '../api/session'
 
-const TOKEN_STORAGE_KEY = 'TOKEN_STORAGE_KEY'
+const TOKEN_STORAGE_KEY = 'token'
+const USERNAME_STORAGE_KEY = 'username'
 
 export const LOGIN_BEGIN = 'LOGIN_BEGIN'
 export const LOGIN_CLEAR = 'LOGIN_CLEAR'
 export const LOGIN_FAILURE = 'LOGIN_FAILURE'
 export const LOGIN_SUCCESS = 'LOGIN_SUCCESS'
 export const LOGOUT = 'LOGOUT'
+export const AUTH_SET_USERNAME = 'AUTH_SET_USERNAME'
 export const AUTH_SET_TOKEN = 'AUTH_SET_TOKEN'
 export const AUTH_REMOVE_TOKEN = 'AUTH_REMOVE_TOKEN'
+export const AUTH_REMOVE_USERNAME = 'AUTH_REMOVE_USERNAME'
 
 const initialState = {
   authenticating: false,
   error: false,
+  username: null,
   token: null
 }
 
 const getters = {
-  isAuthenticated: state => !!state.token
+  isAuthenticated: state => !!state.token,
+  loggedUsername: (state, getters) => getters.isAuthenticated && state.username
 }
 
 const actions = {
@@ -26,7 +31,10 @@ const actions = {
     commit(LOGIN_BEGIN)
     return auth
       .login(username, password)
-      .then(({data}) => commit(AUTH_SET_TOKEN, data.key))
+      .then(({data}) => {
+        commit(AUTH_SET_TOKEN, data.key)
+        commit(AUTH_SET_USERNAME, username)
+      })
       .then(() => commit(LOGIN_SUCCESS))
       .catch(() => commit(LOGIN_FAILURE))
   },
@@ -34,13 +42,21 @@ const actions = {
     return auth
       .logout()
       .then(() => commit(LOGOUT))
-      .finally(() => commit(AUTH_REMOVE_TOKEN))
+      .finally(() => {
+        commit(AUTH_REMOVE_TOKEN)
+        commit(AUTH_REMOVE_USERNAME)
+      })
   },
   initialize({commit}) {
     const token = localStorage.getItem(TOKEN_STORAGE_KEY)
+    const username = localStorage.getItem(USERNAME_STORAGE_KEY)
 
     if (token) {
       commit(AUTH_SET_TOKEN, token)
+    }
+
+    if (username) {
+      commit(AUTH_SET_USERNAME, username)
     }
   }
 }
@@ -71,6 +87,14 @@ const mutations = {
     localStorage.removeItem(TOKEN_STORAGE_KEY)
     delete session.defaults.headers.Authorization
     state.token = null
+  },
+  [AUTH_SET_USERNAME](state, username) {
+    localStorage.setItem(USERNAME_STORAGE_KEY, username)
+    state.username = username
+  },
+  [AUTH_REMOVE_USERNAME](state) {
+    localStorage.removeItem(USERNAME_STORAGE_KEY)
+    state.username = null
   }
 }
 

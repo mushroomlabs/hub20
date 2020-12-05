@@ -27,6 +27,16 @@ class UserRelatedField(serializers.SlugRelatedField):
         super().__init__(*args, **kw)
 
 
+class UserSerializer(serializers.ModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name="hub20:users-detail", lookup_field="username"
+    )
+
+    class Meta:
+        model = User
+        fields = read_only_fields = ("url", "username", "first_name", "last_name", "email")
+
+
 class TokenBalanceSerializer(serializers.Serializer):
     url = serializers.SerializerMethodField()
     amount = TokenValueField(read_only=True)
