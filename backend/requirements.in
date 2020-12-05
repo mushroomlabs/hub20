@@ -4,6 +4,7 @@ channels_redis
 django
 django-allauth
 django-cors-headers
+django-filter
 django-ipware
 django-model-utils
 django-pdb
