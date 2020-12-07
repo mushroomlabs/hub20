@@ -2,7 +2,7 @@ import Vue from 'vue'
 import Vuex from 'vuex'
 import createLogger from 'vuex/dist/logger'
 
-import {default as hub20lib} from 'vue-hub20'
+import {store} from 'vue-hub20'
 
 import {APP_SET_INITIALIZED} from './types'
 
@@ -29,7 +29,7 @@ const mutations = {
 const actions = {
   initialize({commit, dispatch, getters}) {
     const eventHandler = evt => {
-      let eventTypes = hub20lib.store.EVENT_TYPES
+      let eventTypes = store.EVENT_TYPES
       const message = JSON.parse(evt.data)
       const eventData = message.data
       switch (message.event) {
@@ -98,7 +98,7 @@ const actions = {
 }
 
 export default new Vuex.Store({
-  modules: hub20lib.store,
+  modules: store,
   state: initialState,
   strict: debug,
   plugins: debug ? [createLogger()] : [],

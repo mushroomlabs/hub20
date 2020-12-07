@@ -4,9 +4,9 @@
 
 <script>
 import {mapActions, mapGetters} from 'vuex'
-import {default as hub20lib} from 'vue-hub20'
+import {components as hub20Components} from 'vue-hub20'
 
-const {PaymentRequest} = hub20lib.components
+const {PaymentRequest} = hub20Components
 
 export default {
   components: {
