@@ -1,5 +1,6 @@
 import account from './account'
 import auth from './auth'
+import coingecko from './coingecko'
 import events from './events'
 import funding from './funding'
 import notifications from './notifications'
@@ -25,6 +26,7 @@ export const EVENT_TYPES = {
 export default {
   account,
   auth,
+  coingecko,
   events,
   funding,
   notifications,

@@ -1,8 +1,8 @@
 <template>
   <tr>
     <td class="name" :title="token.address">{{ token.name }} ({{ token.code }})</td>
+    <td class="price">{{ exchangeRate(token) | formattedCurrency(baseCurrency) }}</td>
     <td class="balance">{{ balance }}</td>
-    <td class="identifier">{{ token.id }}</td>
     <td class="actions">
       <button @click="openDepositModal()" :disabled="!ethereumNodeOk">Receive</button>
       <button @click="openTransferModal()" :disabled="!ethereumNodeOk || !hasFunds">
@@ -22,7 +22,8 @@
   </tr>
 </template>
 <script>
-import {mapGetters} from 'vuex'
+import {mapActions, mapGetters, mapState} from 'vuex'
+import {filters as hub20filters} from 'vue-hub20'
 
 import Modal from '@/widgets/dialogs/Modal'
 
@@ -34,6 +35,9 @@ export default {
     Modal,
     DepositTracker,
     TransferForm
+  },
+  filters: {
+    formattedCurrency: hub20filters.formattedCurrency
   },
   props: {
     token: {
@@ -49,6 +53,8 @@ export default {
   computed: {
     ...mapGetters('account', ['tokenBalance']),
     ...mapGetters('server', ['ethereumNodeOk']),
+    ...mapGetters('coingecko', ['exchangeRate']),
+    ...mapState('coingecko', ['baseCurrency']),
     balance() {
       return this.tokenBalance(this.token.address)
     },
@@ -67,6 +73,7 @@ export default {
     }
   },
   methods: {
+    ...mapActions('coingecko', ['fetchRate']),
     openDepositModal() {
       this.hasOpenDeposit = true
     },
@@ -80,6 +87,9 @@ export default {
     onTransferSubmitted() {
       this.hasOpenTransfer = false
     }
+  },
+  mounted() {
+    this.fetchRate(this.token)
   }
 }
 </script>

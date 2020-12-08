@@ -7,6 +7,7 @@
 </template>
 
 <script>
+import {mapGetters} from 'vuex'
 import BaseLayout from '@/layout/BaseLayout'
 
 export default {
@@ -14,16 +15,20 @@ export default {
     BaseLayout,
   },
   computed: {
-    isAuthenticated() {
-      return this.$store.getters['auth/isAuthenticated']
+    ...mapGetters('auth', ['isAuthenticated']),
+  },
+  methods: {
+    refresh() {
+      this.$store.dispatch('refresh')
     },
   },
   mounted() {
-    setInterval(() => this.$store.dispatch('refresh'), 60 * 1000)
+    setInterval(this.refresh, 60 * 1000)
     this.$store.subscribe(mutation => {
       switch (mutation.type) {
       case 'notifications/ADD_NOTIFICATION':
         this.$notify(mutation.payload)
+        break
       }
     })
   },
