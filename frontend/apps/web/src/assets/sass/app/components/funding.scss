@@ -1,6 +1,16 @@
 $_qrcode_size: 35vw !important;
 $_qrcode_max_size: 250px !important;
 
+table.funding-status {
+  .balance, .price {
+    text-align: right;
+  }
+
+  th.name, td.name {
+    text-align: left;
+  }
+}
+
 div.payment-request, form[name='transfer'] {
   div.button-bar {
     text-align: center;

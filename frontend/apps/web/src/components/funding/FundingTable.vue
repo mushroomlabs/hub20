@@ -1,7 +1,8 @@
 <template>
-<table id="funding-data" class="table">
+<table id="funding-data" class="table funding-status">
   <thead>
     <th class="name">Token</th>
+    <th class="price">Price</th>
     <th class="balance">Current Balance</th>
     <th class="actions"></th>
   </thead>

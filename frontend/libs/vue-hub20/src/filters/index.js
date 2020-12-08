@@ -12,4 +12,8 @@ export const formattedAmount = function(amount, token) {
   return `${formattedAmount} ${token.code}`
 }
 
-export default {toWei, formattedAmount}
+export const formattedCurrency = function(amount, currencyCode) {
+  return new Intl.NumberFormat([], {style: 'currency', currency: currencyCode}).format(amount)
+}
+
+export default {toWei, formattedAmount, formattedCurrency}

@@ -80,6 +80,7 @@ const actions = {
       if (getters['auth/isAuthenticated']) {
         dispatch('tokens/initialize')
           .then(() => dispatch('account/initialize'))
+          .then(() => dispatch('coingecko/initialize'))
           .then(() => dispatch('stores/initialize'))
           .then(() => dispatch('funding/initialize'))
           .then(() => dispatch('server/initialize'))
@@ -93,6 +94,7 @@ const actions = {
   refresh({dispatch}) {
     dispatch('account/refresh')
       .then(() => dispatch('stores/refresh'))
+      .then(() => dispatch('coingecko/refresh'))
       .then(() => dispatch('funding/refresh'))
   }
 }
