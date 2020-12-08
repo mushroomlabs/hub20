@@ -6,11 +6,9 @@
 import {mapActions, mapGetters} from 'vuex'
 import {components as hub20Components} from 'vue-hub20'
 
-const {PaymentRequest} = hub20Components
-
 export default {
   components: {
-    PaymentRequest
+    PaymentRequest: hub20Components.PaymentRequest
   },
   props: {
     token: {
