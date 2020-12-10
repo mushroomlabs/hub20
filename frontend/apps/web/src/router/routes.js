@@ -3,6 +3,7 @@ import DashboardLayout from '@/layout/dashboard/DashboardLayout'
 // Pages outside of Dashboard
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
+import Setup from '@/pages/Setup'
 
 // GeneralViews
 import NotFound from '@/pages/NotFoundPage'
@@ -114,6 +115,11 @@ const routes = [
     ]
   },
   {
+    path: '/setup',
+    name: 'setup',
+    component: Setup
+  },
+  {
     path: '/login',
     name: 'login',
     component: Login,
@@ -132,5 +138,15 @@ const routes = [
   },
   {path: '*', component: NotFound}
 ]
+
+export const requireServerConnection = (to, from, next) => {
+  store.dispatch('server/initialize').then(() => {
+    if (!store.getters['server/isConnected']) {
+      next('/setup')
+    } else {
+      next()
+    }
+  })
+}
 
 export default routes

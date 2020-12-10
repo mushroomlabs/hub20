@@ -54,6 +54,18 @@ services:
     depends_on:
       - web
 
+  # Admin backend
+  admin:
+    <<: *development_service
+    stdin_open: true
+    tty: true
+    volumes:
+      - ./backend:/app
+      - ./docker/volumes/media/hub20/static:${HUB20_STATIC_ROOT}
+    networks:
+      dev:
+        ipv4_address: 10.0.20.98
+
   # Web API
   web:
     <<: *development_service

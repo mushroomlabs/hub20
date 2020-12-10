@@ -27,6 +27,9 @@ const mutations = {
 }
 
 const actions = {
+  setServer({dispatch}, url) {
+    dispatch('server/setUrl', url)
+  },
   initialize({commit, dispatch, getters}) {
     const eventHandler = evt => {
       let eventTypes = store.EVENT_TYPES
@@ -34,7 +37,7 @@ const actions = {
       const eventData = message.data
       switch (message.event) {
         case eventTypes.BLOCKCHAIN_BLOCK_CREATED:
-          commit('server/SERVER_SET_ETHEREUM_CURRENT_BLOCK', eventData.number)
+          commit('network/NETWORK_SET_ETHEREUM_CURRENT_BLOCK', eventData.number)
           break
         case eventTypes.BLOCKCHAIN_DEPOSIT_BROADCAST:
           commit('notifications/ADD_NOTIFICATION', {
@@ -74,16 +77,15 @@ const actions = {
       }
     }
 
-    commit('server/SERVER_SET_URL', SERVER_URL)
+    dispatch('coingecko/initialize')
 
     dispatch('auth/initialize').then(() => {
       if (getters['auth/isAuthenticated']) {
         dispatch('tokens/initialize')
           .then(() => dispatch('account/initialize'))
-          .then(() => dispatch('coingecko/initialize'))
+          .then(() => dispatch('network/initialize'))
           .then(() => dispatch('stores/initialize'))
           .then(() => dispatch('funding/initialize'))
-          .then(() => dispatch('server/initialize'))
           .then(() => dispatch('users/initialize'))
           .then(() => dispatch('events/initialize', SERVER_URL))
           .then(() => dispatch('events/setEventHandler', eventHandler))

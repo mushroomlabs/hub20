@@ -3,6 +3,7 @@ import auth from './auth'
 import coingecko from './coingecko'
 import events from './events'
 import funding from './funding'
+import network from './network'
 import notifications from './notifications'
 import password from './password'
 import server from './server'
@@ -29,6 +30,7 @@ export default {
   coingecko,
   events,
   funding,
+  network,
   notifications,
   password,
   server,

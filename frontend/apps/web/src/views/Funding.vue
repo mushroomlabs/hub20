@@ -20,7 +20,7 @@ export default {
     FundingTable,
   },
   computed: {
-    ...mapGetters('server', ['ethereumNodeOk']),
+    ...mapGetters('network', ['ethereumNodeOk']),
   },
 }
 </script>

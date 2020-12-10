@@ -28,6 +28,25 @@ services:
   redis:
     image: redis:latest
 
+  # Admin Site
+  admin:
+    <<: *hub20_backend
+
+    command: >
+      /bin/bash -c "
+        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+        django-admin collectstatic --noinput
+        uvicorn hub20.admin.asgi:application --port 80 --host 0.0.0.0 --root-path="/admin" --reload --reload-dir /app/hub20
+      "
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - ./.env
+    environment:
+      HUB20_URLCONF_MODULE: hub20.admin.urls
+
   # Web API
   web:
     <<: *hub20_backend
@@ -38,7 +57,7 @@ services:
         while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
         django-admin migrate;
         django-admin collectstatic --noinput
-        uvicorn hub20.api.asgi:application --port 80 --host 0.0.0.0 --reload --reload-dir /app/hub20
+        uvicorn hub20.api.asgi:application --port 80 --host 0.0.0.0 --root-path="/api" --reload --reload-dir /app/hub20
       "
     depends_on:
       - db
@@ -73,7 +92,7 @@ services:
         mkdir -p ${HUB20_DATA_FOLDER}/celery;
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
         while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
-        celery beat -A hub20.api -l info -s ${HUB20_DATA_FOLDER}/celery/celerybeat-schedule.db --pidfile=${HUB20_DATA_FOLDER}/celery/celerybeat.pid
+        celery -A hub20.api beat -l info -s ${HUB20_DATA_FOLDER}/celery/celerybeat-schedule.db --pidfile=${HUB20_DATA_FOLDER}/celery/celerybeat.pid
       "
 
     depends_on:

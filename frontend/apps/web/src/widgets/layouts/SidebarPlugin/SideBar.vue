@@ -2,7 +2,7 @@
   <div class="sidebar">
     <router-link to="/" class="logo" exact>
       <img src="@/assets/img/logos/ethereum.svg">
-      <span>{{title}}</span>
+      <span>{{ title }}</span>
     </router-link>
     <slot></slot>
     <ul class="nav">
@@ -37,10 +37,6 @@ export default {
     MovingArrow,
   },
   computed: {
-    /**
-     * Styles to animate the arrow near the current active sidebar link
-     * @returns {{transform: string}}
-     */
     links() {
       return this.$children.filter(component => { return component.$options.name === "sidebar-link" });
     },

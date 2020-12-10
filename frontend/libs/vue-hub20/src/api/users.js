@@ -1,13 +1,14 @@
-import session from './session'
+import client from './client'
 
 export default {
+  _client: client,
   getUserList() {
-    return session.get('/api/users')
+    return this._client.get('/users')
   },
   getUser(username) {
-    return session.get(`/api/users/${username}`)
+    return this._client.get(`/users/${username}`)
   },
   searchUsers(searchTerm) {
-    return session.get('/api/users', {params: {search: searchTerm}})
+    return this._client.get('/users', {params: {search: searchTerm}})
   }
 }

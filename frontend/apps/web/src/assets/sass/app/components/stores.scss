@@ -1,0 +1,5 @@
+#stores {
+  section.header a {
+    @include button($info-color, $info-states-color);
+  }
+}

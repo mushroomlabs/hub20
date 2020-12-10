@@ -28,9 +28,7 @@ class UserRelatedField(serializers.SlugRelatedField):
 
 
 class UserSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(
-        view_name="hub20:users-detail", lookup_field="username"
-    )
+    url = serializers.HyperlinkedIdentityField(view_name="users-detail", lookup_field="username")
 
     class Meta:
         model = User
@@ -45,14 +43,14 @@ class TokenBalanceSerializer(serializers.Serializer):
 
     def get_url(self, obj):
         return reverse(
-            "hub20:balance-detail",
+            "balance-detail",
             kwargs={"address": obj.currency.address},
             request=self.context.get("request"),
         )
 
 
 class TransferSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="hub20:transfer-detail")
+    url = serializers.HyperlinkedIdentityField(view_name="transfer-detail")
     address = EthereumAddressField(write_only=True, required=False)
     recipient = UserRelatedField(write_only=True, required=False, allow_null=True)
     token = CurrencyRelatedField(source="currency")
@@ -177,7 +175,7 @@ class RaidenPaymentRouteSerializer(PaymentRouteSerializer):
 
 class PaymentSerializer(serializers.ModelSerializer):
     id = serializers.UUIDField()
-    url = serializers.HyperlinkedIdentityField(view_name="hub20:payments-detail")
+    url = serializers.HyperlinkedIdentityField(view_name="payments-detail")
     currency = EthereumTokenSerializer()
     confirmed = serializers.BooleanField(source="is_confirmed", read_only=True)
 
@@ -231,7 +229,7 @@ class RaidenPaymentSerializer(PaymentSerializer):
 
 
 class DepositSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="hub20:deposit-detail")
+    url = serializers.HyperlinkedIdentityField(view_name="deposit-detail")
     token = CurrencyRelatedField(source="currency")
     routes = serializers.SerializerMethodField()
     payments = serializers.SerializerMethodField()
@@ -275,7 +273,7 @@ class DepositSerializer(serializers.ModelSerializer):
 
 
 class PaymentOrderSerializer(DepositSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="hub20:payment-order-detail")
+    url = serializers.HyperlinkedIdentityField(view_name="payment-order-detail")
     amount = TokenValueField()
 
     class Meta:
@@ -285,7 +283,7 @@ class PaymentOrderSerializer(DepositSerializer):
 
 
 class PaymentOrderReadSerializer(PaymentOrderSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="hub20:payment-order-detail")
+    url = serializers.HyperlinkedIdentityField(view_name="payment-order-detail")
 
 
 class PaymentConfirmationSerializer(serializers.ModelSerializer):
@@ -343,7 +341,7 @@ class CheckoutSerializer(PaymentOrderSerializer):
 
 
 class HttpCheckoutSerializer(CheckoutSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="hub20:checkout-detail")
+    url = serializers.HyperlinkedIdentityField(view_name="checkout-detail")
 
     class Meta:
         model = models.Checkout
@@ -352,7 +350,7 @@ class HttpCheckoutSerializer(CheckoutSerializer):
 
 
 class StoreSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="hub20:store-detail")
+    url = serializers.HyperlinkedIdentityField(view_name="store-detail")
     site_url = serializers.URLField(source="url")
     public_key = serializers.CharField(source="rsa.public_key_pem", read_only=True)
     accepted_currencies = CurrencyRelatedField(many=True)
@@ -388,11 +386,11 @@ class BookEntrySerializer(serializers.ModelSerializer):
     def get_reference(self, obj):
         params = {
             models.TransferExecution: lambda: {
-                "viewname": "hub20:transfer-detail",
+                "viewname": "transfer-detail",
                 "kwargs": {"pk": obj.reference.transfer.pk},
             },
             models.PaymentConfirmation: lambda: {
-                "viewname": "hub20:payments-detail",
+                "viewname": "payments-detail",
                 "kwargs": {"pk": obj.reference.payment.pk},
             },
         }.get(type(obj.reference))
@@ -414,7 +412,7 @@ class CreditSerializer(BookEntrySerializer):
     def get_reference(self, obj):
         params = {
             models.PaymentConfirmation: lambda: {
-                "viewname": "hub20:payments-detail",
+                "viewname": "payments-detail",
                 "kwargs": {"pk": obj.reference.payment.pk},
             },
         }.get(type(obj.reference))
@@ -430,7 +428,7 @@ class DebitSerializer(BookEntrySerializer):
     def get_reference(self, obj):
         params = {
             models.TransferExecution: lambda: {
-                "viewname": "hub20:transfer-detail",
+                "viewname": "transfer-detail",
                 "kwargs": {"pk": obj.reference.transfer.pk},
             },
         }.get(type(obj.reference))

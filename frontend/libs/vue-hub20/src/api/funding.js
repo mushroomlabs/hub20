@@ -1,31 +1,32 @@
-import session from './session'
+import client from './client'
 
 export default {
+  _client: client,
   createDeposit(token) {
-    return session.post('/api/deposits', {
+    return this._client.post('/deposits', {
       token: token.address
     })
   },
   getDeposits() {
-    return session.get('/api/deposits')
+    return this._client.get('/deposits')
   },
   getDeposit(depositId) {
-    return session.get(`/api/deposit/${depositId}`)
+    return this._client.get(`/deposit/${depositId}`)
   },
   createPaymentOrder(token, amount) {
-    return session.post('/api/payment/orders', {
+    return this._client.post('/payment/orders', {
       amount: amount,
       token: token.address
     })
   },
   getPaymentOrder(orderId) {
-    return session.get(`/api/payment/orders/${orderId}`)
+    return this._client.get(`/payment/orders/${orderId}`)
   },
   cancelPaymentOrder(orderId) {
-    return session.delete(`/api/payment/orders/${orderId}`)
+    return this._client.delete(`/payment/orders/${orderId}`)
   },
   getTransfers() {
-    return session.get('/api/transfers')
+    return this._client.get('/transfers')
   },
   scheduleTransfer(token, amount, options) {
     let payload = {
@@ -33,6 +34,6 @@ export default {
       token: token.address,
       ...options
     }
-    return session.post('/api/transfers', payload)
+    return this._client.post('/transfers', payload)
   }
 }

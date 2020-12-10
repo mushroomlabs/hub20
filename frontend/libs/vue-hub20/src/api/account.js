@@ -1,16 +1,17 @@
-import session from './session';
+import client from './client'
 
 export default {
+  _client: client,
   getCredits() {
-    return session.get('/api/credits');
+    return this._client.get('/credits')
   },
   getDebits() {
-    return session.get('/api/debits');
+    return this._client.get('/debits')
   },
   getBalances() {
-    return session.get('/api/balances');
+    return this._client.get('/balances')
   },
   getTokenBalance(address) {
-    return session.get(`/api/balance/${address}`);
-  },
-};
+    return this._client.get(`/balance/${address}`)
+  }
+}

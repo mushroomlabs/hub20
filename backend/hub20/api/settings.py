@@ -56,7 +56,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = "hub20.api.urls"
+ROOT_URLCONF = os.getenv("HUB20_URLCONF_MODULE", "hub20.api.urls")
 ASGI_APPLICATION = "hub20.api.asgi.application"
 
 
@@ -173,6 +173,10 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
     "DEFAULT_RENDERER_CLASSES": [
         f"rest_framework.renderers.{renderer}" for renderer in REST_RENDERERS
+    ],
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
     ],
 }
 

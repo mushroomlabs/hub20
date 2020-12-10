@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from django.contrib.auth import get_user_model
+
 from django.db.models import ProtectedError, Q
 from django.db.models.query import QuerySet
 from django.http import Http404
@@ -13,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.serializers import Serializer
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
+
 
 from hub20.apps.blockchain.models import Chain
 from hub20.apps.blockchain.serializers import ChainSerializer
@@ -235,7 +237,13 @@ class UserViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
         return User.objects.filter(is_active=True, is_superuser=False, is_staff=False)
 
     def get_object(self, *args, **kw):
-        return get_object_or_404(User, username=self.kwargs["username"])
+        return get_object_or_404(
+            User,
+            is_active=True,
+            is_superuser=False,
+            is_staff=False,
+            username=self.kwargs["username"],
+        )
 
 
 class StatusView(APIView):

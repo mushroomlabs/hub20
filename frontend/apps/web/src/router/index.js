@@ -1,6 +1,6 @@
 import Vue from 'vue'
 import VueRouter from 'vue-router'
-import routes from './routes'
+import {default as routes, requireServerConnection} from './routes'
 Vue.use(VueRouter)
 
 const router = new VueRouter({
@@ -8,5 +8,7 @@ const router = new VueRouter({
   mode: 'history',
   linkActiveClass: 'active'
 })
+
+router.beforeEach(requireServerConnection)
 
 export default router

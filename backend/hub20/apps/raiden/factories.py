@@ -17,6 +17,11 @@ factory.Faker.add_provider(EthereumProvider)
 User = get_user_model()
 
 
+class UserFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = User
+
+
 class AdminUserFactory(factory.django.DjangoModelFactory):
     username = factory.Sequence(lambda n: f"admin-user-{n:03}")
     is_superuser = True
@@ -88,6 +93,7 @@ class UserDepositContractOrderFactory(RaidenManagementOrderFactory):
 
 
 __all__ = [
+    "UserFactory",
     "AdminUserFactory",
     "TokenNetworkFactory",
     "RaidenFactory",

@@ -24,7 +24,7 @@ class TokenNetworkField(serializers.RelatedField):
 
 class TokenNetworkSerializer(serializers.ModelSerializer):
     url = serializers.HyperlinkedIdentityField(
-        view_name="raiden:token-network-detail", lookup_field="address"
+        view_name="token-network-detail", lookup_field="address"
     )
     token = HyperlinkedEthereumTokenSerializer()
 
@@ -35,7 +35,7 @@ class TokenNetworkSerializer(serializers.ModelSerializer):
 
 
 class ServiceDepositSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="raiden:service-deposit-detail")
+    url = serializers.HyperlinkedIdentityField(view_name="service-deposit-detail")
     transaction = HexadecimalField(read_only=True, source="result.transaction.hash")
     token = EthereumTokenSerializer(source="currency", read_only=True)
     amount = TokenValueField()
@@ -57,7 +57,7 @@ class ServiceDepositSerializer(serializers.ModelSerializer):
 
 
 class ChannelSerializer(serializers.ModelSerializer):
-    url = serializers.HyperlinkedIdentityField(view_name="raiden:channel-detail")
+    url = serializers.HyperlinkedIdentityField(view_name="channel-detail")
     token = CurrencyRelatedField(queryset=None, source="token_network.token", read_only=True)
 
     class Meta:
@@ -67,9 +67,7 @@ class ChannelSerializer(serializers.ModelSerializer):
 
 
 class ChannelManagementSerializer(serializers.ModelSerializer):
-    channel = serializers.HyperlinkedRelatedField(
-        view_name="raiden:channel-detail", read_only=True
-    )
+    channel = serializers.HyperlinkedRelatedField(view_name="channel-detail", read_only=True)
     amount = TokenValueField()
 
     def create(self, validated_data):
@@ -130,7 +128,7 @@ class RaidenSerializer(serializers.ModelSerializer):
 
 class JoinTokenNetworkOrderSerializer(serializers.ModelSerializer):
     token_network = serializers.HyperlinkedRelatedField(
-        view_name="raiden:token-network-detail", lookup_field="address", read_only=True
+        view_name="token-network-detail", lookup_field="address", read_only=True
     )
 
     def get_token_network(self):

@@ -52,7 +52,7 @@ export default {
   },
   computed: {
     ...mapGetters('account', ['tokenBalance']),
-    ...mapGetters('server', ['ethereumNodeOk']),
+    ...mapGetters('network', ['ethereumNodeOk']),
     ...mapGetters('coingecko', ['exchangeRate']),
     ...mapState('coingecko', ['baseCurrency']),
     balance() {

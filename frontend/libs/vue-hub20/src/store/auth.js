@@ -1,5 +1,4 @@
 import auth from '../api/auth'
-import session from '../api/session'
 
 const TOKEN_STORAGE_KEY = 'token'
 const USERNAME_STORAGE_KEY = 'username'
@@ -80,12 +79,12 @@ const mutations = {
   },
   [AUTH_SET_TOKEN](state, token) {
     localStorage.setItem(TOKEN_STORAGE_KEY, token)
-    session.defaults.headers.Authorization = `Token ${token}`
+    auth.setToken(token)
     state.token = token
   },
   [AUTH_REMOVE_TOKEN](state) {
     localStorage.removeItem(TOKEN_STORAGE_KEY)
-    delete session.defaults.headers.Authorization
+    auth.removeToken()
     state.token = null
   },
   [AUTH_SET_USERNAME](state, username) {

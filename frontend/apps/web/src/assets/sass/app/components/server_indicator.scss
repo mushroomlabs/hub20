@@ -1,0 +1,14 @@
+@use "../../paper/variables";
+
+div.server-indicator {
+  margin: variables.$padding-large-vertical auto;
+
+  span.server-url {
+    border-bottom: variables.$border-thick dashed variables.$info-color;
+  }
+
+  a {
+    font-size: variables.$font-size-small;
+    margin: variables.$padding-large-horizontal;
+  }
+}

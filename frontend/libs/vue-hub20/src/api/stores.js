@@ -1,23 +1,24 @@
-import session from './session';
+import client from './client'
 
 export default {
+  _client: client,
   create(storeData) {
-    const {name, site_url, accepted_currencies } = storeData;
-    let payload = { name, site_url, accepted_currencies };
-    return session.post('/api/stores', payload);
+    const {name, site_url, accepted_currencies} = storeData
+    let payload = {name, site_url, accepted_currencies}
+    return this._client.post('/stores', payload)
   },
   getList() {
-    return session.get('/api/stores');
+    return this._client.get('/stores')
   },
   get(storeId) {
-    return session.get(`/api/stores/${storeId}`);
+    return this._client.get(`/stores/${storeId}`)
   },
   update(storeData) {
-    const {url, name, site_url, accepted_currencies}  = storeData;
-    let payload = { name, site_url, accepted_currencies };
-    return session.put(url, payload)
+    const {url, name, site_url, accepted_currencies} = storeData
+    let payload = {name, site_url, accepted_currencies}
+    return this._client.put(url, payload)
   },
   remove(storeId) {
-    return session.delete(`/api/stores/${storeId}`);
+    return this._client.delete(`/stores/${storeId}`)
   }
-};
+}

@@ -13,7 +13,7 @@ class StoreViewTestCase(TestCase):
         self.store = factories.StoreFactory()
 
     def test_anonymous_user_can_see_store(self):
-        url = reverse("hub20:store-detail", kwargs={"pk": self.store.pk})
+        url = reverse("store-detail", kwargs={"pk": self.store.pk})
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["id"], str(self.store.id))
@@ -25,7 +25,7 @@ class UserViewTestCase(TestCase):
         self.staff_user = factories.UserFactory(is_staff=True)
         self.inactive_user = factories.UserFactory(is_active=False)
         self.client = APIClient()
-        self.url = reverse("hub20:users-list")
+        self.url = reverse("users-list")
 
     def test_search_shows_only_active_users(self):
         regular_username = "one_regular_user"
@@ -62,7 +62,7 @@ class CheckoutViewTestCase(TestCase):
     def test_can_create_checkout_via_api(self):
         amount = Erc20TokenAmountFactory(currency=self.token)
 
-        url = reverse("hub20:checkout-list")
+        url = reverse("checkout-list")
         post_data = {
             "amount": amount.amount,
             "token": amount.currency.address,
@@ -75,7 +75,7 @@ class CheckoutViewTestCase(TestCase):
 
     def test_can_not_delete_checkout(self):
         checkout = factories.CheckoutFactory(store=self.store)
-        url = reverse("hub20:checkout-detail", kwargs={"pk": checkout.pk})
+        url = reverse("checkout-detail", kwargs={"pk": checkout.pk})
         response = self.client.delete(url)
         self.assertEqual(response.status_code, 405)
 
@@ -84,7 +84,7 @@ class CheckoutViewTestCase(TestCase):
         route = checkout.routes.select_subclasses().first()
         add_eth_to_account(route.account, amount=checkout.as_token_amount, chain=self.token.chain)
 
-        url = reverse("hub20:checkout-detail", kwargs={"pk": checkout.pk})
+        url = reverse("checkout-detail", kwargs={"pk": checkout.pk})
         response = self.client.get(url)
 
         self.assertEqual(len(response.data["payments"]), 1)

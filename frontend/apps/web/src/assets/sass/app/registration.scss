@@ -1,19 +1,19 @@
-div.login-screen, div.registration-screen {
-    background-color: transparent !important;
-    box-shadow: none !important;
-    display: grid;
-    min-height: 100vh;
-    max-width: 45rem;
-    padding: 5vh 3em;
-    margin: auto;
-    align-content: center;
+div.login-screen, div.registration-screen, div.setup-screen {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  display: grid;
+  min-height: 100vh;
+  max-width: 45rem;
+  padding: 5vh 3em;
+  margin: auto;
+  align-content: center;
 }
 
 div.action-panel div.secondary {
-    a, button {
-        @include button-link(
-            $primary-color,
-            $primary-states-color,
-        );
-    }
+  a, button {
+    @include button-link(
+      $primary-color,
+      $primary-states-color,
+    );
+  }
 }

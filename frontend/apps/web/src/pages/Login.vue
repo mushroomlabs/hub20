@@ -1,21 +1,24 @@
 <template>
 <card class="login-screen" title="Sign in">
   <slot>
+    <ServerIndicator>
+      Sign-in to your account on
+    </ServerIndicator>
     <form @submit.prevent="login(username, password)">
-    <fg-input v-model="username"
-              id="username"
-              placeholder="Username"
-              autocomplete="username"
-              required
-              />
-    <fg-input v-model="password"
-              id="password"
-              type="password"
-              placeholder="Password"
-              autocomplete="current-password"
-              required
-              />
-    <input type="submit" hidden />
+      <fg-input v-model="username"
+                id="username"
+                placeholder="Username"
+                autocomplete="username"
+                required
+                />
+      <fg-input v-model="password"
+                id="password"
+                type="password"
+                placeholder="Password"
+                autocomplete="current-password"
+                required
+                />
+      <input type="submit" hidden />
     </form>
   </slot>
   <slot name="footer">
@@ -30,8 +33,13 @@
 </template>
 
 <script>
+import ServerIndicator from '@/components/ServerIndicator'
+
 export default {
   name: "login",
+  components: {
+    ServerIndicator
+  },
   data(){
     return {
       username: "",
