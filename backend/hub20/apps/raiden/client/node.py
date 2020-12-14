@@ -116,7 +116,7 @@ class RaidenClient:
 
     def transfer(
         self, amount: EthereumTokenAmount, address: Address, identifier: Optional[int] = None, **kw
-    ):
+    ) -> Optional[str]:
         if not settings.HUB20_RAIDEN_ENABLED:
             return
 
@@ -128,13 +128,35 @@ class RaidenClient:
             payload["identifier"] = identifier
 
         try:
-            _make_request(url, method="POST", **payload)
+            payment_data = _make_request(url, method="POST", **payload)
+            return payment_data.get("identifier")
         except requests.exceptions.HTTPError as error:
             logger.exception(error)
 
             error_code = error.response.status_code
             message = error.response.json().get("errors")
             raise RaidenPaymentError(error_code=error_code, message=message) from error
+
+    @classmethod
+    def select_for_transfer(cls, amount: EthereumTokenAmount, target: Address):
+        if not settings.HUB20_RAIDEN_ENABLED:
+            return None
+
+        # Token is not part of a token network.
+        if not hasattr(amount.currency, "tokennetwork"):
+            return None
+
+        token_channels = Channel.available.filter(
+            token_network__token=amount.currency, balance__gte=amount.amount
+        )
+
+        if not token_channels.exists():
+            return None
+
+        if not amount.currency.tokennetwork.can_reach(target):
+            return None
+
+        return cls(Raiden.get())
 
 
 def get_raiden_client(address: Optional[str] = None) -> Optional[RaidenClient]:

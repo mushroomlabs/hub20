@@ -78,26 +78,32 @@ const actions = {
     }
 
     dispatch('coingecko/initialize')
-
-    dispatch('auth/initialize').then(() => {
-      if (getters['auth/isAuthenticated']) {
-        dispatch('tokens/initialize')
-          .then(() => dispatch('account/initialize'))
-          .then(() => dispatch('network/initialize'))
-          .then(() => dispatch('stores/initialize'))
-          .then(() => dispatch('funding/initialize'))
-          .then(() => dispatch('users/initialize'))
-          .then(() => dispatch('events/initialize', SERVER_URL))
-          .then(() => dispatch('events/setEventHandler', eventHandler))
-          .then(() => commit(APP_SET_INITIALIZED))
+    return dispatch('server/initialize').then(() => {
+      if (getters['server/isConnected']) {
+        dispatch('auth/initialize').then(() => {
+          if (getters['auth/isAuthenticated']) {
+            dispatch('tokens/initialize')
+              .then(() => dispatch('account/initialize'))
+              .then(() => dispatch('network/initialize'))
+              .then(() => dispatch('stores/initialize'))
+              .then(() => dispatch('funding/initialize'))
+              .then(() => dispatch('users/initialize'))
+              .then(() => dispatch('events/initialize', SERVER_URL))
+              .then(() => dispatch('events/setEventHandler', eventHandler))
+              .then(() => commit(APP_SET_INITIALIZED))
+          }
+        })
       }
     })
   },
-  refresh({dispatch}) {
-    dispatch('account/refresh')
-      .then(() => dispatch('stores/refresh'))
-      .then(() => dispatch('coingecko/refresh'))
-      .then(() => dispatch('funding/refresh'))
+  refresh({dispatch, getters}) {
+    dispatch('coingecko/refresh')
+
+    if (getters['server/isConnected'] && getters['auth/isAuthenticated']) {
+      dispatch('account/refresh')
+        .then(() => dispatch('stores/refresh'))
+        .then(() => dispatch('funding/refresh'))
+    }
   }
 }
 

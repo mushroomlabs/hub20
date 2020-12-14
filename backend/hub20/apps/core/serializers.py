@@ -1,5 +1,4 @@
-import copy
-from typing import Dict, Type, Union
+from typing import Dict
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -8,8 +7,10 @@ from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 from hub20.apps.blockchain.serializers import EthereumAddressField, HexadecimalField
+from hub20.apps.ethereum_money.models import EthereumTokenAmount
 from hub20.apps.ethereum_money.serializers import (
     CurrencyRelatedField,
+    EthereumAccountSerializer,
     EthereumTokenSerializer,
     TokenValueField,
 )
@@ -36,10 +37,12 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class TokenBalanceSerializer(serializers.Serializer):
-    url = serializers.SerializerMethodField()
     amount = TokenValueField(read_only=True)
     currency = EthereumTokenSerializer(read_only=True)
-    balance = serializers.CharField(source="formatted", read_only=True)
+
+
+class HyperlinkedTokenBalanceSerializer(TokenBalanceSerializer):
+    url = serializers.SerializerMethodField()
 
     def get_url(self, obj):
         return reverse(
@@ -51,8 +54,8 @@ class TokenBalanceSerializer(serializers.Serializer):
 
 class TransferSerializer(serializers.ModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name="transfer-detail")
-    address = EthereumAddressField(write_only=True, required=False)
-    recipient = UserRelatedField(write_only=True, required=False, allow_null=True)
+    address = EthereumAddressField(required=False, allow_null=True)
+    recipient = UserRelatedField(source="receiver", required=False, allow_null=True)
     token = CurrencyRelatedField(source="currency")
     target = serializers.CharField(read_only=True)
     status = serializers.CharField(read_only=True)
@@ -64,9 +67,9 @@ class TransferSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, data):
-        address = data.pop("address", None)
-        recipient = data.pop("recipient", None)
-        request = self.context["request"]
+        # Check if we have a valid recipient
+        address = data.get("address", None)
+        recipient = data.get("receiver", None)
 
         if not address and not recipient:
             raise serializers.ValidationError(
@@ -77,31 +80,30 @@ class TransferSerializer(serializers.ModelSerializer):
                 "Choose recipient by address or username, but not both at the same time"
             )
 
-        transfer_data = copy.copy(data)
+        # We do need to check the balance here though because the amount
+        # corresponding to the transfer is deducted from the user's balance
+        # upon creation for two reasons: keeping the accounting books balanced
+        # and ensuring that users can not overdraw.
 
-        if recipient is not None:
-            transfer_class = models.InternalTransfer
-            transfer_data["receiver"] = recipient
-        else:
-            transfer_class = models.ExternalTransfer
-            transfer_data["recipient_address"] = address
-
-        transfer = transfer_class(sender=request.user, **transfer_data)
-
-        try:
-            transfer.verify_conditions()
-        except models.TransferError as exc:
-            raise serializers.ValidationError(str(exc))
-
-        return transfer_data
-
-    def create(self, validated_data):
-        transfer_class: Union[Type[models.InternalTransfer], Type[models.ExternalTransfer]] = (
-            models.InternalTransfer if "receiver" in validated_data else models.ExternalTransfer
-        )
+        # There is also the cost of transfer fees (especially for on-chain
+        # transfers), but given that these can not be predicted and the hub
+        # operator might waive the fees from the users, we do not do any
+        # charging here and deduct fees only after the transaction is complete.
         request = self.context["request"]
 
-        return transfer_class.objects.create(sender=request.user, **validated_data)
+        currency = data["currency"]
+        transfer_amount = EthereumTokenAmount(currency=currency, amount=data["amount"])
+        user_balance = request.user.account.get_balance(currency)
+
+        if user_balance < transfer_amount:
+            raise serializers.ValidationError("Insuffcient balance")
+
+        return data
+
+    def create(self, validated_data):
+        request = self.context["request"]
+
+        return self.Meta.model.objects.create(sender=request.user, **validated_data)
 
     class Meta:
         model = models.Transfer
@@ -117,7 +119,7 @@ class TransferSerializer(serializers.ModelSerializer):
             "status",
             "target",
         )
-        read_only_fields = ("id", "recipient", "status", "target")
+        read_only_fields = ("id", "status", "target")
 
 
 class TransferExecutionSerializer(serializers.ModelSerializer):
@@ -438,3 +440,26 @@ class DebitSerializer(BookEntrySerializer):
     class Meta:
         model = models.Debit
         fields = read_only_fields = BookEntrySerializer.Meta.fields
+
+
+class AccountingBookSerializer(serializers.Serializer):
+    total_credit = TokenValueField(read_only=True)
+    total_debit = TokenValueField(read_only=True)
+
+
+class TokenAccountingBookSerializer(EthereumTokenSerializer, AccountingBookSerializer):
+    class Meta:
+        model = EthereumTokenSerializer.Meta.model
+        fields = read_only_fields = EthereumTokenSerializer.Meta.read_only_fields + (
+            "total_credit",
+            "total_debit",
+        )
+
+
+class WalletAccountingBookSerializer(EthereumAccountSerializer, AccountingBookSerializer):
+    class Meta:
+        model = EthereumAccountSerializer.Meta.model
+        fields = read_only_fields = EthereumAccountSerializer.Meta.read_only_fields + (
+            "total_credit",
+            "total_debit",
+        )

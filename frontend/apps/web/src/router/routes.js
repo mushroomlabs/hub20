@@ -22,7 +22,9 @@ import store from '@/store/index'
 
 const requireAuthenticated = (to, from, next) => {
   store.dispatch('initialize').then(() => {
-    if (!store.getters['auth/isAuthenticated']) {
+    if (!store.getters['server/isConnected']) {
+      next('/setup')
+    } else if (!store.getters['auth/isAuthenticated']) {
       next('/login')
     } else {
       next()
@@ -32,7 +34,9 @@ const requireAuthenticated = (to, from, next) => {
 
 const requireAnonymous = (to, from, next) => {
   store.dispatch('initialize').then(() => {
-    if (store.getters['auth/isAuthenticated']) {
+    if (!store.getters['server/isConnected']) {
+      next('/setup')
+    } else if (store.getters['auth/isAuthenticated']) {
       next('/')
     } else {
       next()
@@ -136,17 +140,10 @@ const routes = [
     component: Register,
     beforeEnter: requireAnonymous
   },
-  {path: '*', component: NotFound}
+  {
+    path: '*',
+    component: NotFound
+  }
 ]
-
-export const requireServerConnection = (to, from, next) => {
-  store.dispatch('server/initialize').then(() => {
-    if (!store.getters['server/isConnected']) {
-      next('/setup')
-    } else {
-      next()
-    }
-  })
-}
 
 export default routes

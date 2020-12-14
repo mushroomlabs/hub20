@@ -40,7 +40,7 @@ class TokenNetwork(models.Model):
     def url(self):
         return f"{self.raiden.api_root_url}/tokens/{self.address}"
 
-    def can_reach(self, address):
+    def can_reach(self, address) -> bool:
         # This is a very naive assumption. One should not assume that we can
         # reach an address just because the address has an open channel.
 

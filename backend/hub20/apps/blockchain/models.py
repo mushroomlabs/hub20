@@ -161,6 +161,10 @@ class Transaction(models.Model):
 
         return tx
 
+    @property
+    def gas_fee(self) -> Uint256Field:
+        return self.gas_used * self.gas_price
+
     def __str__(self) -> str:
         return f"Tx {self.hash_hex}"
 

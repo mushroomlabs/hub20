@@ -25,7 +25,8 @@ urlpatterns = [
     path("payment/order/<uuid:pk>", views.PaymentOrderView.as_view(), name="payment-order-detail"),
     path("transfers", views.TransferListView.as_view(), name="transfer-list"),
     path("transfers/transfer/<int:pk>", views.TransferView.as_view(), name="transfer-detail"),
-    path("status", views.StatusView.as_view(), name="status"),
+    path("status/networks", views.NetworkStatusView.as_view(), name="status-networks"),
+    path("status/accounting", views.AccountingReportView.as_view(), name="status-accounting"),
 ] + router.urls
 
 

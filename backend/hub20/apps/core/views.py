@@ -1,8 +1,8 @@
 from typing import List, Optional
 
 from django.contrib.auth import get_user_model
-
-from django.db.models import ProtectedError, Q
+from django.db.models import ProtectedError, Q, Sum
+from django.db.models.functions import Coalesce
 from django.db.models.query import QuerySet
 from django.http import Http404
 from django.shortcuts import get_object_or_404
@@ -15,14 +15,16 @@ from rest_framework.serializers import Serializer
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
-
 from hub20.apps.blockchain.models import Chain
 from hub20.apps.blockchain.serializers import ChainSerializer
+from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
+from hub20.apps.raiden.models import Raiden
 
 from . import models, serializers
 
 User = get_user_model()
+EthereumAccount = get_ethereum_account_model()
 
 
 class UserFilter(filters.FilterSet):
@@ -156,7 +158,7 @@ class TransferView(generics.RetrieveAPIView):
 
 class TokenBalanceListView(generics.ListAPIView):
     permission_classes = (IsAuthenticated,)
-    serializer_class = serializers.TokenBalanceSerializer
+    serializer_class = serializers.HyperlinkedTokenBalanceSerializer
 
     def get_queryset(self) -> List[EthereumTokenAmount]:
         return self.request.user.account.get_balances()
@@ -164,7 +166,7 @@ class TokenBalanceListView(generics.ListAPIView):
 
 class TokenBalanceView(generics.RetrieveAPIView):
     permission_classes = (IsAuthenticated,)
-    serializer_class = serializers.TokenBalanceSerializer
+    serializer_class = serializers.HyperlinkedTokenBalanceSerializer
 
     def get_object(self) -> EthereumTokenAmount:
         token = get_object_or_404(EthereumToken, address=self.kwargs["address"])
@@ -249,7 +251,33 @@ class UserViewSet(GenericViewSet, ListModelMixin, RetrieveModelMixin):
 class StatusView(APIView):
     permission_classes = (IsAuthenticated,)
 
+
+class NetworkStatusView(StatusView):
     def get(self, request, **kw):
         chain = Chain.make()
-
         return Response({"ethereum": ChainSerializer(chain).data})
+
+
+class AccountingReportView(StatusView):
+    @staticmethod
+    def _get_serialized_book(serializer_class, queryset):
+        annotated_qs = queryset.annotate(
+            total_credit=Coalesce(Sum("books__credits__amount"), 0),
+            total_debit=Coalesce(Sum("books__debits__amount"), 0),
+        ).exclude(total_credit=0, total_debit=0)
+
+        return serializer_class(annotated_qs, many=True).data
+
+    def get(self, request, **kw):
+        serialize = AccountingReportView._get_serialized_book
+
+        return Response(
+            dict(
+                token_books=serialize(
+                    serializers.TokenAccountingBookSerializer, EthereumToken.objects.all()
+                ),
+                wallets=serialize(
+                    serializers.EthereumAccountSerializer, models.WalletAccount.objects.all()
+                ),
+            )
+        )

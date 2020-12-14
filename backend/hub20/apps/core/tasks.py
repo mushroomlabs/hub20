@@ -17,10 +17,16 @@ logger = logging.getLogger(__name__)
 @shared_task
 def execute_transfer(transfer_id):
     try:
-        transfer = Transfer.objects.get_subclass(id=transfer_id)
+        transfer = Transfer.objects.get(id=transfer_id)
         transfer.execute()
     except Transfer.DoesNotExist:
         logger.warning(f"Transfer {transfer_id} not found")
+
+
+@shared_task
+def execute_pending_transfers():
+    for transfer in Transfer.pending.exclude(execute_on__gt=timezone.now()):
+        transfer.execute()
 
 
 @shared_task

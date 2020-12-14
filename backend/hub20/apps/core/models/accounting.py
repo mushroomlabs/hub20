@@ -1,23 +1,21 @@
 import logging
-from typing import List, Union
+from typing import List
 
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
-from django.contrib.sites.models import Site
 from django.core.exceptions import ValidationError
 from django.db import models
 from model_utils.models import TimeStampedModel
 
-from hub20.apps.ethereum_money import get_ethereum_account_model
+from hub20.apps.blockchain.fields import EthereumAddressField
+from hub20.apps.blockchain.models import Chain
 from hub20.apps.ethereum_money.models import (
     EthereumToken,
     EthereumTokenAmount,
     EthereumTokenValueModel,
 )
-from hub20.apps.raiden.models import Channel
-
-EthereumAccount = get_ethereum_account_model()
+from hub20.apps.raiden.models import Channel, Raiden
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +59,40 @@ class Debit(BookEntry):
     book = models.ForeignKey(Book, on_delete=models.CASCADE, related_name="debits")
 
 
-class UserAccount(models.Model):
+class DoubleEntryAccountModel(models.Model):
+    book_relation_attr = None
+    token_balance_relation_attr = None
+
+    @property
+    def debits(self):
+        return Debit.objects.filter(**{self.book_relation_attr: self})
+
+    @property
+    def credits(self):
+        return Credit.objects.filter(**{self.book_relation_attr: self})
+
+    def get_book(self, token: EthereumToken) -> Book:
+        book, _ = self.books.get_or_create(token=token)
+        return book
+
+    def get_balance(self, token: EthereumToken) -> EthereumTokenAmount:
+        total_debit = EthereumTokenAmount.aggregated(self.debits, currency=token)
+        total_credit = EthereumTokenAmount.aggregated(self.credits, currency=token)
+
+        return total_credit - total_debit
+
+    def get_balances(self) -> List[EthereumTokenAmount]:
+        tokens = EthereumToken.objects.filter(**{self.token_balance_relation_attr: self})
+        return [self.get_balance(token) for token in tokens]
+
+    class Meta:
+        abstract = True
+
+
+class UserAccount(DoubleEntryAccountModel):
+    book_relation_attr = "book__account"
+    token_balance_relation_attr = "books__account"
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="account"
     )
@@ -72,35 +103,97 @@ class UserAccount(models.Model):
         related_query_name="account",
     )
 
-    @property
-    def debits(self):
-        return Debit.objects.filter(book__account=self)
 
-    @property
-    def credits(self):
-        return Credit.objects.filter(book__account=self)
+class Treasury(DoubleEntryAccountModel):
+    book_relation_attr = "book__treasury"
+    token_balance_relation_attr = "books__treasury"
 
-    def get_balance(self, token: EthereumToken) -> EthereumTokenAmount:
-        total_debit = EthereumTokenAmount.aggregated(self.debits, currency=token)
-        total_credit = EthereumTokenAmount.aggregated(self.credits, currency=token)
-
-        return total_credit - total_debit
-
-    def get_balances(self) -> List[EthereumTokenAmount]:
-        tokens = EthereumToken.objects.filter(books__account=self)
-        return [self.get_balance(token) for token in tokens]
+    chain = models.OneToOneField(Chain, on_delete=models.CASCADE)
+    books = GenericRelation(
+        Book,
+        content_type_field="owner_type",
+        object_id_field="owner_id",
+        related_query_name="treasury",
+    )
 
 
-class HubSite(Site):
-    def get_funds(self, currency: EthereumToken) -> Union[int, EthereumTokenAmount]:
-        account_funds = sum(
-            [account.get_balance(currency) for account in EthereumAccount.objects.all()]
-        )
-        channel_funds = sum([c.balance_amount for c in Channel.objects.filter(currency=currency)])
-        return account_funds + channel_funds
+class WalletAccount(DoubleEntryAccountModel):
+    book_relation_attr = "book__wallet"
+    token_balance_relation_attr = "books__wallet"
 
-    class Meta:
-        proxy = True
+    account = models.OneToOneField(
+        settings.ETHEREUM_ACCOUNT_MODEL, on_delete=models.CASCADE, related_name="onchain_account"
+    )
+    books = GenericRelation(
+        Book,
+        content_type_field="owner_type",
+        object_id_field="owner_id",
+        related_query_name="wallet",
+    )
 
 
-__all__ = ["Book", "BookEntry", "HubSite", "UserAccount", "Credit", "Debit"]
+class RaidenAccount(DoubleEntryAccountModel):
+    book_relation_attr = "book__raiden"
+    token_balance_relation_attr = "books__raiden"
+
+    raiden = models.OneToOneField(Raiden, on_delete=models.CASCADE, related_name="raiden_account")
+    books = GenericRelation(
+        Book,
+        content_type_field="owner_type",
+        object_id_field="owner_id",
+        related_query_name="raiden",
+    )
+
+
+class ExternalAddressAccount(DoubleEntryAccountModel):
+    book_relation_attr = "book__address"
+    token_balance_relation_attr = "books__address"
+
+    address = EthereumAddressField(unique=True)
+    books = GenericRelation(
+        Book,
+        content_type_field="owner_type",
+        object_id_field="owner_id",
+        related_query_name="address",
+    )
+
+
+class BlockchainAccount(DoubleEntryAccountModel):
+    book_relation_attr = "book__chain"
+    token_balance_relation_attr = "books__chain"
+
+    chain = models.OneToOneField(Chain, on_delete=models.CASCADE, related_name="account")
+    books = GenericRelation(
+        Book,
+        content_type_field="owner_type",
+        object_id_field="owner_id",
+        related_query_name="chain",
+    )
+
+
+class RaidenChannelAccount(DoubleEntryAccountModel):
+    book_relation_attr = "book__channel"
+    token_balance_relation_attr = "books__channel"
+
+    channel = models.OneToOneField(Channel, on_delete=models.CASCADE, related_name="account")
+    books = GenericRelation(
+        Book,
+        content_type_field="owner_type",
+        object_id_field="owner_id",
+        related_query_name="channel",
+    )
+
+
+__all__ = [
+    "Book",
+    "BookEntry",
+    "Credit",
+    "Debit",
+    "UserAccount",
+    "Treasury",
+    "WalletAccount",
+    "RaidenAccount",
+    "ExternalAddressAccount",
+    "BlockchainAccount",
+    "RaidenChannelAccount",
+]

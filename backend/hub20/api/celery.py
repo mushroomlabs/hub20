@@ -18,6 +18,10 @@ class Hub20CeleryConfig:
             "task": "hub20.apps.core.tasks.clear_expired_sessions",
             "schedule": crontab(minute="*/30"),
         },
+        "execute-transfers": {
+            "task": "hub20.apps.core.tasks.execute_pending_transfers",
+            "schedule": crontab(),
+        },
     }
     task_always_eager = "HUB20_TEST" in os.environ
     task_eager_propagates = "HUB20_TEST" in os.environ

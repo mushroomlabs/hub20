@@ -1,30 +1,30 @@
 from __future__ import annotations
 
 import logging
-import random
-from typing import Optional
+from typing import Optional, Union
 
 from django.conf import settings
-from django.core.exceptions import ValidationError
-from django.db import models, transaction
-from model_utils.managers import InheritanceManager, QueryManager
+from django.contrib.auth import get_user_model
+from django.db import models
+from model_utils.managers import QueryManager
 from model_utils.models import TimeStampedModel
 
 from hub20.apps.blockchain.fields import EthereumAddressField
 from hub20.apps.blockchain.models import Transaction
-from hub20.apps.core.choices import TRANSFER_EVENT_TYPES
-from hub20.apps.ethereum_money import get_ethereum_account_model
+from hub20.apps.blockchain.typing import Address
+from hub20.apps.core.choices import PAYMENT_NETWORKS, TRANSFER_STATUS
 from hub20.apps.ethereum_money.client import EthereumClient
-from hub20.apps.ethereum_money.models import EthereumTokenAmount, EthereumTokenValueModel
-from hub20.apps.ethereum_money.typing import EthereumAccount_T
+from hub20.apps.ethereum_money.models import (
+    EthereumToken,
+    EthereumTokenAmount,
+    EthereumTokenValueModel,
+)
 from hub20.apps.raiden.client.node import RaidenClient
 from hub20.apps.raiden.exceptions import RaidenPaymentError
-from hub20.apps.raiden.models import Channel, Raiden
+from hub20.apps.raiden.models import Payment
 
 logger = logging.getLogger(__name__)
-
-
-EthereumAccount = get_ethereum_account_model()
+User = get_user_model()
 
 
 class TransferError(Exception):
@@ -36,137 +36,118 @@ class TransferOperationError(Exception):
 
 
 class BlockchainTransferExecutor(EthereumClient):
-    def execute(self, transfer: ExternalTransfer):
+    def execute(self, transfer: Transfer):
         try:
-            self.transfer(amount=transfer.as_token_amount, address=transfer.recipient_address)
+            tx_hash = self.transfer(amount=transfer.as_token_amount, address=transfer.address)
+            TransferReceipt.objects.create(
+                transfer=transfer, network=PAYMENT_NETWORKS.blockchain, identifier=tx_hash.hex()
+            )
         except Exception as exc:
             raise TransferError(str(exc)) from exc
 
-    @classmethod
-    def can_reach(cls, transfer: ExternalTransfer) -> bool:
-        return True
-
-    @classmethod
-    def select_account(
-        cls, transfer: ExternalTransfer, transfer_fee: EthereumTokenAmount
-    ) -> Optional[EthereumAccount_T]:
-        assert transfer_fee.is_ETH
-
-        ETH = transfer_fee.currency
-
-        token_required = transfer.as_token_amount
-        accounts = EthereumAccount.objects.all()
-
-        if token_required.is_ETH:
-            token_required += transfer_fee
-            funded_accounts = [
-                account for account in accounts if account.get_balance(ETH) >= token_required
-            ]
-        else:
-            funded_accounts = [
-                account
-                for account in accounts
-                if account.get_balance(token_required.currency) >= token_required
-                and account.get_balance(ETH) >= transfer_fee
-            ]
-
-        try:
-            return random.choice(funded_accounts)
-        except IndexError:
-            return None
-
-    @classmethod
-    def make_for_transfer(cls, transfer: ExternalTransfer):
-        transfer_fee = cls.estimate_transfer_fees()
-        account = cls.select_account(transfer=transfer, transfer_fee=transfer_fee)
-
-        return account and cls(account=account)
-
 
 class RaidenTransferExecutor(RaidenClient):
-    def execute(self, transfer: ExternalTransfer):
+    def execute(self, transfer: Transfer):
         try:
-            self.transfer(
+            payment_identifier = self.transfer(
                 amount=transfer.as_token_amount,
-                address=transfer.recipient_address,
+                address=transfer.address,
                 identifier=self._ensure_valid_identifier(transfer.identifier),
             )
         except RaidenPaymentError as exc:
             raise TransferError(exc.message) from exc
 
+        TransferReceipt.objects.create(
+            transfer=transfer, network=PAYMENT_NETWORKS.raiden, identifier=payment_identifier
+        )
+
+
+class InternalTransferExecutor:
+    def execute(self, transfer: Transfer):
+        TransferReceipt.objects.create(
+            transfer=transfer, network=PAYMENT_NETWORKS.internal, identifier=transfer.identifier
+        )
         TransferExecution.objects.create(transfer=transfer)
-        TransferConfirmation.objects.create(transfer=transfer)
 
     @classmethod
-    def can_reach(cls, transfer: ExternalTransfer) -> bool:
-        return Channel.available.filter(token_network__token=transfer.currency).exists()
-
-    @classmethod
-    def select_account(cls, transfer: ExternalTransfer) -> Optional[EthereumAccount_T]:
-        return Raiden.get() if cls.can_reach(transfer) else None
-
-    @classmethod
-    def make_for_transfer(cls, transfer: ExternalTransfer):
-        if not settings.HUB20_RAIDEN_ENABLED:
-            return None
-
-        if not cls.can_reach(transfer):
-            return None
-
-        raiden = cls.select_account(transfer)
-        return raiden and cls(raiden)
+    def select_for_transfer(cls, amount: EthereumTokenAmount, target: Optional[User]):
+        if target:
+            return cls()
 
 
 class Transfer(TimeStampedModel, EthereumTokenValueModel):
+    EXECUTORS = (InternalTransferExecutor, RaidenTransferExecutor, BlockchainTransferExecutor)
+
     sender = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="transfers_sent"
     )
+    receiver = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="transfers_received",
+        null=True,
+    )
+    address = EthereumAddressField(db_index=True, null=True)
     memo = models.TextField(null=True, blank=True)
     identifier = models.CharField(max_length=300, null=True, blank=True)
-    objects = InheritanceManager()
+    execute_on = models.DateTimeField(auto_now_add=True)
+
+    objects = models.Manager()
+    processed = QueryManager(receipt__isnull=False)
+    canceled = QueryManager(cancellation__isnull=False)
+    failed = QueryManager(failure__isnull=False)
+    executed = QueryManager(execution__isnull=False)
+    pending = QueryManager(
+        receipt__isnull=True,
+        cancellation__isnull=True,
+        failure__isnull=True,
+        execution__isnull=True,
+    )
 
     @property
     def status(self) -> str:
-        if self.failed:
-            return TRANSFER_EVENT_TYPES.failed
-        elif self.canceled:
-            return TRANSFER_EVENT_TYPES.canceled
-        elif self.confirmed:
-            return TRANSFER_EVENT_TYPES.confirmed
-        elif self.executed:
-            return TRANSFER_EVENT_TYPES.executed
+        if self.is_executed:
+            return TRANSFER_STATUS.executed
+        elif self.is_failed:
+            return TRANSFER_STATUS.failed
+        elif self.is_canceled:
+            return TRANSFER_STATUS.canceled
+        elif self.is_processed:
+            return TRANSFER_STATUS.processed
         else:
-            return TRANSFER_EVENT_TYPES.scheduled
+            return TRANSFER_STATUS.scheduled
 
     @property
-    def canceled(self):
+    def is_canceled(self):
         return TransferCancellation.objects.filter(transfer=self).exists()
 
     @property
-    def confirmed(self):
-        return TransferConfirmation.objects.filter(transfer=self).exists()
+    def is_processed(self):
+        return TransferReceipt.objects.filter(transfer=self).exists()
 
     @property
-    def executed(self):
+    def is_executed(self):
         return TransferExecution.objects.filter(transfer=self).exists()
 
     @property
-    def failed(self):
+    def is_failed(self):
         return TransferFailure.objects.filter(transfer=self).exists()
 
     @property
     def is_finalized(self) -> bool:
-        return self.status != TRANSFER_EVENT_TYPES.scheduled
+        return self.status != TRANSFER_STATUS.scheduled
 
-    def _execute(self):
-        pass
+    @property
+    def target(self) -> Union[User, Address]:
+        return self.receiver or self.address
 
-    def verify_conditions(self):
-        transfer_amount = self.as_token_amount
-        sender_balance = self.sender.account.get_balance(self.currency)
-
-        if sender_balance < transfer_amount:
-            raise TransferError("Insufficient balance")
+    def get_executor(self):
+        for executor_class in self.EXECUTORS:
+            executor = executor_class.select_for_transfer(
+                amount=self.as_token_amount, target=self.target
+            )
+            if executor:
+                return executor
 
     def execute(self):
         if self.is_finalized:
@@ -174,8 +155,18 @@ class Transfer(TimeStampedModel, EthereumTokenValueModel):
             return
 
         try:
-            self.verify_conditions()
-            self._execute()
+            # The user has already been deducted from the transfer amount upon
+            # creation. This check here just enforces that the transfer is not
+            # doing double spend of reserved funds.
+            sender_account_balance = self.sender.account.get_balance(token=self.currency)
+            if sender_account_balance.amount < 0:
+                raise TransferError("Insufficient balance")
+
+            executor = self.get_executor()
+            if not executor:
+                raise TransferError("Could not get find a suitable method to execute transfer")
+
+            executor.execute(self)
         except TransferError as exc:
             logger.info(f"{self} failed: {str(exc)}")
             TransferFailure.objects.create(transfer=self)
@@ -184,46 +175,10 @@ class Transfer(TimeStampedModel, EthereumTokenValueModel):
             logger.exception(exc)
 
 
-class InternalTransfer(Transfer):
-    receiver = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="transfers_received"
-    )
-
-    @property
-    def target(self):
-        return self.receiver.username
-
-    def clean(self):
-        if self.sender == self.receiver:
-            raise ValidationError("Sender and Receiver are the same")
-
-    @transaction.atomic()
-    def _execute(self):
-        try:
-            TransferExecution.objects.create(transfer=self)
-            TransferConfirmation.objects.create(transfer=self)
-        except Exception as exc:
-            raise TransferError from exc
-
-
-class ExternalTransfer(Transfer):
-    EXECUTORS = (RaidenTransferExecutor, BlockchainTransferExecutor)
-    recipient_address = EthereumAddressField(db_index=True)
-    objects = models.Manager()
-    unconfirmed = QueryManager(confirmation__isnull=True)
-
-    @property
-    def target(self):
-        return self.recipient_address
-
-    @transaction.atomic()
-    def _execute(self):
-        try:
-            executor_class = next(e for e in self.EXECUTORS if e.make_for_transfer(self))
-            executor = executor_class.make_for_transfer(self)
-            executor.execute(self)
-        except StopIteration:
-            raise TransferError("No executor found to complete transfer")
+class TransferReceipt(TimeStampedModel):
+    transfer = models.OneToOneField(Transfer, on_delete=models.CASCADE, related_name="receipt")
+    network = models.CharField(max_length=64, choices=PAYMENT_NETWORKS)
+    identifier = models.CharField(max_length=300, null=True)
 
 
 class TransferExecution(TimeStampedModel):
@@ -233,11 +188,14 @@ class TransferExecution(TimeStampedModel):
 class BlockchainTransferExecution(TransferExecution):
     transaction = models.OneToOneField(Transaction, on_delete=models.CASCADE)
 
+    @property
+    def fee(self) -> EthereumTokenAmount:
+        ETH = EthereumToken.ETH(chain=self.transaction.block.chain)
+        return ETH.from_wei(self.transaction.gas_fee)
 
-class TransferConfirmation(TimeStampedModel):
-    transfer = models.OneToOneField(
-        Transfer, on_delete=models.CASCADE, related_name="confirmation"
-    )
+
+class RaidenTransferExecution(TransferExecution):
+    payment = models.OneToOneField(Payment, on_delete=models.CASCADE)
 
 
 class TransferFailure(TimeStampedModel):
@@ -258,8 +216,10 @@ __all__ = [
     "TransferCancellation",
     "TransferExecution",
     "BlockchainTransferExecution",
-    "TransferConfirmation",
-    "InternalTransfer",
-    "ExternalTransfer",
+    "RaidenTransferExecution",
+    "TransferReceipt",
     "TransferError",
+    "InternalTransferExecutor",
+    "BlockchainTransferExecutor",
+    "RaidenTransferExecutor",
 ]

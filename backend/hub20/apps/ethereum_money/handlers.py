@@ -52,22 +52,7 @@ def on_transaction_event_check_for_token_transfer(sender, **kw):
                 )
 
 
-@receiver(account_deposit_received, sender=Transaction)
-def on_account_deposit_create_balance_entry(sender, **kw):
-    account = kw["account"]
-    transaction = kw["transaction"]
-    amount = kw["amount"]
-
-    try:
-        account.balance_entries.create(
-            amount=amount.amount, currency=amount.currency, transaction=transaction
-        )
-    except Exception as exc:
-        logger.exception(exc)
-
-
 __all__ = [
     "on_transaction_mined_check_for_deposit",
     "on_transaction_event_check_for_token_transfer",
-    "on_account_deposit_create_balance_entry",
 ]

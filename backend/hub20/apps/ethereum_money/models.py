@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, List, Optional, Tuple
+from typing import Any, Optional, Tuple
 
 import ethereum
 from django.conf import settings
@@ -166,12 +166,6 @@ class EthereumTokenValueModel(models.Model):
 class AbstractEthereumAccount(models.Model):
     address = EthereumAddressField(unique=True, db_index=True)
 
-    def get_balance(self, currency: EthereumToken) -> EthereumTokenAmount:
-        return EthereumTokenAmount.aggregated(self.balance_entries.all(), currency=currency)
-
-    def get_balances(self, chain: Chain) -> List[EthereumTokenAmount]:
-        return [self.get_balance(token) for token in EthereumToken.objects.filter(chain=chain)]
-
     class Meta:
         abstract = True
 
@@ -229,13 +223,6 @@ class HierarchicalDeterministicWallet(AbstractEthereumAccount):
     @classmethod
     def get_latest_generation(cls) -> Optional[int]:
         return cls.objects.aggregate(generation=Max("index")).get("generation")
-
-
-class AccountBalanceEntry(EthereumTokenValueModel):
-    account = models.ForeignKey(
-        settings.ETHEREUM_ACCOUNT_MODEL, on_delete=models.CASCADE, related_name="balance_entries"
-    )
-    transaction = models.OneToOneField(Transaction, on_delete=models.CASCADE)
 
 
 class EthereumTokenAmount:
@@ -322,6 +309,5 @@ __all__ = [
     "EthereumTokenValueModel",
     "KeystoreAccount",
     "HierarchicalDeterministicWallet",
-    "AccountBalanceEntry",
     "encode_transfer_data",
 ]

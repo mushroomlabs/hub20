@@ -1,28 +1,27 @@
 import factory
 
 from hub20.apps.blockchain.factories.providers import EthereumProvider
-from hub20.apps.ethereum_money.factories import EthereumTokenValueModelFactory
 from hub20.apps.core import models
+from hub20.apps.ethereum_money.factories import EthereumTokenValueModelFactory
 
 from .base import UserFactory
 
 factory.Faker.add_provider(EthereumProvider)
 
 
-class InternalTransferFactory(EthereumTokenValueModelFactory):
+class TransferFactory(EthereumTokenValueModelFactory):
     sender = factory.SubFactory(UserFactory)
+
+    class Meta:
+        model = models.Transfer
+
+
+class InternalTransferFactory(TransferFactory):
     receiver = factory.SubFactory(UserFactory)
 
-    class Meta:
-        model = models.InternalTransfer
+
+class ExternalTransferFactory(TransferFactory):
+    address = factory.Faker("ethereum_address")
 
 
-class ExternalTransferFactory(EthereumTokenValueModelFactory):
-    sender = factory.SubFactory(UserFactory)
-    recipient_address = factory.Faker("ethereum_address")
-
-    class Meta:
-        model = models.ExternalTransfer
-
-
-__all__ = ["InternalTransferFactory", "ExternalTransferFactory"]
+__all__ = ["TransferFactory", "InternalTransferFactory", "ExternalTransferFactory"]
