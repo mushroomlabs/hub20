@@ -92,14 +92,13 @@ def on_payment_confirmed_record_entries(sender, **kw):
 def on_transfer_created_deduct_sender_balance(sender, **kw):
     if kw["created"]:
         transfer = kw["instance"]
+        params = dict(reference=transfer, currency=transfer.currency, amount=transfer.amount)
+
         user_book = transfer.sender.account.get_book(token=transfer.currency)
-        user_book.debits.create(
-            reference=transfer, currency=transfer.currency, amount=transfer.amount
-        )
         treasury_book = transfer.currency.chain.treasury.get_book(token=transfer.currency)
-        treasury_book.credits.create(
-            reference=transfer, currency=transfer.currency, amount=transfer.amount
-        )
+
+        user_book.debits.create(**params)
+        treasury_book.credits.create(**params)
 
 
 @receiver(post_save, sender=TransferExecution)

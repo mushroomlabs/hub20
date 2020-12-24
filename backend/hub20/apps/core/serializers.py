@@ -10,7 +10,6 @@ from hub20.apps.blockchain.serializers import EthereumAddressField, HexadecimalF
 from hub20.apps.ethereum_money.models import EthereumTokenAmount
 from hub20.apps.ethereum_money.serializers import (
     CurrencyRelatedField,
-    EthereumAccountSerializer,
     EthereumTokenSerializer,
     TokenValueField,
 )
@@ -372,7 +371,7 @@ class StoreSerializer(serializers.ModelSerializer):
 
 class BookEntrySerializer(serializers.ModelSerializer):
     amount = serializers.CharField(source="as_token_amount")
-    summary = serializers.SerializerMethodField()
+    reference_type = serializers.CharField(source="reference_type.model")
     reference = serializers.SerializerMethodField()
     type = serializers.SerializerMethodField()
 
@@ -381,6 +380,7 @@ class BookEntrySerializer(serializers.ModelSerializer):
 
     def get_summary(self, obj):
         return {
+            models.Transfer: "transfer",
             models.TransferExecution: "transfer sent",
             models.PaymentConfirmation: "payment received",
         }.get(type(obj.reference))
@@ -395,6 +395,10 @@ class BookEntrySerializer(serializers.ModelSerializer):
                 "viewname": "payments-detail",
                 "kwargs": {"pk": obj.reference.payment.pk},
             },
+            models.Transfer: lambda: {
+                "viewname": "transfer-detail",
+                "kwargs": {"pk": obj.reference.pk},
+            },
         }.get(type(obj.reference))
 
         return params and reverse(request=self.context.get("request"), **params())
@@ -405,38 +409,18 @@ class BookEntrySerializer(serializers.ModelSerializer):
             "created",
             "amount",
             "type",
-            "summary",
+            "reference_type",
             "reference",
         )
 
 
 class CreditSerializer(BookEntrySerializer):
-    def get_reference(self, obj):
-        params = {
-            models.PaymentConfirmation: lambda: {
-                "viewname": "payments-detail",
-                "kwargs": {"pk": obj.reference.payment.pk},
-            },
-        }.get(type(obj.reference))
-
-        return params and reverse(request=self.context.get("request"), **params())
-
     class Meta:
         model = models.Credit
         fields = read_only_fields = BookEntrySerializer.Meta.fields
 
 
 class DebitSerializer(BookEntrySerializer):
-    def get_reference(self, obj):
-        params = {
-            models.TransferExecution: lambda: {
-                "viewname": "transfer-detail",
-                "kwargs": {"pk": obj.reference.transfer.pk},
-            },
-        }.get(type(obj.reference))
-
-        return params and reverse(request=self.context.get("request"), **params())
-
     class Meta:
         model = models.Debit
         fields = read_only_fields = BookEntrySerializer.Meta.fields

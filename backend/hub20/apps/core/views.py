@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 from django.contrib.auth import get_user_model
-from django.db.models import F, ProtectedError, Q
+from django.db.models import ProtectedError, Q
 from django.db.models.query import QuerySet
 from django.http import Http404
 from django.shortcuts import get_object_or_404
@@ -85,7 +85,7 @@ class AccountDebitEntryList(generics.ListAPIView):
     serializer_class = serializers.DebitSerializer
 
     def get_queryset(self) -> QuerySet:
-        return models.Debit.objects.filter(book__account__user=self.request.user)
+        return self.request.user.account.debits.all()
 
 
 class BaseDepositView:
