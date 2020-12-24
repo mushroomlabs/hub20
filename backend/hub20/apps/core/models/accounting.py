@@ -6,6 +6,8 @@ from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelatio
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import F, Sum
+from django.db.models.functions import Coalesce
 from model_utils.models import TimeStampedModel
 
 from hub20.apps.blockchain.fields import EthereumAddressField
@@ -84,6 +86,16 @@ class DoubleEntryAccountModel(models.Model):
     def get_balances(self) -> List[EthereumTokenAmount]:
         tokens = EthereumToken.objects.filter(**{self.token_balance_relation_attr: self})
         return [self.get_balance(token) for token in tokens]
+
+    @classmethod
+    def balance_sheet(cls):
+        model_type = ContentType.objects.get_for_model(cls)
+        base_qs = EthereumToken.objects.filter(books__owner_type=model_type)
+        annotated_qs = base_qs.annotate(
+            total_credit=Coalesce(Sum("books__credits__amount"), 0),
+            total_debit=Coalesce(Sum("books__debits__amount"), 0),
+        )
+        return annotated_qs.annotate(balance=F("total_credit") - F("total_debit"))
 
     class Meta:
         abstract = True

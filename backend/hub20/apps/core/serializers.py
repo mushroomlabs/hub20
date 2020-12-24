@@ -442,24 +442,16 @@ class DebitSerializer(BookEntrySerializer):
         fields = read_only_fields = BookEntrySerializer.Meta.fields
 
 
-class AccountingBookSerializer(serializers.Serializer):
+class AccountingBookSerializer(EthereumTokenSerializer):
     total_credit = TokenValueField(read_only=True)
     total_debit = TokenValueField(read_only=True)
+    balance = TokenValueField(read_only=True)
 
-
-class TokenAccountingBookSerializer(EthereumTokenSerializer, AccountingBookSerializer):
     class Meta:
         model = EthereumTokenSerializer.Meta.model
-        fields = read_only_fields = EthereumTokenSerializer.Meta.read_only_fields + (
+        fields = EthereumTokenSerializer.Meta.fields + ("total_credit", "total_debit", "balance")
+        read_only_fields = EthereumTokenSerializer.Meta.fields + (
             "total_credit",
             "total_debit",
-        )
-
-
-class WalletAccountingBookSerializer(EthereumAccountSerializer, AccountingBookSerializer):
-    class Meta:
-        model = EthereumAccountSerializer.Meta.model
-        fields = read_only_fields = EthereumAccountSerializer.Meta.read_only_fields + (
-            "total_credit",
-            "total_debit",
+            "balance",
         )

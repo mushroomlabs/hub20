@@ -1,8 +1,7 @@
 from typing import List, Optional
 
 from django.contrib.auth import get_user_model
-from django.db.models import ProtectedError, Q, Sum
-from django.db.models.functions import Coalesce
+from django.db.models import F, ProtectedError, Q
 from django.db.models.query import QuerySet
 from django.http import Http404
 from django.shortcuts import get_object_or_404
@@ -19,7 +18,6 @@ from hub20.apps.blockchain.models import Chain
 from hub20.apps.blockchain.serializers import ChainSerializer
 from hub20.apps.ethereum_money import get_ethereum_account_model
 from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
-from hub20.apps.raiden.models import Raiden
 
 from . import models, serializers
 
@@ -259,25 +257,21 @@ class NetworkStatusView(StatusView):
 
 
 class AccountingReportView(StatusView):
-    @staticmethod
-    def _get_serialized_book(serializer_class, queryset):
-        annotated_qs = queryset.annotate(
-            total_credit=Coalesce(Sum("books__credits__amount"), 0),
-            total_debit=Coalesce(Sum("books__debits__amount"), 0),
-        ).exclude(total_credit=0, total_debit=0)
-
-        return serializer_class(annotated_qs, many=True).data
+    def _get_serialized_book(self, accounting_model_class):
+        return serializers.AccountingBookSerializer(
+            accounting_model_class.balance_sheet(), many=True, context={"request": self.request}
+        ).data
 
     def get(self, request, **kw):
-        serialize = AccountingReportView._get_serialized_book
-
         return Response(
             dict(
-                token_books=serialize(
-                    serializers.TokenAccountingBookSerializer, EthereumToken.objects.all()
-                ),
-                wallets=serialize(
-                    serializers.EthereumAccountSerializer, models.WalletAccount.objects.all()
-                ),
+                user_accounts=self._get_serialized_book(models.UserAccount),
+                treasury=self._get_serialized_book(models.Treasury),
+                wallets=self._get_serialized_book(models.WalletAccount),
+                raiden={
+                    "onchain": self._get_serialized_book(models.RaidenAccount),
+                    "offchain": self._get_serialized_book(models.RaidenChannelAccount),
+                },
+                external_addresses=self._get_serialized_book(models.ExternalAddressAccount),
             )
         )
