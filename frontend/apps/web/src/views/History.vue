@@ -10,7 +10,7 @@
       <tbody>
         <tr v-for="transaction in transactions" :class="transaction.type" :key="transaction.reference">
           <td class="transaction-date">{{ new Date(transaction.created).toLocaleString() }}</td>
-          <td class="description">{{ transaction.summary }}</td>
+          <td class="description">{{ transaction.reference_type | humanize(transaction.type) }}</td>
           <td class="amount">{{ transaction.amount }}</td>
         </tr>
       </tbody>
@@ -22,8 +22,13 @@
 <script>
 import {mapGetters} from "vuex";
 
+import {filters as hub20filters} from 'vue-hub20'
+
 export default {
   name: "history",
+  filters: {
+    humanize: hub20filters.humanizeReference
+  },
   computed: {
     ...mapGetters("account", ["transactions"])
   }
