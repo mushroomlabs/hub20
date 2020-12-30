@@ -159,6 +159,6 @@ class RaidenClient:
         return cls(Raiden.get())
 
 
-def get_raiden_client(address: Optional[str] = None) -> Optional[RaidenClient]:
-    raiden = Raiden.get(address=address)
+def get_raiden_client() -> Optional[RaidenClient]:
+    raiden = Raiden.get()
     return raiden and RaidenClient(raiden)

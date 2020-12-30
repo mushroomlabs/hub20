@@ -8,6 +8,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import F
+from ethereum.utils import checksum_encode, privtoaddr
+from hexbytes import HexBytes
 from model_utils.choices import Choices
 from model_utils.managers import InheritanceManager, QueryManager
 from model_utils.models import StatusModel, TimeStampedModel
@@ -134,19 +136,20 @@ class Raiden(KeystoreAccount):
         return Payment.sent.filter(channel__raiden=self)
 
     @staticmethod
-    def get(address: Optional[str] = None) -> Optional[Raiden]:
+    def get() -> Optional[Raiden]:
         if not settings.HUB20_RAIDEN_ENABLED:
             return None
 
-        accounts = Raiden.objects.all()
+        return Raiden.generate()
 
-        if address is None and not accounts.exists():
-            return Raiden.generate()
-
-        if address is not None:
-            accounts = accounts.filter(address=address)
-
-        return accounts.first()
+    @classmethod
+    def generate(cls):
+        private_key = HexBytes(settings.HUB20_RAIDEN_ACCOUNT_PRIVATE_KEY)
+        raiden, _ = cls.objects.get_or_create(
+            private_key=private_key.hex(),
+            defaults={"address": checksum_encode(privtoaddr(private_key).hex())},
+        )
+        return raiden
 
     def __str__(self):
         return f"Raiden @ {self.address}"
@@ -256,6 +259,18 @@ class Payment(models.Model):
     @property
     def as_token_amount(self) -> EthereumTokenAmount:
         return EthereumTokenAmount(amount=self.amount, currency=self.token)
+
+    @property
+    def partner_address(self):
+        return self.receiver_address if self.is_outgoing else self.sender_address
+
+    @property
+    def is_outgoing(self):
+        return self.channel.raiden.address == self.sender_address
+
+    @property
+    def is_incoming(self):
+        return self.channel.raiden.address == self.receiver_address
 
     @classmethod
     def make(cls, channel: Channel, **payment_data):

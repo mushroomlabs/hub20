@@ -2,12 +2,13 @@ import random
 from datetime import timedelta
 
 import factory
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from factory import fuzzy
 
 from hub20.apps.blockchain.factories import EthereumProvider
-from hub20.apps.ethereum_money.factories import Erc20TokenFactory
+from hub20.apps.ethereum_money.factories import Erc20TokenFactory, KeystoreAccountFactory
 
 from . import models
 
@@ -39,11 +40,12 @@ class TokenNetworkFactory(factory.django.DjangoModelFactory):
         model = models.TokenNetwork
 
 
-class RaidenFactory(factory.django.DjangoModelFactory):
-    address = factory.Faker("ethereum_address")
+class RaidenFactory(KeystoreAccountFactory):
+    private_key = settings.HUB20_RAIDEN_ACCOUNT_PRIVATE_KEY
 
     class Meta:
         model = models.Raiden
+        django_get_or_create = ("private_key",)
 
 
 class ChannelFactory(factory.django.DjangoModelFactory):
