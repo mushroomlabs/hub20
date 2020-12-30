@@ -1,17 +1,17 @@
 <template>
-  <card :title="tokenBalance.currency.code">
+  <card :title="tokenBalance.code">
     <slot>
-      {{ tokenBalance.amount | formattedAmount(tokenBalance.currency) }}
+      {{ tokenBalance.balance | formattedAmount(tokenBalance) }}
     </slot>
   </card>
 </template>
 <script>
-import {filters as hub20filters} from 'vue-hub20'
+import {filters} from 'vue-hub20'
 
 export default {
-  name: "token-balance-card",
+  name: 'token-balance-card',
   filters: {
-    formattedAmount: hub20filters.formattedAmount
+    formattedAmount: filters.formattedAmount
   },
   props: {
     tokenBalance: {

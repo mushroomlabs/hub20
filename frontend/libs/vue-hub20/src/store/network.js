@@ -20,6 +20,7 @@ const initialState = {
 }
 
 const getters = {
+  ethereumNetworkId: state => state.ethereum.network,
   ethereumNodeOk: state => state.ethereum.synced && state.ethereum.online,
   ethereumOnline: state => state.ethereum.online,
   ethereumSynced: state => state.ethereum.synced,
