@@ -16,13 +16,15 @@ from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from hub20.apps.blockchain.models import Chain
 from hub20.apps.blockchain.serializers import ChainSerializer
-from hub20.apps.ethereum_money import get_ethereum_account_model
-from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenAmount
+from hub20.apps.ethereum_money.models import (
+    BaseEthereumAccount,
+    EthereumToken,
+    EthereumTokenAmount,
+)
 
 from . import models, serializers
 
 User = get_user_model()
-EthereumAccount = get_ethereum_account_model()
 
 
 class UserFilter(filters.FilterSet):
@@ -158,7 +160,7 @@ class TokenBalanceListView(generics.ListAPIView):
     permission_classes = (IsAuthenticated,)
     serializer_class = serializers.HyperlinkedTokenBalanceSerializer
 
-    def get_queryset(self) -> List[EthereumTokenAmount]:
+    def get_queryset(self) -> QuerySet:
         return self.request.user.account.get_balances()
 
 
@@ -166,7 +168,7 @@ class TokenBalanceView(generics.RetrieveAPIView):
     permission_classes = (IsAuthenticated,)
     serializer_class = serializers.HyperlinkedTokenBalanceSerializer
 
-    def get_object(self) -> EthereumTokenAmount:
+    def get_object(self) -> EthereumToken:
         token = get_object_or_404(EthereumToken, address=self.kwargs["address"])
         return self.request.user.account.get_balance(token)
 
@@ -257,6 +259,8 @@ class NetworkStatusView(StatusView):
 
 
 class AccountingReportView(StatusView):
+    permission_classes = (IsAdminUser,)
+
     def _get_serialized_book(self, accounting_model_class):
         return serializers.AccountingBookSerializer(
             accounting_model_class.balance_sheet(), many=True, context={"request": self.request}
@@ -265,13 +269,27 @@ class AccountingReportView(StatusView):
     def get(self, request, **kw):
         return Response(
             dict(
-                user_accounts=self._get_serialized_book(models.UserAccount),
                 treasury=self._get_serialized_book(models.Treasury),
                 wallets=self._get_serialized_book(models.WalletAccount),
-                raiden={
-                    "onchain": self._get_serialized_book(models.RaidenAccount),
-                    "offchain": self._get_serialized_book(models.RaidenChannelAccount),
-                },
+                raiden=self._get_serialized_book(models.RaidenClientAccount),
+                user_accounts=self._get_serialized_book(models.UserAccount),
                 external_addresses=self._get_serialized_book(models.ExternalAddressAccount),
             )
+        )
+
+
+class EthereumAccountBalanceSheets(StatusView):
+    permission_classes = (IsAdminUser,)
+
+    def _get_serialized_balances(self, account):
+        return serializers.AccountingBookSerializer(
+            account.get_balances(), many=True, context={"request": self.request}
+        ).data
+
+    def get(self, request, **kw):
+        return Response(
+            {
+                account.account.address: self._get_serialized_balances(account)
+                for account in models.WalletAccount.objects.all()
+            }
         )

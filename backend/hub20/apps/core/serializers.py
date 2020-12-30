@@ -35,9 +35,13 @@ class UserSerializer(serializers.ModelSerializer):
         fields = read_only_fields = ("url", "username", "first_name", "last_name", "email")
 
 
-class TokenBalanceSerializer(serializers.Serializer):
-    amount = TokenValueField(read_only=True)
-    currency = EthereumTokenSerializer(read_only=True)
+class TokenBalanceSerializer(EthereumTokenSerializer):
+    balance = TokenValueField(read_only=True)
+
+    class Meta:
+        model = EthereumTokenSerializer.Meta.model
+        fields = EthereumTokenSerializer.Meta.fields + ("balance",)
+        read_only_fields = EthereumTokenSerializer.Meta.read_only_fields + ("balance",)
 
 
 class HyperlinkedTokenBalanceSerializer(TokenBalanceSerializer):
@@ -46,9 +50,14 @@ class HyperlinkedTokenBalanceSerializer(TokenBalanceSerializer):
     def get_url(self, obj):
         return reverse(
             "balance-detail",
-            kwargs={"address": obj.currency.address},
+            kwargs={"address": obj.address},
             request=self.context.get("request"),
         )
+
+    class Meta:
+        model = TokenBalanceSerializer.Meta.model
+        fields = ("url",) + TokenBalanceSerializer.Meta.fields
+        read_only_fields = ("url",) + TokenBalanceSerializer.Meta.read_only_fields
 
 
 class TransferSerializer(serializers.ModelSerializer):

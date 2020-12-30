@@ -18,7 +18,9 @@ from hub20.apps.core.factories import (
     StoreFactory,
     UserAccountFactory,
 )
-from hub20.apps.core.models import BlockchainPaymentRoute, RaidenPaymentRoute, TransferCancellation
+from hub20.apps.core.models.accounting import ExternalAddressAccount
+from hub20.apps.core.models.payments import BlockchainPaymentRoute, RaidenPaymentRoute
+from hub20.apps.core.models.transfers import TransferCancellation
 from hub20.apps.core.settings import app_settings
 from hub20.apps.core.tests.unit.mocks import (
     MockBlockchainTransferExecutor,
@@ -210,30 +212,6 @@ class ExternalTransferTestCase(TransferTestCase):
         self.assertTrue(self.transfer.is_executed)
         self.assertEqual(self.transfer.status, TRANSFER_STATUS.executed)
 
-    @patch.object(MockBlockchainTransferExecutor, "select_for_transfer")
-    def test_blockchain_transfers_create_balanced_books(self, select_for_transfer):
-        select_for_transfer.return_value = MockBlockchainTransferExecutor(self.wallet)
-
-        transfer_type = ContentType.objects.get_for_model(self.transfer)
-
-        def get_transfer_entry(qs):
-            return qs.filter(reference_type=transfer_type, reference_id=self.transfer.id).last()
-
-        self.transfer.execute()
-
-        sender_debit = get_transfer_entry(self.sender.account.debits)
-        wallet_debit = get_transfer_entry(self.wallet.onchain_account.debits)
-        treasury_credit = get_transfer_entry(self.transfer.currency.chain.treasury.credits)
-        blockchain_credit = get_transfer_entry(self.transfer.currency.chain.account.credits)
-
-        self.assertIsNotNone(sender_debit)
-        self.assertIsNotNone(wallet_debit)
-        self.assertIsNotNone(treasury_credit)
-        self.assertIsNotNone(blockchain_credit)
-
-        self.assertEqual(sender_debit.as_token_amount, treasury_credit.as_token_amount)
-        self.assertEqual(wallet_debit.as_token_amount, blockchain_credit.as_token_amount)
-
 
 class TransferAccountingTestcase(TransferTestCase):
     def test_cancelled_transfer_generate_refunds(self):
@@ -253,31 +231,30 @@ class TransferAccountingTestcase(TransferTestCase):
 
         self.assertEqual(last_treasury_debit.reference, cancellation)
 
-    def test_external_transfers_generate_accounting_entries_for_wallet_and_blockchain(self):
+    def test_external_transfers_generate_accounting_entries_for_wallet_and_external_address(self):
         transfer = ExternalTransferFactory(
             sender=self.sender, currency=self.credit.currency, amount=self.credit.amount
         )
-
-        wallet_debits = self.wallet.onchain_account.debits
-        blockchain_credits = transfer.currency.chain.account.credits
 
         with patch.object(MockBlockchainTransferExecutor, "select_for_transfer") as select:
             select.return_value = MockBlockchainTransferExecutor(self.wallet)
             transfer.EXECUTORS = (MockBlockchainTransferExecutor,)
             transfer.execute()
 
-        transaction = transfer.execution.blockchaintransferexecution.transaction
+        transfer_type = ContentType.objects.get_for_model(transfer)
 
-        transaction_type = ContentType.objects.get_for_model(transaction)
+        wallet_account = self.wallet.onchain_account
+        external_account = ExternalAddressAccount.objects.filter(address=transfer.address).first()
 
-        wallet_debit = wallet_debits.filter(reference_type=transaction_type).last()
-        blockchain_credit = blockchain_credits.filter(reference_type=transaction_type).last()
+        self.assertIsNotNone(external_account)
 
-        self.assertIsNotNone(blockchain_credit)
+        external_credit = external_account.credits.filter(reference_type=transfer_type).last()
+        wallet_debit = wallet_account.debits.filter(reference_type=transfer_type).last()
+
         self.assertIsNotNone(wallet_debit)
+        self.assertIsNotNone(external_credit)
 
-        self.assertEqual(blockchain_credit.reference, transaction)
-        self.assertEqual(wallet_debit.reference, transaction)
+        self.assertEqual(wallet_debit.as_token_amount, external_credit.as_token_amount)
 
     def test_blockchain_transfers_create_fee_entries(self):
         transfer = ExternalTransferFactory(
@@ -292,23 +269,23 @@ class TransferAccountingTestcase(TransferTestCase):
         self.assertTrue(hasattr(transfer, "execution"))
         self.assertTrue(hasattr(transfer.execution, "blockchaintransferexecution"))
 
-        execution = transfer.execution.blockchaintransferexecution
-        execution_type = ContentType.objects.get_for_model(execution)
-        ETH = execution.fee.currency
+        transaction = transfer.execution.blockchaintransferexecution.transaction
+        transaction_type = ContentType.objects.get_for_model(transaction)
+        ETH = transfer.execution.blockchaintransferexecution.fee.currency
 
         treasury_book = self.chain.treasury.get_book(token=ETH)
+        fee_account = ExternalAddressAccount.get_transaction_fee_account()
         wallet_book = self.wallet.onchain_account.get_book(token=ETH)
-        blockchain_book = self.chain.account.get_book(token=ETH)
         sender_book = transfer.sender.account.get_book(token=ETH)
 
-        execution_filters = dict(reference_type=execution_type, reference_id=execution.id)
+        entry_filters = dict(reference_type=transaction_type, reference_id=transaction.id)
 
-        self.assertEqual(treasury_book.credits.filter(**execution_filters).count(), 1)
-        self.assertEqual(wallet_book.debits.filter(**execution_filters).count(), 1)
-        self.assertEqual(blockchain_book.credits.filter(**execution_filters).count(), 1)
-        self.assertEqual(sender_book.debits.filter(**execution_filters).count(), 1)
+        self.assertIsNotNone(treasury_book.credits.filter(**entry_filters).last())
+        self.assertIsNotNone(wallet_book.debits.filter(**entry_filters).last())
+        self.assertIsNotNone(fee_account.credits.filter(**entry_filters).last())
+        self.assertIsNotNone(sender_book.debits.filter(**entry_filters).last())
 
-    def test_raiden_transfers_create_entries_for_account_and_network_accounts(self):
+    def test_raiden_transfers_create_entries_for_account_and_external_address(self):
         transfer = ExternalTransferFactory(
             sender=self.sender,
             currency=self.credit.currency,
@@ -326,13 +303,19 @@ class TransferAccountingTestcase(TransferTestCase):
         self.assertIsNotNone(transfer.execution.raidentransferexecution.payment)
 
         payment = transfer.execution.raidentransferexecution.payment
+        transfer_type = ContentType.objects.get_for_model(transfer)
 
         self.assertEqual(payment.receiver_address, transfer.address)
 
-        payment_type = ContentType.objects.get_for_model(payment)
-        execution_filters = dict(reference_type=payment_type, reference_id=payment.id)
+        raiden_account = payment.channel.raiden.raiden_account
+        external_address_account, _ = ExternalAddressAccount.objects.get_or_create(
+            address=transfer.address
+        )
 
-        self.assertEqual(payment.channel.account.credits.filter(**execution_filters).count(), 1)
+        transfer_filter = dict(reference_type=transfer_type, reference_id=transfer.id)
+
+        self.assertIsNotNone(raiden_account.debits.filter(**transfer_filter).last())
+        self.assertIsNotNone(external_address_account.credits.filter(**transfer_filter).last())
 
 
 __all__ = [
