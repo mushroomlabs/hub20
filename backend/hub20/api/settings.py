@@ -180,6 +180,11 @@ REST_FRAMEWORK = {
     ],
 }
 
+# REST Auth
+REST_AUTH_SERIALIZERS = {
+    "USER_DETAILS_SERIALIZER": "hub20.api.serializers.UserProfileSerializer",
+}
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/1.9/howto/static-files/
