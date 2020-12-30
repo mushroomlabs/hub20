@@ -48,6 +48,7 @@ class EtherBlockchainPaymentRouteFactory(factory.django.DjangoModelFactory):
 
     class Meta:
         model = models.BlockchainPaymentRoute
+        django_get_or_create = ("account",)
 
 
 class Erc20TokenBlockchainPaymentRouteFactory(EtherBlockchainPaymentRouteFactory):

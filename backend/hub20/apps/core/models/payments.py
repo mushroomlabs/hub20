@@ -13,7 +13,11 @@ from model_utils.managers import InheritanceManager
 from model_utils.models import TimeStampedModel
 
 from hub20.apps.blockchain.models import Chain, Transaction
-from hub20.apps.ethereum_money.models import EthereumToken, EthereumTokenValueModel
+from hub20.apps.ethereum_money.models import (
+    BaseEthereumAccount,
+    EthereumToken,
+    EthereumTokenValueModel,
+)
 from hub20.apps.raiden.models import Payment as RaidenPaymentEvent, Raiden
 
 from ..choices import DEPOSIT_STATUS
@@ -177,7 +181,7 @@ class BlockchainPaymentRoute(PaymentRoute):
     NAME = "blockchain"
 
     account = models.ForeignKey(
-        settings.ETHEREUM_ACCOUNT_MODEL, on_delete=models.CASCADE, related_name="blockchain_routes"
+        BaseEthereumAccount, on_delete=models.CASCADE, related_name="blockchain_routes"
     )
     payment_window = IntegerRangeField(default=calculate_blockchain_payment_window)
     chain = models.ForeignKey(Chain, on_delete=models.CASCADE)

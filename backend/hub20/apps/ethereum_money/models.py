@@ -11,7 +11,7 @@ from django.db.models import Max, Q, Sum
 from eth_utils import to_checksum_address
 from eth_wallet import Wallet
 from ethereum.abi import ContractTranslator
-from model_utils.managers import QueryManager
+from model_utils.managers import InheritanceManager, QueryManager
 from web3 import Web3
 from web3.contract import Contract
 
@@ -163,14 +163,26 @@ class EthereumTokenValueModel(models.Model):
         abstract = True
 
 
-class AbstractEthereumAccount(models.Model):
+class BaseEthereumAccount(models.Model):
     address = EthereumAddressField(unique=True, db_index=True)
-
-    class Meta:
-        abstract = True
+    objects = InheritanceManager()
 
 
-class KeystoreAccount(AbstractEthereumAccount):
+class ColdWallet(BaseEthereumAccount):
+    @property
+    def private_key(self):
+        return None
+
+    @property
+    def private_key_bytes(self):
+        return None
+
+    @classmethod
+    def generate(cls):
+        raise TypeError("Cold wallets do not store private keys and can not be generated")
+
+
+class KeystoreAccount(BaseEthereumAccount):
     private_key = HexField(max_length=64, unique=True)
 
     @property
@@ -185,7 +197,7 @@ class KeystoreAccount(AbstractEthereumAccount):
         return cls.objects.create(address=checksum_address, private_key=private_key.hex())
 
 
-class HierarchicalDeterministicWallet(AbstractEthereumAccount):
+class HierarchicalDeterministicWallet(BaseEthereumAccount):
     BASE_PATH_FORMAT = "m/44'/60'/0'/0/{index}"
 
     index = models.PositiveIntegerField(unique=True)
@@ -307,6 +319,8 @@ __all__ = [
     "EthereumToken",
     "EthereumTokenAmount",
     "EthereumTokenValueModel",
+    "BaseEthereumAccount",
+    "ColdWallet",
     "KeystoreAccount",
     "HierarchicalDeterministicWallet",
     "encode_transfer_data",
