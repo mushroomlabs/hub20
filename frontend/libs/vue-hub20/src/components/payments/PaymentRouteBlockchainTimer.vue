@@ -19,7 +19,7 @@ export default {
     }
   },
   computed: {
-    ...mapGetters('server', {
+    ...mapGetters('network', {
       synced: 'ethereumSynced',
       online: 'ethereumOnline',
       currentBlock: 'currentBlock',
