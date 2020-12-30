@@ -1,0 +1,16 @@
+#overview {
+  @include make-container();
+
+  ul.token-balances {
+    @include make-row();
+
+    list-style-type: none;
+    list-style-position: inside;
+    padding-inline-start: 0;
+
+    li {
+      @include make-col(3, 12);
+      padding-right: 1rem;
+    }
+  }
+}
