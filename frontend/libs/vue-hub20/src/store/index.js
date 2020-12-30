@@ -1,4 +1,5 @@
 import account from './account'
+import audit from './audit'
 import auth from './auth'
 import coingecko from './coingecko'
 import events from './events'
@@ -26,6 +27,7 @@ export const EVENT_TYPES = {
 
 export default {
   account,
+  audit,
   auth,
   coingecko,
   events,

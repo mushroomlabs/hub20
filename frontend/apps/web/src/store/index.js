@@ -84,6 +84,7 @@ const actions = {
           if (getters['auth/isAuthenticated']) {
             dispatch('tokens/initialize')
               .then(() => dispatch('account/initialize'))
+              .then(() => dispatch('audit/initialize'))
               .then(() => dispatch('network/initialize'))
               .then(() => dispatch('stores/initialize'))
               .then(() => dispatch('funding/initialize'))
@@ -103,6 +104,10 @@ const actions = {
       dispatch('account/refresh')
         .then(() => dispatch('stores/refresh'))
         .then(() => dispatch('funding/refresh'))
+    }
+
+    if (getters['account/hasAdminAccess']) {
+      dispatch('audit/refresh')
     }
   }
 }

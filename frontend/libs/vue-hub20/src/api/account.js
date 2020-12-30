@@ -13,5 +13,11 @@ export default {
   },
   getTokenBalance(address) {
     return this._client.get(`/balance/${address}`)
+  },
+  getAccountDetails() {
+    return this._client.get('/accounts/user')
+  },
+  updateAccountDetails(data) {
+    return this._client.patch('/accounts/user', data)
   }
 }
