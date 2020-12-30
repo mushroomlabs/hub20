@@ -51,7 +51,7 @@ export default {
     }
   },
   computed: {
-    ...mapGetters('server', ['currentBlock']),
+    ...mapGetters('network', ['currentBlock']),
     hasMultipleRoutes() {
       return this.openRoutes.length > 1
     },

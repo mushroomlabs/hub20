@@ -1,13 +1,12 @@
 import pytest
 from django.test import TestCase
 
-from hub20.apps.core.factories import Erc20TokenPaymentOrderFactory, ExternalTransferFactory
+from hub20.apps.core.factories import Erc20TokenPaymentOrderFactory, TransferFactory
 from hub20.apps.core.models import (
     BlockchainPaymentRoute,
-    ExternalTransfer,
     PaymentOrder,
     RaidenPaymentRoute,
-    TransferConfirmation,
+    Transfer,
     TransferExecution,
 )
 from hub20.apps.ethereum_money.tests.base import add_token_to_account
@@ -45,26 +44,22 @@ class PaymentOrderManagerTestCase(BaseTestCase):
         self.assertFalse(PaymentOrder.objects.unpaid().filter(id=self.order.id).exists())
 
 
-class ExternalTransferManagerTestCase(BaseTestCase):
-    def setUp(self):
-        self.transfer = ExternalTransferFactory()
+class TransferManagerTestCase(BaseTestCase):
+    def test_pending_query_manager(self):
+        self.transfer = TransferFactory()
 
-    def test_unconfirmed_query_manager(self):
-        self.assertTrue(ExternalTransfer.unconfirmed.exists())
+        self.assertTrue(Transfer.pending.exists())
 
-        # Executed transfers should show up as unconfirmed
+        # Executed transfers are no longer pending
         TransferExecution.objects.create(transfer=self.transfer)
-        self.assertTrue(ExternalTransfer.unconfirmed.exists())
-
-        # After confirming it, no more unconfirmed transfers
-        TransferConfirmation.objects.create(transfer=self.transfer)
-        self.assertFalse(ExternalTransfer.unconfirmed.exists())
+        self.assertTrue(Transfer.executed.exists())
+        self.assertFalse(Transfer.pending.exists())
 
         # Another transfer shows up, and already confirmed transfers are out
-        another_transfer = ExternalTransferFactory()
-        self.assertTrue(ExternalTransfer.unconfirmed.exists())
-        self.assertEqual(ExternalTransfer.unconfirmed.count(), 1)
-        self.assertEqual(ExternalTransfer.unconfirmed.first(), another_transfer)
+        another_transfer = TransferFactory()
+        self.assertTrue(Transfer.pending.exists())
+        self.assertEqual(Transfer.pending.count(), 1)
+        self.assertEqual(Transfer.pending.first(), another_transfer)
 
 
-__all__ = ["PaymentOrderManagerTestCase", "ExternalTransferManagerTestCase"]
+__all__ = ["PaymentOrderManagerTestCase", "TransferManagerTestCase"]

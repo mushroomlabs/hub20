@@ -28,7 +28,11 @@ const getters = {
 const actions = {
   initialize({commit, dispatch}) {
     const savedUrl = localStorage.getItem(SERVER_URL_STORAGE_KEY)
-    return dispatch('setUrl', savedUrl).catch(() => commit(SERVER_CLEAR_URL))
+    if (savedUrl) {
+      return dispatch('setUrl', savedUrl).catch(() => commit(SERVER_CLEAR_URL))
+    } else {
+      return Promise.resolve()
+    }
   },
   setUrl({commit}, url) {
     commit(SERVER_SET_URL_BEGIN)

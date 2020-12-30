@@ -4,7 +4,12 @@ export const API_ROOT_URL = 'https://api.coingecko.com/api/v3'
 export const TOKEN_LIST_URL = 'https://tokens.coingecko.com/uniswap/all.json'
 export const ETHEREUM_LOGO_URL =
   'https://assets.coingecko.com/coins/images/279/large/ethereum.png'
-export const client = axios.create()
+export const client = axios.create({
+  headers: {
+    Accept: 'application/json',
+    'Content-Type': 'application/json'
+  }
+})
 
 export default {
   getTokenList() {

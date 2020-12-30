@@ -1,5 +1,4 @@
 import factory
-from django.conf import settings
 from factory import fuzzy
 
 from hub20.apps.blockchain.factories import (
@@ -10,6 +9,7 @@ from hub20.apps.blockchain.factories import (
 )
 from hub20.apps.blockchain.models import Transaction
 from hub20.apps.ethereum_money.models import (
+    BaseEthereumAccount,
     EthereumToken,
     EthereumTokenAmount,
     HierarchicalDeterministicWallet,
@@ -19,14 +19,20 @@ from hub20.apps.ethereum_money.models import (
 factory.Faker.add_provider(EthereumProvider)
 
 
-class KeystoreAccountFactory(factory.django.DjangoModelFactory):
+class BaseWalletFactory(factory.django.DjangoModelFactory):
     address = factory.Faker("ethereum_address")
 
+    class Meta:
+        model = BaseEthereumAccount
+        django_get_or_create = ("address",)
+
+
+class KeystoreAccountFactory(BaseWalletFactory):
     class Meta:
         model = KeystoreAccount
 
 
-class HDWalletFactory(KeystoreAccountFactory):
+class HDWalletFactory(BaseWalletFactory):
     index = factory.LazyFunction(lambda: HierarchicalDeterministicWallet.objects.count())
 
     class Meta:
@@ -90,10 +96,7 @@ class Erc20TransferFactory(TransactionFactory):
         model = Transaction
 
 
-EthereumAccountFactory = {
-    "ethereum_money.KeystoreAccount": KeystoreAccountFactory,
-    "ethereum_money.HierarchicalDeterministicWallet": HDWalletFactory,
-}[settings.ETHEREUM_ACCOUNT_MODEL]
+EthereumAccountFactory = BaseWalletFactory
 
 
 __all__ = [

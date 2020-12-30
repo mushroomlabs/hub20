@@ -15,25 +15,27 @@ export const UPDATE_DEBITS_FAILURE = 'UPDATE_DEBITS_FAILURE'
 export const SET_BALANCES = 'SET_BALANCES'
 export const SET_CREDITS = 'SET_CREDITS'
 export const SET_DEBITS = 'SET_DEBITS'
+export const SET_PROFILE = 'SET_PROFILE'
 
 const initialState = {
   balances: [],
   credits: [],
   debits: [],
+  profile: null,
   error: null
 }
 
 const getters = {
+  hasAdminAccess: state => state.profile && state.profile.has_admin_access,
   openBalances: state =>
-    state.balances.filter(balance =>
-      Decimal(balance.amount)
+    state.balances.filter(token =>
+      Decimal(token.balance)
         .abs()
         .gt(0)
     ),
   balancesByTokenAddress: state =>
     state.balances.reduce(
-      (acc, balance) =>
-        Object.assign({[balance.currency.address]: Decimal(balance.amount)}, acc),
+      (acc, token) => Object.assign({[token.address]: Decimal(token.balance)}, acc),
       {}
     ),
   transactions: state => utils.sortedByDate(state.credits.concat(state.debits)),
@@ -66,16 +68,22 @@ const actions = {
       .then(() => commit(UPDATE_DEBITS_SUCCESS))
       .catch(exc => commit(UPDATE_DEBITS_FAILURE, exc))
   },
+  fetchProfileData({commit}) {
+    return account.getAccountDetails().then(({data}) => commit(SET_PROFILE, data))
+  },
   fetchAll({dispatch}) {
     dispatch('fetchBalances')
     dispatch('fetchCredits')
     dispatch('fetchDebits')
+    dispatch('fetchProfileData')
   },
   initialize({dispatch}) {
     dispatch('fetchAll')
   },
   refresh({dispatch}) {
-    dispatch('fetchAll')
+    dispatch('fetchBalances')
+    dispatch('fetchCredits')
+    dispatch('fetchDebits')
   }
 }
 
@@ -96,6 +104,9 @@ const mutations = {
   },
   [UPDATE_CREDITS_BEGIN](state) {
     state.error = null
+  },
+  [SET_PROFILE](state, profileData) {
+    state.profile = profileData
   },
   [SET_CREDITS](state, credits) {
     state.credits = credits

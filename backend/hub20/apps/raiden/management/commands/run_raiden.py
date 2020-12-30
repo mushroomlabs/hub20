@@ -40,16 +40,12 @@ def exponential_backoff_wait(raiden: Raiden, w3: Web3):
 class Command(BaseCommand):
     help = "Runs a Raiden Node"
 
-    def add_arguments(self, parser):
-        parser.add_argument("-a", "--address", nargs="?", default=None, type=str)
-
     def handle(self, *args, **options):
         if not settings.HUB20_RAIDEN_ENABLED:
             logger.critical("Raiden service is disabled")
             return
 
-        raiden_account_address = options.get("address")
-        raiden = Raiden.get(address=raiden_account_address)
+        raiden = Raiden.get()
 
         if not raiden:
             logger.critical("Could not setup raiden account")

@@ -17,6 +17,7 @@ from hub20.apps.blockchain.client import (
     wait_for_connection,
 )
 from hub20.apps.blockchain.models import Block, Chain, Transaction
+from hub20.apps.blockchain.typing import Address
 from hub20.apps.ethereum_money import get_ethereum_account_model
 
 from .abi import EIP20_ABI
@@ -90,7 +91,7 @@ def get_max_fee(w3: Web3) -> EthereumTokenAmount:
     return ETH.from_wei(TRANSFER_GAS_LIMIT * gas_price)
 
 
-def get_account_balance(w3: Web3, token: EthereumToken, address) -> EthereumTokenAmount:
+def get_account_balance(w3: Web3, token: EthereumToken, address: Address) -> EthereumTokenAmount:
     if token.is_ERC20:
         contract = w3.eth.contract(abi=EIP20_ABI, address=token.address)
         return token.from_wei(contract.functions.balanceOf(address).call())
@@ -278,7 +279,7 @@ def process_latest_transfers(w3: Web3, chain: Chain, block_filter):
                     account=sender_account,
                     transaction=tx,
                     amount=transfer_amount,
-                    recipient_address=recipient_address,
+                    address=recipient_address,
                 )
 
             if recipient_account:
@@ -326,6 +327,33 @@ class EthereumClient:
         if not hasattr(self.account, "private_key"):
             raise NotImplementedError("Can not sign transaction without the private key")
         return self.w3.eth.account.signTransaction(transaction_data, self.account.private_key)
+
+    def get_balance(self, token: EthereumToken):
+        return get_account_balance(w3=self.w3, token=token, address=self.account.address)
+
+    @classmethod
+    def select_for_transfer(cls, amount: EthereumTokenAmount, **kw) -> Optional[EthereumAccount_T]:
+        w3 = kw.pop("w3", get_web3())
+
+        transfer_fee: EthereumTokenAmount = cls.estimate_transfer_fees(w3=w3)
+        assert transfer_fee.is_ETH
+
+        ETH = transfer_fee.currency
+
+        accounts = EthereumAccount.objects.all().order_by("?")
+
+        if amount.is_ETH:
+            amount += transfer_fee
+
+        for account in accounts:
+            get_balance = lambda t: get_account_balance(w3=w3, token=t, address=account.address)
+
+            eth_balance = get_balance(ETH)
+            token_balance = eth_balance if amount.is_ETH else get_balance(amount.currency)
+
+            if eth_balance >= transfer_fee and token_balance >= amount:
+                return cls(account)
+        return None
 
     @classmethod
     def estimate_transfer_fees(cls, *args, **kw) -> EthereumTokenAmount:

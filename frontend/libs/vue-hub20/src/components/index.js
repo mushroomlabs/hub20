@@ -1,9 +1,11 @@
+import EtherscanLink from './EtherscanLink'
 import PaymentRequest from './payments/PaymentRequest'
 
 let components = {
-  PaymentRequest
+  PaymentRequest,
+  EtherscanLink
 }
 
 export default components
 
-export {PaymentRequest}
+export {PaymentRequest, EtherscanLink}

@@ -28,12 +28,6 @@ export default {
       new_password2
     })
   },
-  getAccountDetails() {
-    return this._client.get('/accounts/user')
-  },
-  updateAccountDetails(data) {
-    return this._client.patch('/accounts/user', data)
-  },
   verifyAccountEmail(key) {
     return this._client.post('/registration/verify-email/', {key})
   },

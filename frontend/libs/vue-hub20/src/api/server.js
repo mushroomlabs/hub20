@@ -3,6 +3,7 @@ import client from './client'
 const indexResponseKeys = [
   'current_user_url',
   'network_status_url',
+  'accounting_report_url',
   'tokens_url',
   'users_url',
   'version'

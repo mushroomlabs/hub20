@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
-from typing import Any, List, Optional, Tuple
+from typing import Any, Optional, Tuple
 
 import ethereum
 from django.conf import settings
@@ -11,7 +11,7 @@ from django.db.models import Max, Q, Sum
 from eth_utils import to_checksum_address
 from eth_wallet import Wallet
 from ethereum.abi import ContractTranslator
-from model_utils.managers import QueryManager
+from model_utils.managers import InheritanceManager, QueryManager
 from web3 import Web3
 from web3.contract import Contract
 
@@ -163,20 +163,26 @@ class EthereumTokenValueModel(models.Model):
         abstract = True
 
 
-class AbstractEthereumAccount(models.Model):
+class BaseEthereumAccount(models.Model):
     address = EthereumAddressField(unique=True, db_index=True)
-
-    def get_balance(self, currency: EthereumToken) -> EthereumTokenAmount:
-        return EthereumTokenAmount.aggregated(self.balance_entries.all(), currency=currency)
-
-    def get_balances(self, chain: Chain) -> List[EthereumTokenAmount]:
-        return [self.get_balance(token) for token in EthereumToken.objects.filter(chain=chain)]
-
-    class Meta:
-        abstract = True
+    objects = InheritanceManager()
 
 
-class KeystoreAccount(AbstractEthereumAccount):
+class ColdWallet(BaseEthereumAccount):
+    @property
+    def private_key(self):
+        return None
+
+    @property
+    def private_key_bytes(self):
+        return None
+
+    @classmethod
+    def generate(cls):
+        raise TypeError("Cold wallets do not store private keys and can not be generated")
+
+
+class KeystoreAccount(BaseEthereumAccount):
     private_key = HexField(max_length=64, unique=True)
 
     @property
@@ -191,7 +197,7 @@ class KeystoreAccount(AbstractEthereumAccount):
         return cls.objects.create(address=checksum_address, private_key=private_key.hex())
 
 
-class HierarchicalDeterministicWallet(AbstractEthereumAccount):
+class HierarchicalDeterministicWallet(BaseEthereumAccount):
     BASE_PATH_FORMAT = "m/44'/60'/0'/0/{index}"
 
     index = models.PositiveIntegerField(unique=True)
@@ -229,13 +235,6 @@ class HierarchicalDeterministicWallet(AbstractEthereumAccount):
     @classmethod
     def get_latest_generation(cls) -> Optional[int]:
         return cls.objects.aggregate(generation=Max("index")).get("generation")
-
-
-class AccountBalanceEntry(EthereumTokenValueModel):
-    account = models.ForeignKey(
-        settings.ETHEREUM_ACCOUNT_MODEL, on_delete=models.CASCADE, related_name="balance_entries"
-    )
-    transaction = models.OneToOneField(Transaction, on_delete=models.CASCADE)
 
 
 class EthereumTokenAmount:
@@ -320,8 +319,9 @@ __all__ = [
     "EthereumToken",
     "EthereumTokenAmount",
     "EthereumTokenValueModel",
+    "BaseEthereumAccount",
+    "ColdWallet",
     "KeystoreAccount",
     "HierarchicalDeterministicWallet",
-    "AccountBalanceEntry",
     "encode_transfer_data",
 ]

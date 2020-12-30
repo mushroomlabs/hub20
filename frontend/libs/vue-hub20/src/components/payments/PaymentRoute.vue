@@ -58,7 +58,7 @@ export default {
     }
   },
   computed: {
-    ...mapGetters('server', ['currentBlock']),
+    ...mapGetters('network', ['currentBlock']),
     QrCodeMessage() {
       let protocol = {
         blockchain: "ethereum",

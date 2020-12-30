@@ -10,7 +10,7 @@ from psycopg2.extras import NumericRange
 from hub20.apps.blockchain.models import Block, Chain, Transaction
 from hub20.apps.blockchain.signals import block_sealed
 from hub20.apps.core import tasks
-from hub20.apps.core.choices import PAYMENT_METHODS
+from hub20.apps.core.choices import PAYMENT_NETWORKS
 from hub20.apps.core.consumers import Events
 from hub20.apps.core.models import (
     BlockchainPayment,
@@ -258,9 +258,9 @@ def on_payment_confirmed_publish_checkout(sender, **kw):
         return
 
     payment_method = {
-        InternalPayment: PAYMENT_METHODS.internal,
-        BlockchainPayment: PAYMENT_METHODS.blockchain,
-        RaidenPayment: PAYMENT_METHODS.raiden,
+        InternalPayment: PAYMENT_NETWORKS.internal,
+        BlockchainPayment: PAYMENT_NETWORKS.blockchain,
+        RaidenPayment: PAYMENT_NETWORKS.raiden,
     }.get(type(payment))
 
     tasks.publish_checkout_event.delay(

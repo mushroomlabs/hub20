@@ -1,4 +1,5 @@
 import account from './account'
+import audit from './audit'
 import auth from './auth'
 import funding from './funding'
 import network from './network'
@@ -9,6 +10,7 @@ import users from './users'
 
 export default {
   account,
+  audit,
   auth,
   funding,
   network,

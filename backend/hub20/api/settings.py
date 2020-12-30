@@ -141,7 +141,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Raiden
 HUB20_RAIDEN_ENABLED = "HUB20_RAIDEN_ENABLED" in os.environ
 HUB20_RAIDEN_URL = os.getenv("RAIDEN_API_ADDRESS", "http://localhost:5001")
-
+HUB20_RAIDEN_ACCOUNT_PRIVATE_KEY = os.getenv("HUB20_RAIDEN_ACCOUNT_PRIVATE_KEY")
 
 # Email
 DEFAULT_FROM_EMAIL = os.getenv("HUB20_EMAIL_MAILER_ADDRESS")
@@ -178,6 +178,11 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.TokenAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
+}
+
+# REST Auth
+REST_AUTH_SERIALIZERS = {
+    "USER_DETAILS_SERIALIZER": "hub20.api.serializers.UserProfileSerializer",
 }
 
 
