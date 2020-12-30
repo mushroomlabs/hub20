@@ -11,7 +11,9 @@ from rest_auth.views import (
     PasswordResetView,
     UserDetailsView,
 )
+
 from hub20.apps.core.api import urlpatterns as core_urlpatterns
+
 from .views import IndexView
 
 

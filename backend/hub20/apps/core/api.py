@@ -27,6 +27,11 @@ urlpatterns = [
     path("transfers/transfer/<int:pk>", views.TransferView.as_view(), name="transfer-detail"),
     path("status/networks", views.NetworkStatusView.as_view(), name="status-networks"),
     path("status/accounting", views.AccountingReportView.as_view(), name="status-accounting"),
+    path(
+        "status/accounts",
+        views.EthereumAccountBalanceSheets.as_view(),
+        name="status-accounts",
+    ),
 ] + router.urls
 
 
