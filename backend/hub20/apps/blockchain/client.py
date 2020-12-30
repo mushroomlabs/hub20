@@ -34,7 +34,8 @@ def database_history_gas_price_strategy(w3: Web3, params: Optional[TxParams] = N
     current_block_number = w3.eth.blockNumber
 
     txs = Transaction.objects.filter(
-        block__chain=chain_id, block__number__gte=current_block_number - BLOCK_HISTORY_SIZE
+        block__chain=chain_id,
+        block__number__gte=current_block_number - BLOCK_HISTORY_SIZE,
     )
     avg_price = txs.aggregate(avg_price=Avg("gas_price")).get("avg_price")
     if avg_price:
@@ -77,7 +78,12 @@ def send_transaction(
                 logger.warning("Node reported that nonce is too low. Trying tx again...")
                 kw["nonce"] = nonce + 1
                 return send_transaction(
-                    w3, contract_function, account, gas, contract_args=contract_args, **kw
+                    w3,
+                    contract_function,
+                    account,
+                    gas,
+                    contract_args=contract_args,
+                    **kw,
                 )
         except (AttributeError, IndexError):
             pass
@@ -193,9 +199,13 @@ def run_backfill(w3: Web3, start: int, end: int):
         get_block_by_number(w3=w3, block_number=block_number)
 
 
+def is_connected_to_blockchain(w3: Web3):
+    return w3.isConnected() and (w3.net.peer_count > 0)
+
+
 def run_ethereum_node_connection_check(w3: Web3):
     chain = Chain.make(chain_id=int(w3.net.version))
-    is_connected = w3.isConnected()
+    is_connected = is_connected_to_blockchain(w3=w3)
 
     if is_connected and not chain.online:
         signals.ethereum_node_connected.send(sender=Chain, chain_id=chain.id)
@@ -208,8 +218,8 @@ def run_ethereum_node_connection_check(w3: Web3):
 
 
 def wait_for_connection(w3: Web3):
-    while not w3.isConnected():
-        logger.info("Not connected. Waiting for reconnection...")
+    while not is_connected_to_blockchain(w3=w3):
+        logger.info("Not connected to blockchain. Waiting for reconnection...")
         time.sleep(BLOCK_CREATION_INTERVAL / 2)
 
 
