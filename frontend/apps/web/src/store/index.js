@@ -4,25 +4,43 @@ import createLogger from 'vuex/dist/logger'
 
 import {store} from 'vue-hub20'
 
-import {APP_SET_INITIALIZED} from './types'
+export const APP_SET_INITIALIZED = 'APP_SET_INITIALIZED'
+export const APP_SET_RUNNING = 'APP_SET_RUNNING'
+export const APP_SET_LOADED = 'APP_SET_LOADED'
+export const APP_SET_FINALIZED = 'APP_SET_FINALIZED'
+export const APP_RESET_STATE = 'APP_RESET_STATE'
 
 const debug = process.env.NODE_ENV !== 'production'
 
-const SERVER_URL = window.origin
-
 Vue.use(Vuex)
 
-const initialState = {
-  ready: false
-}
+const initialState = () => ({
+  running: false,
+  loaded: false
+})
 
 const getters = {
-  isReady: state => state.ready
+  isRunning: state => state.running,
+  isLoaded: state => state.loaded,
+  isReady: state => state.running && state.loaded
 }
 
 const mutations = {
   [APP_SET_INITIALIZED](state) {
-    state.ready = true
+    state.running = true
+    state.loaded = true
+  },
+  [APP_SET_RUNNING](state) {
+    state.running = true
+  },
+  [APP_SET_LOADED](state) {
+    state.loaded = true
+  },
+  [APP_SET_FINALIZED](state) {
+    state.running = false
+  },
+  [APP_RESET_STATE](state) {
+    Object.assign(state, initialState())
   }
 }
 
@@ -80,6 +98,7 @@ const actions = {
     dispatch('coingecko/initialize')
     return dispatch('server/initialize').then(() => {
       if (getters['server/isConnected']) {
+        const serverDomain = getters['server/serverDomain']
         dispatch('auth/initialize').then(() => {
           if (getters['auth/isAuthenticated']) {
             dispatch('tokens/initialize')
@@ -89,7 +108,7 @@ const actions = {
               .then(() => dispatch('stores/initialize'))
               .then(() => dispatch('funding/initialize'))
               .then(() => dispatch('users/initialize'))
-              .then(() => dispatch('events/initialize', SERVER_URL))
+              .then(() => dispatch('events/initialize', serverDomain))
               .then(() => dispatch('events/setEventHandler', eventHandler))
               .then(() => commit(APP_SET_INITIALIZED))
           }
@@ -98,23 +117,36 @@ const actions = {
     })
   },
   refresh({dispatch, getters}) {
-    dispatch('coingecko/refresh')
+    if (getters['isRunning']) {
+      dispatch('coingecko/refresh')
 
-    if (getters['server/isConnected'] && getters['auth/isAuthenticated']) {
-      dispatch('account/refresh')
-        .then(() => dispatch('stores/refresh'))
-        .then(() => dispatch('funding/refresh'))
-    }
+      if (getters['server/isConnected'] && getters['auth/isAuthenticated']) {
+        dispatch('account/refresh')
+          .then(() => dispatch('stores/refresh'))
+          .then(() => dispatch('funding/refresh'))
+      }
 
-    if (getters['account/hasAdminAccess']) {
-      dispatch('audit/refresh')
+      if (getters['account/hasAdminAccess']) {
+        dispatch('audit/refresh')
+      }
     }
+  },
+  tearDown({commit, dispatch}) {
+    return dispatch('auth/logout')
+      .then(() => dispatch('auth/tearDown'))
+      .then(() => dispatch('account/tearDown'))
+      .then(() => dispatch('notifications/tearDown'))
+      .then(() => dispatch('funding/tearDown'))
+      .then(() => dispatch('stores/tearDown'))
+      .then(() => dispatch('events/tearDown'))
+      .then(() => dispatch('audit/tearDown'))
+      .finally(() => commit(APP_SET_FINALIZED))
   }
 }
 
 export default new Vuex.Store({
   modules: store,
-  state: initialState,
+  state: initialState(),
   strict: debug,
   plugins: debug ? [createLogger()] : [],
   actions,

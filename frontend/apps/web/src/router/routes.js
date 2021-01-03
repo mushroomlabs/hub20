@@ -45,7 +45,7 @@ const requireAnonymous = (to, from, next) => {
 }
 
 const redirectLogout = (to, from, next) => {
-  store.dispatch('auth/logout').then(() => next('/login'))
+  store.dispatch('tearDown').then(() => next('/login'))
 }
 
 const routes = [

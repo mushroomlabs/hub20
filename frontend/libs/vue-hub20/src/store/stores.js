@@ -10,6 +10,7 @@ export const STORE_EDIT_SET_URL = 'STORE_EDIT_SET_URL'
 export const STORE_EDIT_SET_ACCEPTED_TOKENS = 'STORE_EDIT_SET_ACCEPTED_TOKENS'
 export const STORE_EDIT_SUCCESS = 'STORE_EDIT_SUCCESS'
 export const STORE_EDIT_FAILURE = 'STORE_EDIT_FAILURE'
+export const STORE_RESET_STATE = 'STORE_RESET_STATE'
 
 const initialStoreData = {
   name: '',
@@ -17,7 +18,7 @@ const initialStoreData = {
   accepted_currencies: []
 }
 
-const initialState = {
+const initialState = () => ({
   collection: {
     data: [],
     error: null
@@ -26,7 +27,7 @@ const initialState = {
     data: null,
     error: null
   }
-}
+})
 
 const getters = {
   stores: state => state.collection.data,
@@ -75,12 +76,15 @@ const actions = {
   },
   refresh({dispatch}) {
     dispatch('fetchStores')
+  },
+  tearDown({commit}) {
+    commit(STORE_RESET_STATE)
   }
 }
 
 const mutations = {
   [STORE_INITIALIZE](state) {
-    Object.assign({...initialState}, state)
+    Object.assign(state, initialState())
   },
   [STORE_COLLECTION_SETUP_FAILURE](state, error) {
     state.collection.error = error
@@ -114,12 +118,15 @@ const mutations = {
   },
   [STORE_COLLECTION_SET](state, data) {
     state.collection.data = data
+  },
+  [STORE_RESET_STATE](state) {
+    Object.assign(state, initialState())
   }
 }
 
 export default {
   namespaced: true,
-  state: initialState,
+  state: initialState(),
   actions,
   getters,
   mutations

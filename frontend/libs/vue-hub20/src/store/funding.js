@@ -2,22 +2,21 @@ import Vue from 'vue'
 
 import client from '../api/funding'
 
-export const FUNDING_INITIALIZE = 'FUNDING_INITIALIZE'
 export const FUNDING_DEPOSIT_FAILURE = 'FUNDING_DEPOSIT_FAILURE'
 export const FUNDING_DEPOSIT_LOADED = 'FUNDING_DEPOSIT_LOADED'
 export const FUNDING_DEPOSIT_CREATED = 'FUNDING_DEPOSIT_CREATED'
 export const FUNDING_DEPOSIT_LIST_LOADED = 'FUNDING_DEPOSIT_LIST_LOADED'
-
 export const FUNDING_TRANSFER_CREATED = 'FUNDING_TRANSFER_CREATED'
 export const FUNDING_TRANSFER_LOADED = 'FUNDING_TRANSFER_LOADED'
 export const FUNDING_TRANSFER_FAILURE = 'FUNDING_TRANSFER_FAILURE'
 export const FUNDING_TRANSFER_LIST_LOADED = 'FUNDING_TRANSFER_LIST_LOADED'
+export const FUNDING_RESET_STATE = 'FUNDING_RESET_STATE'
 
-const initialState = {
+const initialState = () => ({
   deposits: [],
   transfers: [],
   error: null
-}
+})
 
 const getters = {
   depositsByToken: state => token =>
@@ -62,21 +61,20 @@ const actions = {
       .then(({data}) => commit(FUNDING_TRANSFER_LIST_LOADED, data))
       .catch(error => commit(FUNDING_TRANSFER_FAILURE, error.response))
   },
-  initialize({commit, dispatch}) {
-    commit(FUNDING_INITIALIZE)
+  initialize({dispatch}) {
     dispatch('fetchDeposits')
     dispatch('fetchTransfers')
   },
   refresh({dispatch}) {
     dispatch('fetchDeposits')
     dispatch('fetchTransfers')
+  },
+  tearDown({commit}) {
+    commit(FUNDING_RESET_STATE)
   }
 }
 
 const mutations = {
-  [FUNDING_INITIALIZE](state) {
-    Object.assign({...initialState}, state)
-  },
   [FUNDING_DEPOSIT_CREATED](state, depositData) {
     state.deposits.push(depositData)
   },
@@ -100,12 +98,15 @@ const mutations = {
   },
   [FUNDING_TRANSFER_LIST_LOADED](state, transferList) {
     state.transfers = transferList
+  },
+  [FUNDING_RESET_STATE](state) {
+    Object.assign(state, initialState())
   }
 }
 
 export default {
   namespaced: true,
-  state: initialState,
+  state: initialState(),
   actions,
   getters,
   mutations

@@ -3,10 +3,10 @@ import client from '../api/users'
 export const USERS_LOAD_SUCCESS = 'USERS_LOAD_SUCCESS'
 export const USERS_LOAD_FAILURE = 'USERS_LOAD_FAILURE'
 
-const initialState = {
+const initialState = () => ({
   users: [],
   error: null
-}
+})
 
 const getters = {
   usersByUsername: state =>
@@ -39,7 +39,7 @@ const mutations = {
 
 export default {
   namespaced: true,
-  state: initialState,
+  state: initialState(),
   actions,
   getters,
   mutations

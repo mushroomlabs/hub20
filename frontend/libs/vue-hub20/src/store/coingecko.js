@@ -6,11 +6,11 @@ import {BASE_TOKEN_LIST, ETHEREUM_NETWORKS} from './tokens'
 export const EXCHANGE_RATE_SET_COINGECKO_LIST = 'EXCHANGE_RATE_SET_COINGECKO_LIST'
 export const EXCHANGE_RATE_SET_COINGECKO_RATE = 'EXCHANGE_RATE_SET_COINGECKO_RATE'
 
-const initialState = {
+const initialState = () => ({
   tokens: [],
   exchangeRates: {},
   baseCurrency: 'USD'
-}
+})
 
 const getters = {
   exchangeRatesByCurrency: state => currencyCode => state.exchangeRates[currencyCode],
@@ -24,7 +24,7 @@ const getters = {
 
 const actions = {
   fetchCoingeckoTokenList({commit}) {
-    coingecko
+    return coingecko
       .getTokenList()
       .then(({data}) => commit(EXCHANGE_RATE_SET_COINGECKO_LIST, data.tokens))
   },
@@ -38,11 +38,11 @@ const actions = {
     const coingeckoToken = address && getters.tokenByAddress(address)
 
     if (coingeckoToken) {
-      coingecko
+      return coingecko
         .getTokenRate(coingeckoToken, currencyCode)
         .then(rate => commit(EXCHANGE_RATE_SET_COINGECKO_RATE, {token, currencyCode, rate}))
     } else {
-      coingecko
+      return coingecko
         .getEthereumRate(currencyCode)
         .then(rate => commit(EXCHANGE_RATE_SET_COINGECKO_RATE, {token, currencyCode, rate}))
     }
@@ -68,7 +68,7 @@ const mutations = {
 
 export default {
   namespaced: true,
-  state: initialState,
+  state: initialState(),
   getters,
   actions,
   mutations

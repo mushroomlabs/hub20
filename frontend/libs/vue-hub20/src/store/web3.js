@@ -231,13 +231,13 @@ function makeTransferData(web3, amount, tokenAddress, recipientAddress) {
   return contract.transfer.getData(recipientAddress, amount)
 }
 
-const initialState = {
+const initialState = () => ({
   selectedAccount: null,
   web3Browser: null,
   connected: false,
   transactions: [],
   error: null
-}
+})
 
 const getters = {
   hasWeb3Provider() {
@@ -314,7 +314,7 @@ const mutations = {
 
 export default {
   namespaced: true,
-  state: initialState,
+  state: initialState(),
   actions,
   getters,
   mutations

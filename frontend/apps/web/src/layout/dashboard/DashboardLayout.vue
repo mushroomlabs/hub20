@@ -13,7 +13,7 @@
     </side-bar>
     <div class="main-panel">
       <top-navbar />
-      <dashboard-content v-if="isReady" />
+      <dashboard-content v-if="isRunning" />
     </div>
   </div>
 </template>
@@ -30,7 +30,7 @@ export default {
     DashboardContent,
   },
   computed: {
-    ...mapGetters(['isReady']),
+    ...mapGetters(['isRunning']),
     ...mapGetters('account', ['hasAdminAccess'])
   },
 }

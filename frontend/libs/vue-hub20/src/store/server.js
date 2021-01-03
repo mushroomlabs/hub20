@@ -13,16 +13,17 @@ export const SERVER_CLEAR_URL = 'SERVER_CLEAR_URL'
 
 const VERSION = '0.2.1'
 
-const initialState = {
+const initialState = () => ({
   rootUrl: null,
   version: null,
   error: null,
   processing: false
-}
+})
 
 const getters = {
   isConnected: state => Boolean(state.rootUrl),
-  isCompatible: state => semver.satisfies(VERSION, `^${state.version}`)
+  isCompatible: state => semver.satisfies(VERSION, `^${state.version}`),
+  serverDomain: state => state.rootUrl && new URL(state.rootUrl).origin
 }
 
 const actions = {
@@ -83,7 +84,7 @@ const mutations = {
 
 export default {
   namespaced: true,
-  state: initialState,
+  state: initialState(),
   actions,
   getters,
   mutations

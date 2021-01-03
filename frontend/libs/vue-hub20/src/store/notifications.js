@@ -1,8 +1,9 @@
 export const ADD_NOTIFICATION = 'ADD_NOTIFICATION'
+export const NOTIFICATION_RESET_STATE = 'NOTIFICATION_RESET_STATE'
 
-const initialState = {
+const initialState = () => ({
   notifications: new Array()
-}
+})
 
 const getters = {
   count: state => state.notifications.length,
@@ -22,16 +23,26 @@ const getters = {
   }
 }
 
+const actions = {
+  tearDown({commit}) {
+    commit(NOTIFICATION_RESET_STATE)
+  }
+}
+
 const mutations = {
   [ADD_NOTIFICATION](state, notification) {
     notification.created = new Date()
     state.notifications.push(notification)
+  },
+  [NOTIFICATION_RESET_STATE](state) {
+    Object.assign(state, initialState())
   }
 }
 
 export default {
   namespaced: true,
-  state: initialState,
+  state: initialState(),
+  actions,
   getters,
   mutations
 }

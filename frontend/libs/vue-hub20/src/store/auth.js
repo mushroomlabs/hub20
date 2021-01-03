@@ -12,13 +12,14 @@ export const AUTH_SET_USERNAME = 'AUTH_SET_USERNAME'
 export const AUTH_SET_TOKEN = 'AUTH_SET_TOKEN'
 export const AUTH_REMOVE_TOKEN = 'AUTH_REMOVE_TOKEN'
 export const AUTH_REMOVE_USERNAME = 'AUTH_REMOVE_USERNAME'
+export const AUTH_RESET_STATE = 'AUTH_RESET_STATE'
 
-const initialState = {
+const initialState = () => ({
   authenticating: false,
   error: false,
   username: null,
   token: null
-}
+})
 
 const getters = {
   isAuthenticated: state => !!state.token,
@@ -57,6 +58,9 @@ const actions = {
     if (username) {
       commit(AUTH_SET_USERNAME, username)
     }
+  },
+  tearDown({commit}) {
+    commit(AUTH_RESET_STATE)
   }
 }
 
@@ -94,12 +98,15 @@ const mutations = {
   [AUTH_REMOVE_USERNAME](state) {
     localStorage.removeItem(USERNAME_STORAGE_KEY)
     state.username = null
+  },
+  [AUTH_RESET_STATE](state) {
+    Object.assign(state, initialState())
   }
 }
 
 export default {
   namespaced: true,
-  state: initialState,
+  state: initialState(),
   getters,
   actions,
   mutations

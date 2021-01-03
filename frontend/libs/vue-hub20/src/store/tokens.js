@@ -110,10 +110,10 @@ export const BASE_TOKEN_LIST = {
   ZRX: '0xE41d2489571d322189246DaFA5ebDe1F4699F498'
 }
 
-const initialState = {
+const initialState = () => ({
   tokens: [],
   error: null
-}
+})
 
 const getters = {
   tokensByAddress: state =>
@@ -154,7 +154,7 @@ const mutations = {
 
 export default {
   namespaced: true,
-  state: initialState,
+  state: initialState(),
   getters,
   actions,
   mutations

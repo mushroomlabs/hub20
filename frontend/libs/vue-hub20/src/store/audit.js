@@ -8,6 +8,7 @@ export const AUDIT_FETCH_ACCOUNTING_REPORT_SUCCESS = 'AUDIT_FETCH_ACCOUNTING_REP
 export const AUDIT_FETCH_WALLET_BALANCES_BEGIN = 'AUDIT_FETCH_WALLET_BALANCES_BEGIN'
 export const AUDIT_FETCH_WALLET_BALANCES_FAILURE = 'AUDIT_FETCH_WALLET_BALANCES_FAILURE'
 export const AUDIT_FETCH_WALLET_BALANCES_SUCCESS = 'AUDIT_FETCH_WALLET_BALANCES_SUCCESS'
+export const AUDIT_RESET_STATE = 'AUDIT_RESET_STATE'
 
 const isSameToken = (one, another) =>
   one.address == another.address && one.network_id == another.network_id
@@ -36,13 +37,13 @@ const filterByToken = (tokenList, token) =>
 const getTokenBalance = (tokenList, token) =>
   tokenList && filterByToken(tokenList, token).shift()
 
-const initialState = {
+const initialState = () => ({
   loadingBooks: false,
   loadingWallets: false,
   accountingBooks: null,
   wallets: null,
   error: null
-}
+})
 
 const getters = {
   treasuryBalances: state => state.accountingBooks && state.accountingBooks.treasury,
@@ -96,6 +97,9 @@ const actions = {
   refresh({dispatch}) {
     dispatch('fetchAccountingReport')
     dispatch('fetchWalletBalances')
+  },
+  tearDown({commit}) {
+    commit(AUDIT_RESET_STATE)
   }
 }
 
@@ -121,12 +125,15 @@ const mutations = {
   [AUDIT_FETCH_WALLET_BALANCES_FAILURE](state, error) {
     state.loadingWallets = false
     state.error = error
+  },
+  [AUDIT_RESET_STATE](state) {
+    Object.assign(state, initialState())
   }
 }
 
 export default {
   namespaced: true,
-  state: initialState,
+  state: initialState(),
   actions,
   getters,
   mutations

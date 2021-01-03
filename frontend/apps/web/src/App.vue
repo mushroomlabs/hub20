@@ -17,17 +17,29 @@ export default {
   computed: {
     ...mapGetters('auth', ['isAuthenticated']),
   },
+  data() {
+    return {
+      timer: null
+    }
+  },
   methods: {
     refresh() {
       this.$store.dispatch('refresh')
     },
   },
   mounted() {
-    setInterval(this.refresh, 60 * 1000)
     this.$store.subscribe(mutation => {
       switch (mutation.type) {
+      case 'APP_SET_INITIALIZED':
+        this.timer = setInterval(this.refresh, 60 * 1000)
+        break
       case 'notifications/ADD_NOTIFICATION':
         this.$notify(mutation.payload)
+        break
+      case 'APP_RESET_STATE':
+        if (this.timer) {
+          clearInterval(this.timer)
+        }
         break
       }
     })

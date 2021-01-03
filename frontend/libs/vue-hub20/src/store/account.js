@@ -16,14 +16,15 @@ export const SET_BALANCES = 'SET_BALANCES'
 export const SET_CREDITS = 'SET_CREDITS'
 export const SET_DEBITS = 'SET_DEBITS'
 export const SET_PROFILE = 'SET_PROFILE'
+export const ACCOUNT_RESET_STATE = 'ACCOUNT_RESET_STATE'
 
-const initialState = {
+const initialState = () => ({
   balances: [],
   credits: [],
   debits: [],
   profile: null,
   error: null
-}
+})
 
 const getters = {
   hasAdminAccess: state => state.profile && state.profile.has_admin_access,
@@ -84,6 +85,9 @@ const actions = {
     dispatch('fetchBalances')
     dispatch('fetchCredits')
     dispatch('fetchDebits')
+  },
+  tearDown({commit}) {
+    commit(ACCOUNT_RESET_STATE)
   }
 }
 
@@ -132,12 +136,15 @@ const mutations = {
   [UPDATE_DEBITS_FAILURE](state, exc) {
     state.debits = []
     state.error = exc
+  },
+  [ACCOUNT_RESET_STATE](state) {
+    Object.assign(state, initialState())
   }
 }
 
 export default {
   namespaced: true,
-  state: initialState,
+  state: initialState(),
   getters,
   actions,
   mutations

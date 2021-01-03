@@ -10,14 +10,14 @@ export const NETWORK_SET_ETHEREUM_ONLINE_STATUS = 'NETWORK_SET_ETHEREUM_ONLINE_S
 export const NETWORK_SET_ETHEREUM_SYNCED_STATUS = 'NETWORK_SET_ETHEREUM_SYNCED_STATUS'
 export const NETWORK_SET_ETHEREUM_CURRENT_BLOCK = 'NETWORK_SET_ETHEREUM_CURRENT_BLOCK'
 
-const initialState = {
+const initialState = () => ({
   ethereum: {
     network: null,
     synced: false,
     online: false,
     currentBlock: null
   }
-}
+})
 
 const getters = {
   ethereumNetworkId: state => state.ethereum.network,
@@ -71,7 +71,7 @@ const mutations = {
 
 export default {
   namespaced: true,
-  state: initialState,
+  state: initialState(),
   actions,
   getters,
   mutations
