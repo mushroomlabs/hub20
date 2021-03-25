@@ -1,8 +1,0 @@
-flake8
-rope
-isort
-jedi
-black
-autopep8
-yapf
-ipython
