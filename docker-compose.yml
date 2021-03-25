@@ -1,72 +1,126 @@
 version: '3.4'
 
+x-backend: &hub20_backend
+  image: "hub20_backend:${TAG:-latest}"
+  build:
+    context: ./backend
+
+x-frontend: &hub20_frontend
+  image: "hub20_frontend:${TAG:-latest}"
+  build:
+    context: ./frontend
+    dockerfile: apps/web/Dockerfile
+
 services:
   db:
     image: postgres
-    env_file:
-      - ./docker/environments/base.env
+    environment:
+      POSTGRES_DB: "${HUB20_DATABASE_NAME}"
+      POSTGRES_USER: "${HUB20_DATABASE_USER}"
+      POSTGRES_PASSWORD: "${HUB20_DATABASE_PASSWORD}"
 
-  # nginx
-  nginx:
-    image: nginx:latest
+  ethereum:
+    image: ethereum/client-go:stable
+    stop_signal: SIGINT
+    stop_grace_period: 1m
 
   # Redis for cache, session engine, celery and channels transport
   redis:
     image: redis:latest
 
-  raiden:
-    image: raidennetwork/raiden:latest
-    entrypoint: /opt/venv/bin/raiden --accept-disclaimer
+  # Admin Site
+  admin:
+    <<: *hub20_backend
+
+    command: >
+      /bin/bash -c "
+        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+        django-admin collectstatic --noinput
+        uvicorn hub20.admin.asgi:application --port 80 --host 0.0.0.0 --root-path="/admin" --reload --reload-dir /app/hub20
+      "
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - ./.env
+    environment:
+      HUB20_URLCONF_MODULE: hub20.admin.urls
 
   # Web API
   web:
-    build: .
+    <<: *hub20_backend
+
     command: >
       /bin/bash -c "
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
         while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
         django-admin migrate;
         django-admin collectstatic --noinput
-        uvicorn hub20.api.routing:application --port 8000 --host 0.0.0.0 --reload
+        uvicorn hub20.api.asgi:application --port 80 --host 0.0.0.0 --root-path="/api" --reload --reload-dir /app/hub20
       "
     depends_on:
       - db
       - redis
     env_file:
-      - ./docker/environments/base.env
+      - ./.env
 
   # Celery app
   celery:
-    build: .
-    command: celery worker -A hub20.api -l info
+    <<: *hub20_backend
+
+    command: >
+      /bin/bash -c "
+      while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+      while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+      celery -A hub20.api worker -l info
+      "
     depends_on:
       - db
       - redis
     environment:
       COLUMNS: 80
     env_file:
-      - ./docker/environments/base.env
+      - ./.env
 
   # Celery beat (periodic tasks)
   celery_beat:
-    build: .
+    <<: *hub20_backend
+
     command: >
       /bin/bash -c "
         mkdir -p ${HUB20_DATA_FOLDER}/celery;
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
         while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
-        celery beat -A hub20.api -l info -s ${HUB20_DATA_FOLDER}/celery/celerybeat-schedule.db --pidfile=${HUB20_DATA_FOLDER}/celery/celerybeat.pid
+        celery -A hub20.api beat -l info -s ${HUB20_DATA_FOLDER}/celery/celerybeat-schedule.db --pidfile=${HUB20_DATA_FOLDER}/celery/celerybeat.pid
       "
 
     depends_on:
       - db
       - redis
     env_file:
-      - ./docker/environments/base.env
+      - ./.env
+
+  # Run raiden via django-admin command
+  raiden:
+    <<: *hub20_backend
+
+    command: >
+      /bin/bash -c "
+        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+        django-admin run_raiden
+      "
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - ./.env
 
   # Background command to listen to blockchain and raiden events
   job_listen_events:
-    build: .
+    <<: *hub20_backend
+
     command: >
       /bin/bash -c "
         while ! nc -w 1 -z db 5432; do sleep 0.5; done;
@@ -77,4 +131,23 @@ services:
       - db
       - redis
     env_file:
-      - ./docker/environments/base.env
+      - ./.env
+
+  # Background command to listen to blockchain and raiden events
+  job_listen_raiden:
+    <<: *hub20_backend
+
+    command: >
+      /bin/bash -c "
+        while ! nc -w 1 -z db 5432; do sleep 0.5; done;
+        while ! nc -w 1 -z redis 6379; do sleep 0.5; done;
+        django-admin sync_raiden
+      "
+    depends_on:
+      - db
+      - redis
+    env_file:
+      - ./.env
+
+  frontend:
+    <<: *hub20_frontend
