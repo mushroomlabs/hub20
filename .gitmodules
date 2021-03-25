@@ -4,3 +4,6 @@
 [submodule "frontend/libs/vue-hub20"]
 	path = frontend/libs/vue-hub20
 	url = https://gitlab.com/mushroomlabs/hub20/frontend-sdk.git
+[submodule "frontend/apps/web"]
+	path = frontend/apps/web
+	url = https://gitlab.com/mushroomlabs/hub20/frontend-app.git
