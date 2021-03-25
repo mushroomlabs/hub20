@@ -1,3 +1,6 @@
 [submodule "backend"]
 	path = backend
 	url = https://gitlab.com/mushroomlabs/hub20/hub20
+[submodule "frontend/libs/vue-hub20"]
+	path = frontend/libs/vue-hub20
+	url = https://gitlab.com/mushroomlabs/hub20/frontend-sdk.git
