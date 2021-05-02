@@ -3,6 +3,8 @@ version: '3.4'
 x-development: &development_service
   networks:
     dev:
+  env_file:
+    - ./docker/environments/dev.env
 
 services:
   redis:
@@ -10,11 +12,25 @@ services:
 
   db:
     <<: *development_service
+    image: postgres:latest
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "${HUB20_DATABASE_USER}"]
+      interval: 5s
+      retries: 5
+
+    environment:
+      POSTGRES_DB: "${HUB20_DATABASE_NAME}"
+      POSTGRES_USER: "${HUB20_DATABASE_USER}"
+      POSTGRES_PASSWORD: "${HUB20_DATABASE_PASSWORD}"
     volumes:
       - "./docker/volumes/database/${HUB20_DATABASE_NAME}:/var/lib/postgresql/data"
 
   ethereum:
     <<: *development_service
+    image: ethereum/client-go:stable
+    stop_signal: SIGINT
+    stop_grace_period: 1m
+
     networks:
       dev:
         ipv4_address: 10.0.20.90
@@ -40,19 +56,6 @@ services:
       - "--ws.api=eth,net,web3"
       - "--datadir=/chaindata"
       - "--cache=4096"
-
-  # Nginx to serve both backend and frontend from same ip:port
-  nginx:
-    <<: *development_service
-    image: nginx:latest
-    volumes:
-      - ./docker/volumes/nginx/dev.conf:/etc/nginx/nginx.conf
-      - ./docker/volumes/media/hub20:/var/www/html/hub20
-    networks:
-      dev:
-        ipv4_address: 10.0.20.101
-    depends_on:
-      - web
 
   # Admin backend
   admin:
@@ -85,6 +88,11 @@ services:
     tty: true
     volumes:
       - ./backend:/app
+    depends_on:
+      - db
+      - redis
+      - ethereum
+
 
   # Celery beat (periodic tasks)
   celery_beat:
@@ -92,6 +100,10 @@ services:
     volumes:
       - ./backend:/app
       - "./docker/volumes/celery:${HUB20_DATA_FOLDER}/celery"
+    depends_on:
+      - db
+      - redis
+      - ethereum
 
   # Background command to listen to blockchain and raiden events
   job_listen_events:
@@ -105,6 +117,7 @@ services:
       - redis
       - ethereum
 
+
   # Background command to listen to blockchain and raiden events
   job_listen_raiden:
     <<: *development_service
@@ -112,6 +125,10 @@ services:
     tty: true
     volumes:
       - ./backend:/app
+    depends_on:
+      - db
+      - redis
+      - ethereum
 
   raiden:
     <<: *development_service
@@ -126,16 +143,6 @@ services:
     volumes:
       - ./backend:/app
       - "./docker/volumes/raiden:${RAIDEN_DATADIR:-/root/.raiden}"
-
-  frontend:
-    <<: *development_service
-    networks:
-      dev:
-        ipv4_address: 10.0.20.80
-    volumes:
-      - ./frontend:/app
-    ports:
-      - "8081:8080"
 
 networks:
   dev:
