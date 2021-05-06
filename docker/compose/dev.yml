@@ -17,11 +17,11 @@ services:
       test: ["CMD", "pg_isready", "-U", "${HUB20_DATABASE_USER}"]
       interval: 5s
       retries: 5
-
     environment:
       POSTGRES_DB: "${HUB20_DATABASE_NAME}"
       POSTGRES_USER: "${HUB20_DATABASE_USER}"
       POSTGRES_PASSWORD: "${HUB20_DATABASE_PASSWORD}"
+
     volumes:
       - "./docker/volumes/database/${HUB20_DATABASE_NAME}:/var/lib/postgresql/data"
 
