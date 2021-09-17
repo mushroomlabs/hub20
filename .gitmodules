@@ -10,3 +10,6 @@
 [submodule "docs"]
 	path = docs
 	url = git@gitlab.com:mushroomlabs/hub20/documentation.git
+[submodule "raiden"]
+	path = raiden
+	url = git@gitlab.com:mushroomlabs/hub20/raiden.git
