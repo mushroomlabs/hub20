@@ -2,7 +2,7 @@
 	path = backend
 	url = git@gitlab.com:mushroomlabs/hub20/hub20.git
 [submodule "frontend/libs/vue-hub20"]
-	path = frontend/libs/vue-hub20
+	path = sdk
 	url = git@gitlab.com:mushroomlabs/hub20/frontend-sdk.git
 [submodule "frontend/apps/web"]
 	path = frontend/apps/web
