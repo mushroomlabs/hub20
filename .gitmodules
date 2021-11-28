@@ -22,3 +22,6 @@
 [submodule "checkout"]
 	path = checkout
 	url = git@gitlab.com:mushroomlabs/hub20/checkout20.git
+[submodule "deployment"]
+	path = deployment
+	url = git@gitlab.com:mushroomlabs/hub20/deployment.git
