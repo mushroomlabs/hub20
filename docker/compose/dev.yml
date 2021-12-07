@@ -1,0 +1,161 @@
+x-development: &development_service
+  networks:
+    dev:
+
+  environment:
+    DJANGO_SETTINGS_MODULE: hub20.api.settings
+    HUB20_DATA_FOLDER: /var/hub20
+    HUB20_STATIC_ROOT: /var/hub20/static
+    HUB20_BROKER_URL: redis://redis:6379/0
+    HUB20_CACHE_BACKEND: django_redis.cache.RedisCache
+    HUB20_CACHE_LOCATION: redis://redis:6379/1
+    HUB20_CHANNEL_LAYER_HOST: redis
+    HUB20_CORS_HEADERS_ENABLED: 1
+    HUB20_DATABASE_HOST: db
+    HUB20_DATABASE_PORT: 5432
+    HUB20_DATABASE_NAME: hub20
+    HUB20_DATABASE_USER: hub20
+    HUB20_DATABASE_PASSWORD: hub20_pass
+    HUB20_EMAIL_MAILER_ADDRESS: noreply@hub20.example.com
+    HUB20_EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
+    HUB20_SECRET_KEY: base-hub20-secret-key
+    HUB20_RAIDEN_SERVERS: http://raiden:5001
+    HUB20_DEBUG: 1
+    HUB20_SERVE_OPENAPI_URLS: 1
+    HUB20_BLOCKCHAIN_NETWORK_ID: 5
+    HUB20_TRACKED_TOKENS: 0x0000000000000000000000000000000000000000,0x1c36690810ad06fb15552657c7a8ff653eb46f76,0xA9cad81fD505DBD678599F2541D0101dd01fc94E,0x95B2d84De40a0121061b105E6B54016a49621B44,0x5Fc523e13fBAc2140F056AD7A96De2cC0C4Cc63A,0x59105441977ecd9d805a4f5b060e34676f50f806,0x709118121A1ccA0f32FC2C0c59752E8FEE3c2834,0xC563388e2e2fdD422166eD5E76971D11eD37A466,0xba62bcfcaafc6622853cca2be6ac7d845bc0f2dc
+    HUB20_ETHEREUM_HD_WALLET_ROOT_KEY: deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef
+    WEB3_PROVIDER_URI: "${WEB3_PROVIDER_URI:-http://ethereum:8545}"
+
+x-raiden: &raiden_service
+  volumes:
+    - "${HUB20_RAIDEN_MOUNT_PATH:-./docker/volumes/raiden/data}:/root/.raiden"
+  environment:
+    RAIDEN_ACCEPT_DISCLAIMER: "true"
+    RAIDEN_API_ADDRESS: 0.0.0.0:5001
+    RAIDEN_ENABLE_MONITORING: "true"
+    RAIDEN_ENVIRONMENT_TYPE: development
+    RAIDEN_ETH_RPC_ENDPOINT: http://10.0.20.90:8545
+    RAIDEN_KEYSTORE_PATH: /keystore
+    RAIDEN_WEB_UI: "true"
+    RAIDEN_MATRIX_SERVER: "${HUB20_RAIDEN_TRANSPORT_SERVICE_URL:-https://transport.demo001.env.raiden.network}"
+    RAIDEN_NETWORK_ID: goerli
+    RAIDEN_PATHFINDING_SERVICE_ADDRESS: "${HUB20_RAIDEN_PATH_FINDING_SERVICE_URL:-https://pfs.demo001.env.raiden.network}"
+    RAIDEN_ROUTING_MODE: pfs
+    RAIDEN_PRIVATE_KEY: "${HUB20_RAIDEN_ACCOUNT_PRIVATE_KEY}"
+
+services:
+  redis:
+    <<: *development_service
+
+  db:
+    <<: *development_service
+    volumes:
+      - "${HUB20_DATABASE_MOUNT_PATH:-./docker/volumes/database/hub20}:/var/lib/postgresql/data"
+
+
+  ethereum:
+    image: ethereum/client-go:stable
+    restart: unless-stopped
+    stop_signal: SIGINT
+    stop_grace_period: 1m
+    ports:
+      - "30303:30303"
+      - "30303:30303/udp"
+      - "8545:8545"
+      - "8546:8546"
+      - "8547:8547"
+    entrypoint:
+      - "geth"
+      - "--goerli"
+      - "--nousb"
+      - "--http"
+      - "--http.addr=0.0.0.0"
+      - "--http.api=eth,net,web3"
+      - "--http.vhosts=*"
+      - "--http.corsdomain=*"
+      - "--ws"
+      - "--ws.origins=*"
+      - "--ws.addr=0.0.0.0"
+      - "--ws.api=eth,net,web3"
+      - "--datadir=/chaindata"
+      - "--cache=4096"
+    healthcheck:
+      test: ["CMD", "geth", "attach", "http://localhost:8545", "--exec", "eth.blockNumber"]
+      interval: 10s
+      retries: 10
+    networks:
+      dev:
+        ipv4_address: 10.0.20.90
+    volumes:
+      - "${HUB20_GETH_MOUNT_PATH:-./docker/volumes/geth/goerli}:/chaindata"
+
+  raiden:
+    <<: *development_service
+    <<: *raiden_service
+    image: "mushroomlabs/raiden:${RAIDEN_VERSION:-2.0.0}"
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    depends_on:
+      - ethereum
+
+  # Admin backend
+  admin:
+    <<: *development_service
+    stdin_open: true
+    tty: true
+    volumes:
+      - "${HUB20_APP_MOUNT_PATH:-./}:/app"
+      - "${HUB20_MEDIA_MOUNT_PATH:-./docker/volumes/media/hub20/static}:/var/hub20/static"
+    networks:
+      dev:
+        ipv4_address: 10.0.20.98
+
+  # Web API
+  web:
+    <<: *development_service
+    stdin_open: true
+    tty: true
+    volumes:
+      - "${HUB20_APP_MOUNT_PATH:-./}:/app"
+      - "${HUB20_MEDIA_MOUNT_PATH:-./docker/volumes/media/hub20/static}:/var/hub20/static"
+    command: >
+      /bin/bash -c "
+        django-admin migrate;
+        django-admin collectstatic --noinput
+        uvicorn hub20.api.asgi:application --port 80 --host 0.0.0.0 --reload --reload-dir /app/hub20
+      "
+    networks:
+      dev:
+        ipv4_address: 10.0.20.99
+
+  # Celery app
+  celery:
+    <<: *development_service
+    stdin_open: true
+    tty: true
+    volumes:
+      - "${HUB20_APP_MOUNT_PATH:-./}:/app"
+
+  # Celery beat (periodic tasks)
+  celery_beat:
+    <<: *development_service
+    volumes:
+      - "${HUB20_APP_MOUNT_PATH:-./}:/app"
+
+  event_publisher:
+    <<: *development_service
+    stdin_open: true
+    tty: true
+    volumes:
+      - "${HUB20_APP_MOUNT_PATH:-./}:/app"
+
+
+networks:
+  dev:
+    name: hub20_development
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.20.0/24
