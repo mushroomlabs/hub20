@@ -35,12 +35,12 @@ x-raiden: &raiden_service
     RAIDEN_API_ADDRESS: 0.0.0.0:5001
     RAIDEN_ENABLE_MONITORING: "true"
     RAIDEN_ENVIRONMENT_TYPE: development
-    RAIDEN_ETH_RPC_ENDPOINT: http://10.0.20.90:8545
+    RAIDEN_ETH_RPC_ENDPOINT: "${WEB3_PROVIDER_URI:-http://10.0.20.90:8545}"
     RAIDEN_KEYSTORE_PATH: /keystore
     RAIDEN_WEB_UI: "true"
-    RAIDEN_MATRIX_SERVER: "${HUB20_RAIDEN_TRANSPORT_SERVICE_URL:-https://transport.demo001.env.raiden.network}"
+    RAIDEN_MATRIX_SERVER: "${HUB20_RAIDEN_TRANSPORT_SERVICE_URL:-https://transport.transport01.raiden.network}"
     RAIDEN_NETWORK_ID: goerli
-    RAIDEN_PATHFINDING_SERVICE_ADDRESS: "${HUB20_RAIDEN_PATH_FINDING_SERVICE_URL:-https://pfs.demo001.env.raiden.network}"
+    RAIDEN_PATHFINDING_SERVICE_ADDRESS: "${HUB20_RAIDEN_PATH_FINDING_SERVICE_URL:-https://pfs.transport01.raiden.network}"
     RAIDEN_ROUTING_MODE: pfs
     RAIDEN_PRIVATE_KEY: "${HUB20_RAIDEN_ACCOUNT_PRIVATE_KEY}"
 
@@ -93,7 +93,7 @@ services:
   raiden:
     <<: *development_service
     <<: *raiden_service
-    image: "mushroomlabs/raiden:${RAIDEN_VERSION:-2.0.0}"
+    image: "mushroomlabs/raiden:${RAIDEN_VERSION:-3.0.0}"
     restart: unless-stopped
     ports:
       - "5001:5001"
