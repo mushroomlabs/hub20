@@ -1,27 +1,37 @@
 ## Welcome to Hub20
 
-Hub20 is a very-early stage open source, self-hosted online payment
+Hub20 is an early stage open source, self-hosted online payment
 solution that can be considered as the Ethereum equivalent of
 [BTCPayServer](https://btcpayserver.org) payment gateway, allowing
-users to collect payments in Ethereum and any ERC20 token.
+users to collect payments in any Ethereum-compatible blockchain, using
+either the blockchain's native token or any ERC20-compatible token
+smart contract.
 
 #### Integration with Layer-2 systems for fast and ultra-cheap transactions
 
-Hub20 also provides integration with [Raiden](https://raiden.network),
-so that if you have a node running you should be able to accept and
-send payments of ERC20 tokens with near-zero fees.
+The ability to interact with any blockchain that uses Ethereum's JSON
+RPC protocol means that it is possible to interact seamlessly with
+scaling projects such as
+[roll-ups](https://docs.ethhub.io/ethereum-roadmap/layer-2-scaling/optimistic_rollups/)
+like [Arbitrum](https://arbitrum.io/) or
+[Optimism](https://www.optimism.io/), and also sidechains like
+[xDAI](https://xdaichain.com) or
+[Polygon](https://polygin.technology).
 
-The possiblity of having low-fee payments, irreversibility of
+Hub20 also integrates with [Raiden Network](https://raiden.network),
+so that if you have a node running you should be able to accept and
+send payments of ERC20 tokens with near-zero fees. Integrating Raiden
+brings the possibility of nearly-free transfers, irreversibility of
 transactions and the usage of stablecoins such as
-[DAI](https://makerdao.com) make hub20 a very compelling offer for
-anyone that wants to receive payments online.
+[DAI](https://makerdao.com), which make it a very compelling offer for anyone
+that wants to receive payments online.
 
 ### More than a payment gateway
 
 Hub20 also allows users *sending* their tokens to either other users
-of the hub as well as to any ethereum address, effectively turning any
-deployment of a hub20 server into an exclusive Paypal/Venmo/cryptobank
-for its users.
+of the hub as well as to any external account (on the compatible
+blockchains), effectively turning any deployment of a hub20 server
+into an exclusive Paypal/Venmo/cryptobank for its users.
 
 This works because hub20 offers the possibility of using custodial
 wallets for managing its funds. While this is not ideal for large
@@ -48,19 +58,29 @@ for authentication? They are both just a configuration setting away.
 
 ## More details:
 
+  - [Main website](https://hub20.io)
   - [Documentation](https://docs.hub20.io)
+  - [Blog](https://blog.hub20.io)
   - [Frontend](https://app.hub20.io) application is available and can
     connect to any backend server available on the internet. Use
     https://demo.hub20.io as a test instance that we provide,
-    connected to Goerli testnet.
+    connected to test networks (Görli, Binance Test, Test Arbitrum, Test Optimism).
 
 
 ### Contributing
 
-If you are a developer and would like to contribute, don't hesitate to
-get in touch. Any contribution is more than welcome. We are using
-[Zenhub](https://app.zenhub.com/workspaces/hub20-5dd80da129db370001f2469e/board)
-to keep track of ongoing work and plan milestones.
+If you like to contribute, don't hesitate to get in touch. Any
+contribution is more than welcome. You don't need to be a developer to
+try the demo application, find bugs and make suggestions for
+improvements. We are using
+[Taiga](https://tree.taiga.io/project/lullis-mushroomlabshub20/) to
+track issues and to manage the work and milestones.
+
+The official repository is at
+[Gitlab](https://gitlab.com/mushroomlabs/hub20), and we also keep a
+mirror at [Github](https://github.com/mushroomlabs/hub20). Gitlab is
+preferred because it provides a free (as in libre) platform for our
+Continuous Integration system.
 
 ### License
 
