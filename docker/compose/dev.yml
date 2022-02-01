@@ -108,6 +108,13 @@ services:
     volumes:
       - "${HUB20_APP_MOUNT_PATH:-./}:/app"
       - "${HUB20_MEDIA_MOUNT_PATH:-./docker/volumes/media/hub20/static}:/var/hub20/static"
+
+    command: >
+      /bin/bash -c '
+        django-admin collectstatic --noinput
+        uvicorn hub20.api.asgi:application --port 80 --host 0.0.0.0 --reload --reload-dir /app/hub20
+      '
+
     networks:
       dev:
         ipv4_address: 10.0.20.98
