@@ -22,10 +22,7 @@ x-development: &development_service
     HUB20_RAIDEN_SERVERS: http://raiden:5001
     HUB20_DEBUG: 1
     HUB20_SERVE_OPENAPI_URLS: 1
-    HUB20_BLOCKCHAIN_NETWORK_ID: 5
-    HUB20_TRACKED_TOKENS: 0x0000000000000000000000000000000000000000,0x1c36690810ad06fb15552657c7a8ff653eb46f76,0xA9cad81fD505DBD678599F2541D0101dd01fc94E,0x95B2d84De40a0121061b105E6B54016a49621B44,0x5Fc523e13fBAc2140F056AD7A96De2cC0C4Cc63A,0x59105441977ecd9d805a4f5b060e34676f50f806,0x709118121A1ccA0f32FC2C0c59752E8FEE3c2834,0xC563388e2e2fdD422166eD5E76971D11eD37A466,0xba62bcfcaafc6622853cca2be6ac7d845bc0f2dc
     HUB20_ETHEREUM_HD_WALLET_ROOT_KEY: deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef
-    WEB3_PROVIDER_URI: "${WEB3_PROVIDER_URI:-http://ethereum:8545}"
 
 x-raiden: &raiden_service
   volumes:
@@ -52,7 +49,6 @@ services:
     <<: *development_service
     volumes:
       - "${HUB20_DATABASE_MOUNT_PATH:-./docker/volumes/database/hub20}:/var/lib/postgresql/data"
-
 
   ethereum:
     image: ethereum/client-go:stable
