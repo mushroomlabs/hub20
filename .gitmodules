@@ -13,12 +13,6 @@
 [submodule "raiden"]
 	path = raiden
 	url = git@gitlab.com:mushroomlabs/hub20/raiden.git
-[submodule "www"]
-	path = www
-	url = git@gitlab.com:mushroomlabs/hub20/website.git
-[submodule "blog"]
-	path = blog
-	url = git@gitlab.com:mushroomlabs/hub20/blog.git
 [submodule "checkout"]
 	path = checkout
 	url = git@gitlab.com:mushroomlabs/hub20/checkout20.git
