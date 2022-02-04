@@ -1,0 +1,25 @@
+services:
+  raiden:
+    image: "mushroomlabs/raiden:${RAIDEN_VERSION:-3.0.0}"
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      RAIDEN_ACCEPT_DISCLAIMER: "true"
+      RAIDEN_API_ADDRESS: 0.0.0.0:5001
+      RAIDEN_ENABLE_MONITORING: "true"
+      RAIDEN_ENVIRONMENT_TYPE: development
+      RAIDEN_ETH_RPC_ENDPOINT: "${HUB20_RAIDEN_ETH_RPC_ENDPOINT:-http://10.0.20.90:8545}"
+      RAIDEN_KEYSTORE_PATH: /keystore
+      RAIDEN_WEB_UI: "true"
+      RAIDEN_MATRIX_SERVER: "${HUB20_RAIDEN_TRANSPORT_SERVICE_URL:-https://transport.transport01.raiden.network}"
+      RAIDEN_NETWORK_ID: goerli
+      RAIDEN_PATHFINDING_SERVICE_ADDRESS: "${HUB20_RAIDEN_PATH_FINDING_SERVICE_URL:-https://pfs.transport01.raiden.network}"
+      RAIDEN_ROUTING_MODE: pfs
+      RAIDEN_PRIVATE_KEY: "${HUB20_RAIDEN_ACCOUNT_PRIVATE_KEY}"
+
+    networks:
+      dev:
+
+    volumes:
+      - "${HUB20_RAIDEN_MOUNT_PATH:-./docker/volumes/raiden/data}:/root/.raiden"
