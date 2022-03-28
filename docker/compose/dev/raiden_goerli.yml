@@ -1,6 +1,6 @@
 services:
   raiden:
-    image: "mushroomlabs/raiden:${RAIDEN_VERSION:-3.0.0}"
+    image: "mushroomlabs/raiden:${RAIDEN_VERSION:-3.0.1}"
     restart: unless-stopped
     ports:
       - "5001:5001"

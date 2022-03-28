@@ -1,6 +1,15 @@
-x-development: &development_service
+x-network: &hub20_dev_network
   networks:
     dev:
+
+
+x-app-volume: &hub20_dev_volume
+  volumes:
+    - "${HUB20_APP_MOUNT_PATH:-./}:/app"
+
+x-development: &hub20_dev_service
+  build:
+    target: hub20_dev
 
   environment:
     DJANGO_SETTINGS_MODULE: hub20.api.settings
@@ -25,16 +34,17 @@ x-development: &development_service
 
 services:
   redis:
-    <<: *development_service
+    <<: *hub20_dev_network
 
   db:
-    <<: *development_service
+    <<: *hub20_dev_network
     volumes:
       - "${HUB20_DATABASE_MOUNT_PATH:-./docker/volumes/database/hub20}:/var/lib/postgresql/data"
 
   # Admin backend
   admin:
-    <<: *development_service
+    <<: *hub20_dev_network
+    <<: *hub20_dev_service
     stdin_open: true
     tty: true
     volumes:
@@ -53,7 +63,8 @@ services:
 
   # Web API
   web:
-    <<: *development_service
+    <<: *hub20_dev_network
+    <<: *hub20_dev_service
     stdin_open: true
     tty: true
     volumes:
@@ -71,7 +82,8 @@ services:
 
   # Celery app
   celery:
-    <<: *development_service
+    <<: *hub20_dev_network
+    <<: *hub20_dev_service
     stdin_open: true
     tty: true
     volumes:
@@ -79,16 +91,51 @@ services:
 
   # Celery beat (periodic tasks)
   celery_beat:
-    <<: *development_service
-    volumes:
-      - "${HUB20_APP_MOUNT_PATH:-./}:/app"
+    <<: *hub20_dev_network
+    <<: *hub20_dev_service
+    <<: *hub20_dev_volume
 
-  event_publisher:
-    <<: *development_service
-    stdin_open: true
-    tty: true
-    volumes:
-      - "${HUB20_APP_MOUNT_PATH:-./}:/app"
+
+  process_stream_mined_blocks:
+    <<: *hub20_dev_network
+    <<: *hub20_dev_service
+    <<: *hub20_dev_volume
+
+
+  process_stream_pending_transactions:
+    <<: *hub20_dev_network
+    <<: *hub20_dev_service
+    <<: *hub20_dev_volume
+
+  process_stream_token_transfer_indexer:
+    <<: *hub20_dev_network
+    <<: *hub20_dev_service
+    <<: *hub20_dev_volume
+
+  process_stream_raiden_channel_event_indexer:
+    <<: *hub20_dev_network
+    <<: *hub20_dev_service
+    <<: *hub20_dev_volume
+
+  process_stream_raiden_channel_sync:
+    <<: *hub20_dev_network
+    <<: *hub20_dev_service
+    <<: *hub20_dev_volume
+
+  process_stream_raiden_payment_sync:
+    <<: *hub20_dev_network
+    <<: *hub20_dev_service
+    <<: *hub20_dev_volume
+
+  process_stream_open_route_transfers:
+    <<: *hub20_dev_network
+    <<: *hub20_dev_service
+    <<: *hub20_dev_volume
+
+  process_stream_pending_open_route_transfers:
+    <<: *hub20_dev_network
+    <<: *hub20_dev_service
+    <<: *hub20_dev_volume
 
 
 networks:

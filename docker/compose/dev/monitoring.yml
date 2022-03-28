@@ -1,0 +1,39 @@
+version: '3'
+
+services:
+  flower:
+    environment:
+      CELERY_BROKER_URL: "${HUB20_BROKER_URL:-redis://redis:6379/0}"
+      FLOWER_PORT: 8888
+    networks:
+      dev:
+        ipv4_address: 10.0.20.81
+
+  loki:
+    networks:
+      dev:
+        ipv4_address: 10.0.20.82
+
+  promtail:
+    volumes:
+      - "${HUB20_PROMTAIL_MOUNT_PATH:-./docker/volumes/promtail}:/var/log"
+    networks:
+      dev:
+
+  grafana:
+    depends_on:
+      - influxdb
+    volumes:
+      - "${HUB20_GRAFANA_MOUNT_PATH:-./docker/volumes/grafana}/data:/var/lib/grafana"
+    networks:
+      dev:
+        ipv4_address: 10.0.20.83
+
+  influxdb:
+    volumes:
+      - "${HUB20_INFLUXDB_MOUNT_PATH:-./docker/volumes/influx}:/var/lib/influxdb"
+    environment:
+      INFLUXDB_DB: hub20dev
+    networks:
+      dev:
+        ipv4_address: 10.0.20.84

@@ -1,7 +1,0 @@
-version: '3'
-
-services:
-  mkdocs:
-    networks:
-      dev:
-        ipv4_address: 10.0.20.100

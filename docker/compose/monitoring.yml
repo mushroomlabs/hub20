@@ -3,49 +3,30 @@ version: '3'
 x-logging: &loki-logging
   driver: loki
   options:
-    loki-url: "http://localhost:3100/api/prom/push"
+    loki-url: "http://loki:3100/api/prom/push"
 
 services:
   flower:
     image: mher/flower
     depends_on:
       - redis
-    environment:
-      CELERY_BROKER_URL: "${HUB20_BROKER_URL:-redis://redis:6379/0}"
-      FLOWER_PORT: 8888
 
     logging: *loki-logging
-    ports:
-      - 8888:8888
-    networks:
-      dev:
-        ipv4_address: 10.0.20.81
 
   loki:
     image: grafana/loki:2.4.0
-    ports:
-      - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
-    networks:
-      dev:
-        ipv4_address: 10.0.20.82
 
   promtail:
     image: grafana/promtail:2.4.0
-    volumes:
-      - /var/log:/var/log
     command: -config.file=/etc/promtail/config.yml
-    networks:
-      dev:
+
+  influxdb:
+    image: influxdb:1.7
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:latest
-    ports:
-      - "3000:3000"
-    networks:
-      dev:
-        ipv4_address: 10.0.20.83
-
 
   web:
     logging: *loki-logging
@@ -56,5 +37,26 @@ services:
   db:
     logging: *loki-logging
 
-  event_publisher:
+  process_stream_mined_blocks:
+    logging: *loki-logging
+
+  process_stream_pending_transactions:
+    logging: *loki-logging
+
+  process_stream_token_transfer_indexer:
+    logging: *loki-logging
+
+  process_stream_raiden_channel_event_indexer:
+    logging: *loki-logging
+
+  process_stream_raiden_channel_sync:
+    logging: *loki-logging
+
+  process_stream_raiden_payment_sync:
+    logging: *loki-logging
+
+  process_stream_open_route_transfers:
+    logging: *loki-logging
+
+  process_stream_pending_open_route_transfers:
     logging: *loki-logging

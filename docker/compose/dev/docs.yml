@@ -1,0 +1,12 @@
+services:
+  mkdocs:
+    image: "hub20_docs:${TAG-latest}"
+    build:
+      context: ../docs
+    entrypoint: mkdocs
+    command: serve --dev-addr=0.0.0.0:8000
+    networks:
+      dev:
+        ipv4_address: 10.0.20.100
+    volumes:
+      - "${HUB20_DOCS_PROJECT_ROOT:-./}:/docs"
