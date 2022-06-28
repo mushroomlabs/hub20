@@ -1,0 +1,21 @@
+x-development: &hub20_dev_service
+  environment:
+    HUB20_WALLET_MODEL: ethereum.HierarchicalDeterministicWallet
+    HUB20_ETHEREUM_HD_WALLET_MNEMONIC_FILE: "/run/secrets/hub20_hdwallet_seed"
+
+  secrets:
+    - hub20_hdwallet_seed
+
+services:
+  web:
+    <<: *hub20_dev_service
+
+  celery:
+    <<: *hub20_dev_service
+
+  celery_beat:
+    <<: *hub20_dev_service
+
+secrets:
+  hub20_hdwallet_seed:
+    file: ./docker/secrets/hdwallet.txt
