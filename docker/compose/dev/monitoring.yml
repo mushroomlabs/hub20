@@ -1,10 +1,8 @@
-version: '3'
-
 services:
   flower:
     environment:
-      CELERY_BROKER_URL: "${HUB20_BROKER_URL:-redis://redis:6379/0}"
-      FLOWER_PORT: 8888
+      CELERY_BROKER_URL: "amqp://${HUB20_BROKER_USER:-hub20}:${HUB20_BROKER_PASSWORD:-hub20_pass}@rabbitmq:5672${HUB20_RABBITMQ_VHOST:-/}"
+      FLOWER_PORT: 5555
     networks:
       dev:
         ipv4_address: 10.0.20.81
@@ -16,7 +14,8 @@ services:
 
   promtail:
     volumes:
-      - "${HUB20_PROMTAIL_MOUNT_PATH:-./docker/volumes/promtail}:/var/log"
+      - /var/log:/var/log
+      - "${HUB20_PROMTAIL_MOUNT_PATH:-./docker/volumes/promtail}:/etc/promtail"
     networks:
       dev:
 

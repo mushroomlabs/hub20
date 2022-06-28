@@ -1,17 +1,14 @@
-version: '3'
-
 x-logging: &loki-logging
-  driver: loki
-  options:
-    loki-url: "http://loki:3100/api/prom/push"
+  depends_on:
+    - loki
+  logging:
+    driver: loki
+    options:
+      loki-url: "http://loki:3100/api/prom/push"
 
 services:
   flower:
     image: mher/flower
-    depends_on:
-      - redis
-
-    logging: *loki-logging
 
   loki:
     image: grafana/loki:2.4.0
@@ -28,35 +25,17 @@ services:
   grafana:
     image: grafana/grafana:latest
 
-  web:
-    logging: *loki-logging
+  # web:
+  #   <<: *loki-logging
 
-  celery:
-    logging: *loki-logging
+  # celery:
+  #   <<: *loki-logging
 
-  db:
-    logging: *loki-logging
+  # rabbitmq:
+  #   <<: *loki-logging
 
-  process_stream_mined_blocks:
-    logging: *loki-logging
+  # redis:
+  #   <<: *loki-logging
 
-  process_stream_pending_transactions:
-    logging: *loki-logging
-
-  process_stream_token_transfer_indexer:
-    logging: *loki-logging
-
-  process_stream_raiden_channel_event_indexer:
-    logging: *loki-logging
-
-  process_stream_raiden_channel_sync:
-    logging: *loki-logging
-
-  process_stream_raiden_payment_sync:
-    logging: *loki-logging
-
-  process_stream_open_route_transfers:
-    logging: *loki-logging
-
-  process_stream_pending_open_route_transfers:
-    logging: *loki-logging
+  # db:
+  #   <<: *loki-logging
